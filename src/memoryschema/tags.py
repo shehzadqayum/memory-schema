@@ -21,16 +21,21 @@ def _derive_project(filepath):
     Supports nested projects: projects/parent/projects/child/ -> parent.child
 
     Returns the project name (dot-notation) or None.
+    Segments that are empty or not kebab-case are skipped.
     """
     if not filepath:
         return None
+    import re
+    _kebab = re.compile(r'^[a-z0-9]+(-[a-z0-9]+)*$')
     normalized = filepath.replace('\\', '/')
     parts = normalized.split('/')
     segments = []
     i = 0
     while i < len(parts):
         if parts[i] == 'projects' and i + 1 < len(parts):
-            segments.append(parts[i + 1])
+            seg = parts[i + 1]
+            if seg and _kebab.match(seg):
+                segments.append(seg)
             i += 2
         else:
             i += 1
