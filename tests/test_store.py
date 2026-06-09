@@ -278,3 +278,65 @@ class TestComputeAssociations:
         assert result >= 2
         entry_a = store.get('a')
         assert len(entry_a.get('associations', [])) > 0
+
+
+class TestHierarchyScoping:
+    """Integration tests for hierarchy scoping across store operations."""
+
+    @pytest.fixture
+    def scoped_store(self, tmp_path):
+        s = MemoryStore(str(tmp_path / "scoped.jsonl"))
+        s.upsert({'name': 'parent-mem', 'schema': 2, 'description': 'Parent memory',
+                  'project': 'org', 'type': 'semantic', 'importance': 7})
+        s.upsert({'name': 'child-mem', 'schema': 2, 'description': 'Child memory',
+                  'project': 'org.team', 'type': 'semantic', 'importance': 7})
+        s.upsert({'name': 'grandchild-mem', 'schema': 2, 'description': 'Grandchild memory',
+                  'project': 'org.team.sub', 'type': 'semantic', 'importance': 7})
+        s.upsert({'name': 'unrelated-mem', 'schema': 2, 'description': 'Unrelated project',
+                  'project': 'other', 'type': 'semantic', 'importance': 7})
+        s.upsert({'name': 'unscoped-mem', 'schema': 2, 'description': 'No project field',
+                  'type': 'semantic', 'importance': 7})
+        return s
+
+    def test_search_project_returns_children(self, scoped_store):
+        results = scoped_store.search(project='org')
+        names = {r['name'] for r in results}
+        assert 'parent-mem' in names
+        assert 'child-mem' in names
+        assert 'grandchild-mem' in names
+        assert 'unrelated-mem' not in names
+
+    def test_search_project_excludes_unrelated(self, scoped_store):
+        results = scoped_store.search(project='other')
+        names = {r['name'] for r in results}
+        assert names == {'unrelated-mem', 'unscoped-mem'}
+
+    def test_recall_project_scope_bidirectional(self, scoped_store):
+        # Add relation so recall cascades from child to parent
+        scoped_store.upsert({'name': 'child-mem', 'schema': 2, 'description': 'Child memory',
+                             'project': 'org.team', 'type': 'semantic', 'importance': 7,
+                             'relations': [{'target': 'parent-mem', 'type': 'DEPENDS_ON'}]})
+        results = scoped_store.recall(name='child-mem', project='org.team')
+        names = {r['name'] for r in results}
+        assert 'child-mem' in names
+        assert 'parent-mem' in names  # read-up via relation + scope
+        assert 'unrelated-mem' not in names
+
+    def test_unscoped_entity_visible_everywhere(self, scoped_store):
+        # Entity with no project is universally visible
+        results = scoped_store.search(project='org')
+        names = {r['name'] for r in results}
+        assert 'unscoped-mem' in names
+
+        results = scoped_store.search(project='other')
+        names = {r['name'] for r in results}
+        assert 'unscoped-mem' in names
+
+    def test_list_all_with_project(self, scoped_store):
+        results = scoped_store.list_all(project='org.team')
+        names = {r['name'] for r in results}
+        assert 'child-mem' in names
+        assert 'grandchild-mem' in names
+        assert 'unscoped-mem' in names  # universal
+        assert 'parent-mem' not in names  # list_all uses filter, not scope
+        assert 'unrelated-mem' not in names

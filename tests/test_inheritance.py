@@ -257,6 +257,15 @@ class TestResolveConfigChain:
         assert config.project_name == 'fromtoml'
         assert config.recall_depth == 4
 
+    def test_from_toml_env_var_beats_toml(self, tmp_path):
+        """Env vars must override TOML values in from_toml()."""
+        _write_toml(tmp_path / 'memoryschema.toml',
+                     '[neo4j]\nuri = "bolt://toml:7687"')
+        from memoryschema.config import MemoryConfig
+        with patch.dict(os.environ, {'NEO4J_URI': 'bolt://env:7687'}):
+            config = MemoryConfig.from_toml(tmp_path)
+        assert config.neo4j_uri == 'bolt://env:7687'  # env wins
+
 
 # --- Rules Ancestry ---
 

@@ -280,7 +280,6 @@ class MemoryStore:
         entries = self._load()
         embedded = [e for e in entries if e.get('embedding')]
         if project is not None:
-            from memoryschema.hierarchy import project_matches_filter
             embedded = [e for e in embedded
                         if project_matches_filter(e.get('project', ''), project)]
 

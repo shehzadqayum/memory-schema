@@ -124,7 +124,18 @@ class MemoryConfig:
             resolved['store_path'] = Path(project_root) / resolved['store_path']
         instance = cls(**{k: v for k, v in resolved.items()
                          if k in cls.__dataclass_fields__})
-        # Advisory name validation (Fix 8: diagnostic on instance, not in dict)
+        # Env vars override TOML — apply on top of constructed instance
+        _ENV_OVERRIDES = {
+            'NEO4J_URI': 'neo4j_uri',
+            'NEO4J_USER': 'neo4j_user',
+            'NEO4J_PASSWORD': 'neo4j_password',
+            'VOYAGE_API_KEY': 'voyage_api_key',
+            'MEMORY_PROJECT': 'project_name',
+        }
+        for env_var, field_name in _ENV_OVERRIDES.items():
+            val = os.environ.get(env_var)
+            if val is not None:
+                setattr(instance, field_name, val)
         instance._name_warning = validate_toml_name(Path(project_root).resolve())
         return instance
 
