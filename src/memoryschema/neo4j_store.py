@@ -178,7 +178,9 @@ class Neo4jMemoryStore:
             if project is not None:
                 result = session.run("""
                     MATCH (m:Memory)
-                    WHERE m.project = $project OR m.project STARTS WITH $project_prefix
+                    WHERE m.project IS NULL
+                       OR m.project = $project
+                       OR m.project STARTS WITH $project_prefix
                     RETURN m
                 """, project=project, project_prefix=project + '.')
             else:
@@ -196,6 +198,7 @@ class Neo4jMemoryStore:
                     YIELD node, score
                     WHERE ($filter_type IS NULL OR node.type = $filter_type)
                       AND ($filter_project IS NULL
+                           OR node.project IS NULL
                            OR node.project = $filter_project
                            OR node.project STARTS WITH $filter_project_prefix)
                     RETURN node
@@ -210,7 +213,7 @@ class Neo4jMemoryStore:
                 if type:
                     wheres.append("m.type = $filter_type")
                 if project:
-                    wheres.append("(m.project = $filter_project OR m.project STARTS WITH $filter_project_prefix)")
+                    wheres.append("(m.project IS NULL OR m.project = $filter_project OR m.project STARTS WITH $filter_project_prefix)")
                 if wheres:
                     clauses.append("WHERE " + " AND ".join(wheres))
                 clauses.append("RETURN m AS node LIMIT $result_limit")
@@ -411,7 +414,8 @@ class Neo4jMemoryStore:
                 result = session.run("""
                     CALL db.index.vector.queryNodes('memory_embedding', $oversample, $embedding)
                     YIELD node, score
-                    WHERE node.project = $project
+                    WHERE node.project IS NULL
+                       OR node.project = $project
                        OR node.project STARTS WITH $project_prefix
                        OR $project STARTS WITH (node.project + '.')
                     RETURN node, score
@@ -438,7 +442,8 @@ class Neo4jMemoryStore:
         scope_params = {}
         if project is not None:
             scope_clause = """
-                AND (n.project = $scope_project
+                AND (n.project IS NULL
+                     OR n.project = $scope_project
                      OR n.project STARTS WITH $scope_prefix
                      OR $scope_project STARTS WITH (n.project + '.'))"""
             scope_params = {'scope_project': project, 'scope_prefix': project + '.'}
