@@ -1,6 +1,17 @@
-# Working Memory Guidelines (importance: 10)
+# Working Memory Guidelines
 
-**Enforcement: strict — every response MUST end with a memory write to `memory/<name>.md`.** No exceptions. Non-compliance is a protocol violation.
+**Enforcement: selective — write memory when it matters, not on every response.**
+
+Write when:
+- A decision was made (architectural, design, or process)
+- A correction was received (user feedback, bug discovery)
+- A novel durable fact was established (not already captured)
+- A session boundary was reached (open, checkpoint, close)
+
+Skip when:
+- The response is purely mechanical (running tests, staging files)
+- The information is already captured in an existing memory
+- The response is a clarification question with no new facts
 
 ---
 
@@ -12,16 +23,17 @@ The thinking, not just the conclusion. A future session should be able to recons
 - `<memory:reasoning>` — why this approach, what alternatives, what connections
 - `<memory:observation>` — specific facts and data
 
-## How much
-
-As many entities as the thinking requires. The entity is small by design — volume compensates.
-
 ## Importance
 
-Working memory entities should use importance **7-10**:
-- 10: critical decisions, architectural changes, user corrections
-- 8-9: significant findings, evaluations, initiative records
-- 7: routine session reasoning
+Importance means **salience** — how important this memory is for future sessions. Use the full 1-10 range:
+
+| Range | Use for |
+|-------|---------|
+| 8-10 | Critical decisions, user corrections, architectural choices |
+| 5-7 | Standard working knowledge, implementation details |
+| 1-4 | Transient observations, session-specific context |
+
+Scope (which project sees a memory) is handled by the `project` field, not importance.
 
 ## Type guidance
 
@@ -35,4 +47,4 @@ Write to `memory/<name>.md` where `<name>` is kebab-case and describes the conte
 
 ## Compact resilience
 
-The PostToolUse hook automatically appends working memory entries to MEMORY.md. After a `/compact` event, all working memory remains visible in context via the MEMORY.md index.
+The PostToolUse hook automatically appends working memory entries to MEMORY.md. After a `/compact` event, all working memory remains visible in context via the MEMORY.md index. L0 budget enforcement evicts lowest-scoring entries when the index exceeds the configured token limit.

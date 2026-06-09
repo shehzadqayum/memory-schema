@@ -32,7 +32,7 @@ The entity is general-purpose. What determines how it is **used** — as a docum
 
 ### Working Memory
 
-Session reasoning — what was asked, what was decided, why. Importance 10, strict enforcement (every response writes memory).
+Session reasoning — what was asked, what was decided, why. Selective enforcement (write when a decision, correction, or novel fact is established).
 
 - `<memory:prompt>` holds the user's input
 - `<memory:reasoning>` holds the narrative thinking
@@ -40,7 +40,7 @@ Session reasoning — what was asked, what was decided, why. Importance 10, stri
 
 ### Corpus Memory
 
-Ingested content — documents, posts, articles. Importance 4-7, batch enforcement (ingested via scripts).
+Ingested content — documents, posts, articles. Batch enforcement (ingested via scripts). Importance reflects source salience.
 
 - `<memory:observation>` holds the source text
 - No `<memory:prompt>` or `<memory:reasoning>` (content was ingested, not generated)
