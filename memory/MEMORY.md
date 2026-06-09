@@ -14,3 +14,4 @@
 - [fix-env-precedence](fix-env-precedence.md) — Plan to fix env var precedence inversion, redundant import, and add hierarchy integration tests
 - [session-3-close](session-3-close.md) — Session 3 complete — fixed env var precedence, redundant import, added hierarchy integration tests
 - [docs-update-plan](docs-update-plan.md) — Plan to update all documentation for hierarchy and inheritance features
+- [session-4-close](session-4-close.md) — Session 4 complete — full documentation alignment, 8 items across 12 files
