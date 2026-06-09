@@ -438,6 +438,39 @@ class MemoryStore:
             entry.get('reasoning', '') or '',
         ]).lower()
 
+    @staticmethod
+    def _bm25_score(query, document, k1=1.2, b=0.75, avg_dl=50):
+        """Pure-Python BM25 score for a single query-document pair.
+
+        Tokenizes on whitespace. Returns a score in [0, ~0.3] range
+        suitable as a boost added to the base retrieval score.
+        """
+        if not query or not document:
+            return 0.0
+        query_terms = query.lower().split()
+        doc_terms = document.lower().split()
+        dl = len(doc_terms)
+        if dl == 0:
+            return 0.0
+
+        # Term frequencies in document
+        tf = {}
+        for term in doc_terms:
+            tf[term] = tf.get(term, 0) + 1
+
+        score = 0.0
+        for qt in query_terms:
+            f = tf.get(qt, 0)
+            if f == 0:
+                continue
+            # BM25 term score (without IDF — single document context)
+            numerator = f * (k1 + 1)
+            denominator = f + k1 * (1 - b + b * dl / avg_dl)
+            score += numerator / denominator
+
+        # Normalize to a boost range (~0.0 to 0.3)
+        return min(score * 0.1, 0.3)
+
     def _score_entry(self, entry, query_embedding=None, mode='semantic',
                      precomputed_relevance=None):
         """Score a memory entry for retrieval ranking.
@@ -542,14 +575,14 @@ class MemoryStore:
                     for i, entry in enumerate(embedded_entries):
                         score = self._score_entry(
                             entry, precomputed_relevance=float(similarities[i]))
-                        if q_lower and q_lower in self._searchable_text(entry):
-                            score += 0.1
+                        if q_lower:
+                            score += self._bm25_score(q_lower, self._searchable_text(entry))
                         results.append((entry, score))
 
                 for entry in non_embedded:
                     score = self._score_entry(entry, None)
-                    if q_lower and q_lower in self._searchable_text(entry):
-                        score += 0.1
+                    if q_lower:
+                        score += self._bm25_score(q_lower, self._searchable_text(entry))
                     results.append((entry, score))
 
                 return results
@@ -560,8 +593,8 @@ class MemoryStore:
         scored = []
         for entry in entries:
             score = self._score_entry(entry, query_embedding)
-            if q_lower and q_lower in self._searchable_text(entry):
-                score += 0.1
+            if q_lower:
+                score += self._bm25_score(q_lower, self._searchable_text(entry))
             scored.append((entry, score))
         return scored
 
