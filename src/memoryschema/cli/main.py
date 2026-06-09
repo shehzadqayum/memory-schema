@@ -62,7 +62,15 @@ from memoryschema.config import MemoryConfig
 @click.pass_context
 def cli(ctx, project, root):
     """Memory schema system for Claude Code."""
-    ctx.obj = MemoryConfig(project_name=project, project_root=root)
+    from memoryschema.inheritance import find_toml_config
+    toml_path = find_toml_config(root)
+    if toml_path is not None:
+        cli_overrides = {}
+        if project != "default":
+            cli_overrides['project_name'] = project
+        ctx.obj = MemoryConfig.from_toml(root, cli_overrides=cli_overrides or None)
+    else:
+        ctx.obj = MemoryConfig(project_name=project, project_root=root)
 
 
 # --- Setup & Deployment ---
@@ -148,6 +156,17 @@ def init(config, with_neo4j, scopes, neo4j_password):
     except Exception:
         click.echo("Warning: Templates not found. Skipping rules setup.", err=True)
 
+    # 5. memoryschema.toml
+    toml_path = config.config_file_path
+    if not toml_path.exists():
+        try:
+            tpl = (pkg_files("memoryschema.templates") / "memoryschema.toml.tpl").read_text()
+            content = tpl.format(project_name=config.project_name)
+            toml_path.write_text(content)
+            created.append(str(toml_path))
+        except Exception:
+            click.echo("Warning: memoryschema.toml template not found. Skipping.", err=True)
+
     # Report
     if created:
         click.echo("Created:")
@@ -223,4 +242,9 @@ cli.add_command(export_cmd, name="export")
 cli.add_command(import_cmd, name="import")
 
 from memoryschema.cli.doctor_cmd import doctor
+from memoryschema.cli.rules_cmd import rules
+from memoryschema.cli.config_cmd import config_cmd
+
 cli.add_command(doctor)
+cli.add_command(rules)
+cli.add_command(config_cmd, name="config")

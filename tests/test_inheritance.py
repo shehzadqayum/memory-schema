@@ -1,0 +1,354 @@
+"""Tests for agent inheritance: TOML config and rules resolution."""
+
+import os
+from pathlib import Path
+from unittest.mock import patch
+
+import pytest
+
+from memoryschema.inheritance import (
+    find_toml_config,
+    load_toml_config,
+    flatten_toml,
+    walk_config_chain,
+    merge_config_dicts,
+    resolve_config_chain,
+    rules_ancestry,
+    resolve_rules,
+)
+
+
+# --- Helpers ---
+
+def _write_toml(path, content):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content)
+
+
+def _make_rules(rules_dir, filenames):
+    rules_dir.mkdir(parents=True, exist_ok=True)
+    for name in filenames:
+        (rules_dir / name).write_text(f"# {name} rules")
+
+
+# --- TOML Parsing ---
+
+class TestFindTomlConfig:
+    def test_found(self, tmp_path):
+        _write_toml(tmp_path / 'memoryschema.toml', '[project]\nname = "test"')
+        assert find_toml_config(tmp_path) == tmp_path / 'memoryschema.toml'
+
+    def test_not_found(self, tmp_path):
+        assert find_toml_config(tmp_path) is None
+
+
+class TestLoadTomlConfig:
+    def test_valid(self, tmp_path):
+        path = tmp_path / 'memoryschema.toml'
+        _write_toml(path, '[project]\nname = "test"\n[neo4j]\nuri = "bolt://custom:7687"')
+        result = load_toml_config(path)
+        assert result['project']['name'] == 'test'
+        assert result['neo4j']['uri'] == 'bolt://custom:7687'
+
+    def test_missing_file(self, tmp_path):
+        result = load_toml_config(tmp_path / 'nonexistent.toml')
+        assert result == {}
+
+    def test_invalid_syntax(self, tmp_path):
+        path = tmp_path / 'memoryschema.toml'
+        _write_toml(path, 'this is not valid toml {{{}}}')
+        result = load_toml_config(path)
+        assert result == {}
+
+    def test_minimal(self, tmp_path):
+        path = tmp_path / 'memoryschema.toml'
+        _write_toml(path, '[project]\nname = "minimal"')
+        result = load_toml_config(path)
+        assert result == {'project': {'name': 'minimal'}}
+
+    def test_full(self, tmp_path):
+        path = tmp_path / 'memoryschema.toml'
+        _write_toml(path, """
+[project]
+name = "full"
+
+[store]
+path = "custom/store.jsonl"
+
+[neo4j]
+uri = "bolt://db:7687"
+user = "admin"
+password = "secret"
+
+[voyage]
+embed_model = "voyage-3"
+
+[retrieval]
+recency_decay = 0.99
+recall_depth = 3
+""")
+        result = load_toml_config(path)
+        assert result['project']['name'] == 'full'
+        assert result['neo4j']['uri'] == 'bolt://db:7687'
+        assert result['retrieval']['recall_depth'] == 3
+
+
+class TestFlattenToml:
+    def test_nested(self):
+        raw = {'neo4j': {'uri': 'bolt://x', 'user': 'admin'}, 'project': {'name': 'test'}}
+        flat = flatten_toml(raw)
+        assert flat == {'neo4j_uri': 'bolt://x', 'neo4j_user': 'admin', 'project_name': 'test'}
+
+    def test_empty(self):
+        assert flatten_toml({}) == {}
+
+    def test_unknown_keys_ignored(self):
+        raw = {'unknown_section': {'key': 'value'}, 'neo4j': {'unknown_key': 'val', 'uri': 'bolt://x'}}
+        flat = flatten_toml(raw)
+        assert flat == {'neo4j_uri': 'bolt://x'}
+
+    def test_partial(self):
+        raw = {'retrieval': {'recall_depth': 5}}
+        flat = flatten_toml(raw)
+        assert flat == {'recall_depth': 5}
+
+
+# --- Config Chain Walking ---
+
+class TestWalkConfigChain:
+    def test_single_project(self, tmp_path):
+        _write_toml(tmp_path / 'memoryschema.toml', '[project]\nname = "root"')
+        chain = walk_config_chain(tmp_path)
+        assert len(chain) == 1
+        assert chain[0] == tmp_path / 'memoryschema.toml'
+
+    def test_nested_two_levels(self, tmp_path):
+        parent = tmp_path / 'parent'
+        child = parent / 'projects' / 'child'
+        child.mkdir(parents=True)
+        _write_toml(parent / 'memoryschema.toml', '[project]\nname = "parent"')
+        _write_toml(child / 'memoryschema.toml', '[project]\nname = "parent.child"')
+        chain = walk_config_chain(child)
+        assert len(chain) >= 2
+        assert chain[0] == child / 'memoryschema.toml'  # child first
+        # Parent should be in chain
+        assert any('parent/memoryschema.toml' in str(p) for p in chain)
+
+    def test_no_toml(self, tmp_path):
+        chain = walk_config_chain(tmp_path)
+        assert chain == []
+
+    def test_skips_intermediate_dirs(self, tmp_path):
+        parent = tmp_path / 'parent'
+        child = parent / 'projects' / 'child'
+        child.mkdir(parents=True)
+        _write_toml(parent / 'memoryschema.toml', '[project]\nname = "parent"')
+        # No TOML in projects/ (intermediate)
+        _write_toml(child / 'memoryschema.toml', '[project]\nname = "child"')
+        chain = walk_config_chain(child)
+        assert len(chain) == 2  # child + parent, skipped projects/
+
+    def test_child_only_no_parent(self, tmp_path):
+        child = tmp_path / 'projects' / 'child'
+        child.mkdir(parents=True)
+        _write_toml(child / 'memoryschema.toml', '[project]\nname = "child"')
+        chain = walk_config_chain(child)
+        assert len(chain) == 1
+
+
+# --- Config Merging ---
+
+class TestMergeConfigDicts:
+    def test_parent_overrides_child(self):
+        child = {'neo4j_uri': 'bolt://child:7687', 'project_name': 'child'}
+        parent = {'neo4j_uri': 'bolt://parent:7687'}
+        merged = merge_config_dicts(child, parent)
+        assert merged['neo4j_uri'] == 'bolt://parent:7687'
+        assert merged['project_name'] == 'child'
+
+    def test_child_unique_preserved(self):
+        child = {'recall_depth': 5}
+        parent = {'neo4j_uri': 'bolt://parent:7687'}
+        merged = merge_config_dicts(child, parent)
+        assert merged['recall_depth'] == 5
+        assert merged['neo4j_uri'] == 'bolt://parent:7687'
+
+    def test_parent_unique_applied(self):
+        child = {}
+        parent = {'neo4j_uri': 'bolt://parent:7687'}
+        merged = merge_config_dicts(child, parent)
+        assert merged['neo4j_uri'] == 'bolt://parent:7687'
+
+    def test_empty_child(self):
+        merged = merge_config_dicts({}, {'a': 1, 'b': 2})
+        assert merged == {'a': 1, 'b': 2}
+
+    def test_empty_parent(self):
+        merged = merge_config_dicts({'a': 1}, {})
+        assert merged == {'a': 1}
+
+    def test_both_empty(self):
+        assert merge_config_dicts({}, {}) == {}
+
+
+# --- Full Resolution ---
+
+class TestResolveConfigChain:
+    def test_flat_project(self, tmp_path):
+        _write_toml(tmp_path / 'memoryschema.toml',
+                     '[project]\nname = "flat"\n[neo4j]\nuri = "bolt://custom:7687"')
+        result = resolve_config_chain(tmp_path)
+        assert result['project_name'] == 'flat'
+        assert result['neo4j_uri'] == 'bolt://custom:7687'
+
+    def test_nested_parent_wins(self, tmp_path):
+        parent = tmp_path / 'parent'
+        child = parent / 'projects' / 'child'
+        child.mkdir(parents=True)
+        _write_toml(parent / 'memoryschema.toml',
+                     '[project]\nname = "parent"\n[neo4j]\nuri = "bolt://parent:7687"')
+        _write_toml(child / 'memoryschema.toml',
+                     '[project]\nname = "parent.child"\n[neo4j]\nuri = "bolt://child:7687"\n[retrieval]\nrecall_depth = 5')
+        result = resolve_config_chain(child)
+        assert result['neo4j_uri'] == 'bolt://parent:7687'  # parent wins
+        assert result['recall_depth'] == 5  # child-unique preserved
+
+    def test_no_toml_fallback(self, tmp_path):
+        result = resolve_config_chain(tmp_path)
+        assert 'project_root' in result
+        assert 'neo4j_uri' not in result  # no TOML, no values
+
+    def test_env_var_overrides_toml(self, tmp_path):
+        _write_toml(tmp_path / 'memoryschema.toml',
+                     '[neo4j]\nuri = "bolt://toml:7687"')
+        with patch.dict(os.environ, {'NEO4J_URI': 'bolt://env:7687'}):
+            result = resolve_config_chain(tmp_path)
+        assert result['neo4j_uri'] == 'bolt://env:7687'
+
+    def test_cli_overrides_toml(self, tmp_path):
+        _write_toml(tmp_path / 'memoryschema.toml',
+                     '[project]\nname = "toml-name"')
+        result = resolve_config_chain(tmp_path, cli_overrides={'project_name': 'cli-name'})
+        assert result['project_name'] == 'cli-name'
+
+    def test_from_toml_classmethod(self, tmp_path):
+        _write_toml(tmp_path / 'memoryschema.toml',
+                     '[project]\nname = "fromtoml"\n[retrieval]\nrecall_depth = 4')
+        from memoryschema.config import MemoryConfig
+        config = MemoryConfig.from_toml(tmp_path)
+        assert config.project_name == 'fromtoml'
+        assert config.recall_depth == 4
+
+
+# --- Rules Ancestry ---
+
+class TestRulesAncestry:
+    def test_single_project(self, tmp_path):
+        _make_rules(tmp_path / '.claude' / 'rules', ['memory-schema.md'])
+        dirs = rules_ancestry(tmp_path)
+        assert len(dirs) == 1
+
+    def test_nested(self, tmp_path):
+        parent = tmp_path / 'parent'
+        child = parent / 'projects' / 'child'
+        _make_rules(parent / '.claude' / 'rules', ['memory-schema.md'])
+        _make_rules(child / '.claude' / 'rules', ['custom.md'])
+        dirs = rules_ancestry(child)
+        assert len(dirs) >= 2
+        assert dirs[0] == child / '.claude' / 'rules'  # child first
+
+    def test_no_rules(self, tmp_path):
+        dirs = rules_ancestry(tmp_path)
+        assert dirs == []
+
+    def test_skips_intermediate_dirs(self, tmp_path):
+        parent = tmp_path / 'parent'
+        child = parent / 'projects' / 'child'
+        _make_rules(parent / '.claude' / 'rules', ['parent.md'])
+        # No rules in projects/ (intermediate)
+        _make_rules(child / '.claude' / 'rules', ['child.md'])
+        dirs = rules_ancestry(child)
+        assert len(dirs) == 2  # child + parent, skipped projects/
+
+
+# --- Rules Resolution ---
+
+class TestResolveRules:
+    def test_single_project(self, tmp_path):
+        _make_rules(tmp_path / '.claude' / 'rules', ['memory-schema.md', 'memory-working.md'])
+        rules = resolve_rules(tmp_path)
+        assert len(rules) == 2
+        assert all(not r['is_inherited'] for r in rules)
+
+    def test_parent_wins_on_conflict(self, tmp_path):
+        parent = tmp_path / 'parent'
+        child = parent / 'projects' / 'child'
+        _make_rules(parent / '.claude' / 'rules', ['memory-working.md'])
+        _make_rules(child / '.claude' / 'rules', ['memory-working.md'])
+        rules = resolve_rules(child)
+        conflict = [r for r in rules if r['filename'] == 'memory-working.md']
+        assert len(conflict) == 1
+        assert 'parent' in str(conflict[0]['source_dir'])
+        assert conflict[0]['is_inherited'] is True
+
+    def test_child_unique_preserved(self, tmp_path):
+        parent = tmp_path / 'parent'
+        child = parent / 'projects' / 'child'
+        _make_rules(parent / '.claude' / 'rules', ['memory-schema.md'])
+        _make_rules(child / '.claude' / 'rules', ['custom.md'])
+        rules = resolve_rules(child)
+        filenames = [r['filename'] for r in rules]
+        assert 'memory-schema.md' in filenames
+        assert 'custom.md' in filenames
+        custom = [r for r in rules if r['filename'] == 'custom.md'][0]
+        assert custom['is_inherited'] is False
+
+    def test_parent_unique_inherited(self, tmp_path):
+        parent = tmp_path / 'parent'
+        child = parent / 'projects' / 'child'
+        _make_rules(parent / '.claude' / 'rules', ['memory-schema.md', 'memory-working.md'])
+        _make_rules(child / '.claude' / 'rules', ['custom.md'])
+        rules = resolve_rules(child)
+        assert len(rules) == 3
+        inherited = [r for r in rules if r['is_inherited']]
+        assert len(inherited) == 2
+
+    def test_no_rules(self, tmp_path):
+        rules = resolve_rules(tmp_path)
+        assert rules == []
+
+    def test_child_only_no_parent(self, tmp_path):
+        child = tmp_path / 'projects' / 'child'
+        _make_rules(child / '.claude' / 'rules', ['memory-schema.md'])
+        rules = resolve_rules(child)
+        assert len(rules) == 1
+        assert rules[0]['is_inherited'] is False
+
+    def test_three_levels_grandparent_wins(self, tmp_path):
+        gp = tmp_path / 'gp'
+        parent = gp / 'sub' / 'parent'
+        child = parent / 'sub' / 'child'
+        _make_rules(gp / '.claude' / 'rules', ['shared.md'])
+        _make_rules(parent / '.claude' / 'rules', ['shared.md'])
+        _make_rules(child / '.claude' / 'rules', ['shared.md'])
+        rules = resolve_rules(child)
+        shared = [r for r in rules if r['filename'] == 'shared.md']
+        assert len(shared) == 1
+        assert 'gp' in str(shared[0]['source_dir'])  # grandparent wins
+
+    def test_is_inherited_flag(self, tmp_path):
+        parent = tmp_path / 'parent'
+        child = parent / 'projects' / 'child'
+        _make_rules(parent / '.claude' / 'rules', ['parent-only.md', 'shared.md'])
+        _make_rules(child / '.claude' / 'rules', ['child-only.md', 'shared.md'])
+        rules = resolve_rules(child)
+        by_name = {r['filename']: r for r in rules}
+        assert by_name['parent-only.md']['is_inherited'] is True
+        assert by_name['shared.md']['is_inherited'] is True  # parent wins
+        assert by_name['child-only.md']['is_inherited'] is False
+
+    def test_sorted_by_filename(self, tmp_path):
+        _make_rules(tmp_path / '.claude' / 'rules', ['z-rule.md', 'a-rule.md', 'm-rule.md'])
+        rules = resolve_rules(tmp_path)
+        filenames = [r['filename'] for r in rules]
+        assert filenames == sorted(filenames)

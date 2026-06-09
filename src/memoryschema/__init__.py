@@ -39,6 +39,7 @@ from memoryschema.validator import (
     parse_entity,
 )
 from memoryschema.consolidation import consolidate
+from memoryschema.inheritance import resolve_config_chain, resolve_rules
 from memoryschema.hierarchy import (
     parse_project_path,
     parent_project,
@@ -73,6 +74,9 @@ __all__ = [
     "project_matches_scope",
     "project_matches_filter",
     "validate_project_name",
+    # Inheritance
+    "resolve_config_chain",
+    "resolve_rules",
     # Lazy imports (optional deps)
     "Neo4jMemoryStore",
     "embed_text",

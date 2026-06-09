@@ -102,6 +102,30 @@ class MemoryConfig:
         return self.project_root / ".env.example"
 
     @property
+    def config_file_path(self) -> Path:
+        """Path to memoryschema.toml."""
+        return self.project_root / "memoryschema.toml"
+
+    @classmethod
+    def from_toml(cls, project_root, cli_overrides=None):
+        """Create config with TOML file + inheritance chain.
+
+        Resolution order (highest to lowest):
+        1. Environment variables
+        2. cli_overrides dict
+        3. Parent memoryschema.toml (wins over child on conflict)
+        4. Child memoryschema.toml
+        5. Dataclass defaults
+        """
+        from memoryschema.inheritance import resolve_config_chain
+        resolved = resolve_config_chain(Path(project_root).resolve(), cli_overrides)
+        # Convert store_path to Path if present as string
+        if 'store_path' in resolved and isinstance(resolved['store_path'], str):
+            resolved['store_path'] = Path(project_root) / resolved['store_path']
+        return cls(**{k: v for k, v in resolved.items()
+                      if k in cls.__dataclass_fields__})
+
+    @property
     def project_segments(self) -> list[str]:
         """Split project_name into hierarchy segments."""
         from memoryschema.hierarchy import parse_project_path
