@@ -422,31 +422,43 @@ class Neo4jMemoryStore:
     def _vector_search(self, query_embedding, top_k=10, project=None):
         with self._driver.session() as session:
             if project is not None:
-                # Over-fetch and post-filter for scope (vector index has no pre-filter)
-                result = session.run("""
-                    CALL db.index.vector.queryNodes('memory_embedding', $oversample, $embedding)
-                    YIELD node, score
-                    WHERE node.project IS NULL
-                       OR node.project = $project
-                       OR node.project STARTS WITH $project_prefix
-                       OR $project STARTS WITH (node.project + '.')
-                    RETURN node, score
-                    LIMIT $top_k
-                """, embedding=query_embedding, top_k=top_k,
-                    oversample=top_k * 3, project=project,
-                    project_prefix=project + '.')
+                # Over-fetch and post-filter with iterative widening
+                # Try 3x, 9x, then 100x if post-filter yields < top_k
+                entries = []
+                for multiplier in (3, 9, 100):
+                    oversample = top_k * multiplier
+                    result = session.run("""
+                        CALL db.index.vector.queryNodes('memory_embedding', $oversample, $embedding)
+                        YIELD node, score
+                        WHERE node.project IS NULL
+                           OR node.project = $project
+                           OR node.project STARTS WITH $project_prefix
+                           OR $project STARTS WITH (node.project + '.')
+                        RETURN node, score
+                        LIMIT $top_k
+                    """, embedding=query_embedding, top_k=top_k,
+                        oversample=oversample, project=project,
+                        project_prefix=project + '.')
+                    entries = []
+                    for r in result:
+                        entry = self._node_to_dict(r['node'])
+                        entry['_vector_score'] = r['score']
+                        entries.append(entry)
+                    if len(entries) >= top_k:
+                        break  # Got enough results
+                return entries
             else:
                 result = session.run("""
                     CALL db.index.vector.queryNodes('memory_embedding', $top_k, $embedding)
                     YIELD node, score
                     RETURN node, score
                 """, embedding=query_embedding, top_k=top_k)
-            entries = []
-            for r in result:
-                entry = self._node_to_dict(r['node'])
-                entry['_vector_score'] = r['score']
-                entries.append(entry)
-            return entries
+                entries = []
+                for r in result:
+                    entry = self._node_to_dict(r['node'])
+                    entry['_vector_score'] = r['score']
+                    entries.append(entry)
+                return entries
 
     def _get_neighbors(self, name, project=None):
         neighbors = []
