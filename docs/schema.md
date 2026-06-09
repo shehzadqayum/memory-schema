@@ -185,7 +185,7 @@ Memories connected to other memories rank higher in retrieval.
 
 **Filename:** `<name>.md` — matches the `name` attribute exactly.
 
-**Path:** `memory/<name>.md` (project-scoped) or `memory/user/<name>.md` (user-scoped).
+**Path:** `memory/<name>.md`. Project scoping is via the `<memory:project>` element, not directory structure.
 
 **Structure:** `<memory:entity>` block followed by optional body text (markdown) after the closing tag.
 
