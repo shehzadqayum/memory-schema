@@ -317,8 +317,25 @@ class MemoryStore:
         self._save(entries)
         return sum(1 for e in entries if e.get('associations'))
 
-    def _score_entry(self, entry, query_embedding=None, mode='semantic'):
-        """Score a memory entry for retrieval ranking."""
+    @staticmethod
+    def _searchable_text(entry):
+        """Build searchable text from an entry's text fields."""
+        return ' '.join([
+            entry.get('name', ''),
+            entry.get('description', ''),
+            ' '.join(entry.get('observations', [])),
+            entry.get('prompt', '') or '',
+            entry.get('reasoning', '') or '',
+        ]).lower()
+
+    def _score_entry(self, entry, query_embedding=None, mode='semantic',
+                     precomputed_relevance=None):
+        """Score a memory entry for retrieval ranking.
+
+        Args:
+            precomputed_relevance: If provided, use this cosine similarity
+                instead of computing it. Used by the numpy batch path.
+        """
         recency = 0.5
         last = entry.get('last_accessed') or entry.get('created_at')
         if last:
@@ -337,16 +354,21 @@ class MemoryStore:
             importance = 5
         importance = importance / 10.0
 
-        relevance = 0.0
-        if query_embedding and entry.get('embedding'):
+        if precomputed_relevance is not None:
+            relevance = precomputed_relevance
+        elif query_embedding and entry.get('embedding'):
             relevance = max(0.0, _cosine_similarity(query_embedding, entry['embedding']))
+        else:
+            relevance = 0.0
 
         if mode == 'structured':
             w_r, w_i, w_v = 0.3, 0.5, 0.2
         else:
             w_r, w_i, w_v = 0.2, 0.3, 0.5
 
-        if not query_embedding or not entry.get('embedding'):
+        has_relevance = (precomputed_relevance is not None
+                         or (query_embedding and entry.get('embedding')))
+        if not has_relevance:
             w_r += w_v * 0.4
             w_i += w_v * 0.6
             w_v = 0.0
@@ -367,8 +389,6 @@ class MemoryStore:
             try:
                 import numpy as np
 
-                now = datetime.now(timezone.utc)
-
                 embedded_entries = []
                 non_embedded = []
                 for e in entries:
@@ -387,52 +407,16 @@ class MemoryStore:
                     similarities = (matrix @ query_vec) / (norms * query_norm + 1e-10)
                     similarities = np.clip(similarities, 0.0, 1.0)
 
-                    w_r, w_i, w_v = 0.2, 0.3, 0.5
-
                     for i, entry in enumerate(embedded_entries):
-                        recency = 0.5
-                        last = entry.get('last_accessed') or entry.get('created_at')
-                        if last:
-                            try:
-                                accessed = datetime.fromisoformat(last)
-                                if accessed.tzinfo is None:
-                                    accessed = accessed.replace(tzinfo=timezone.utc)
-                                hours = max(0, (now - accessed).total_seconds() / 3600)
-                                recency = 0.995 ** hours
-                            except (ValueError, TypeError):
-                                pass
-
-                        imp = (entry.get('importance') or 5) / 10.0
-                        rel = float(similarities[i])
-
-                        score = recency * w_r + imp * w_i + rel * w_v
-
-                        bl = len(entry.get('backlinks', []))
-                        if bl > 0:
-                            score += 0.05 * min(bl, 5)
-
-                        searchable = ' '.join([
-                            entry.get('name', ''),
-                            entry.get('description', ''),
-                            ' '.join(entry.get('observations', [])),
-                            entry.get('prompt', '') or '',
-                            entry.get('reasoning', '') or '',
-                        ]).lower()
-                        if q_lower in searchable:
+                        score = self._score_entry(
+                            entry, precomputed_relevance=float(similarities[i]))
+                        if q_lower and q_lower in self._searchable_text(entry):
                             score += 0.1
-
-                        results.append((entry, round(min(score, 1.0), 4)))
+                        results.append((entry, score))
 
                 for entry in non_embedded:
                     score = self._score_entry(entry, None)
-                    searchable = ' '.join([
-                        entry.get('name', ''),
-                        entry.get('description', ''),
-                        ' '.join(entry.get('observations', [])),
-                        entry.get('prompt', '') or '',
-                        entry.get('reasoning', '') or '',
-                    ]).lower()
-                    if q_lower in searchable:
+                    if q_lower and q_lower in self._searchable_text(entry):
                         score += 0.1
                     results.append((entry, score))
 
@@ -444,14 +428,7 @@ class MemoryStore:
         scored = []
         for entry in entries:
             score = self._score_entry(entry, query_embedding)
-            searchable = ' '.join([
-                entry.get('name', ''),
-                entry.get('description', ''),
-                ' '.join(entry.get('observations', [])),
-                entry.get('prompt', '') or '',
-                entry.get('reasoning', '') or '',
-            ]).lower()
-            if q_lower in searchable:
+            if q_lower and q_lower in self._searchable_text(entry):
                 score += 0.1
             scored.append((entry, score))
         return scored
