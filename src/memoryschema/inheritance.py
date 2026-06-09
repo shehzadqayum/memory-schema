@@ -31,6 +31,7 @@ _TOML_FIELD_MAP = {
     'retrieval.association_k': 'association_k',
     'retrieval.recall_depth': 'recall_depth',
     'retrieval.recall_decay': 'recall_decay',
+    'retrieval.l0_token_budget': 'l0_token_budget',
 }
 
 TOML_FILENAME = 'memoryschema.toml'

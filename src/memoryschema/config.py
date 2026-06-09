@@ -67,6 +67,9 @@ class MemoryConfig:
     valid_types: tuple = tuple(sorted(VALID_TYPES))
     valid_relation_types: tuple = tuple(sorted(VALID_RELATION_TYPES))
 
+    # L0 budget
+    l0_token_budget: int = 2000
+
     # Retrieval
     recency_decay: float = 0.995
     association_k: int = 10

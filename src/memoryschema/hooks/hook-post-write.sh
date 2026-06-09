@@ -118,6 +118,16 @@ if name and not name.startswith('tweet-') and not name.startswith('forum-'):
             existing = existing.rstrip('\n') + '\n' + entry + '\n'
             with open(index_path, 'w') as f:
                 f.write(existing)
+        # Enforce L0 token budget (evict lowest-scoring entries)
+        try:
+            from memoryschema.l0_budget import enforce_budget
+            result = enforce_budget(index_path, store_path)
+            if result['evicted']:
+                print(f'hook: L0 evicted {len(result[\"evicted\"])} entries '
+                      f'({result[\"tokens_before\"]}→{result[\"tokens_after\"]} tokens)',
+                      file=sys.stderr)
+        except Exception:
+            pass  # Budget enforcement failure does not block
     except Exception:
         pass  # MEMORY.md update failure does not block indexing
 "
