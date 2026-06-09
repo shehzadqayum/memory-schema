@@ -30,3 +30,5 @@
 - Dual env var reads removed from `inheritance.py`
 - `_name_warning` side-channel removed from config resolution dict
 - Direct `os.environ` reads removed from `neo4j_store.py` and `embeddings.py` — centralized in `config.py`
+- Env var precedence inversion in `from_toml()` — env vars now correctly override TOML values
+- Redundant inline import in `store.py` `compute_associations()`

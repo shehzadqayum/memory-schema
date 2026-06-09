@@ -1,4 +1,4 @@
-# Fix 3 issues: env var precedence, redundant import, integration tests
+# Fix 3 issues: env var precedence, redundant import, integration tests ✓ 5f7b1ef
 
 ## Context
 
@@ -77,6 +77,10 @@ Add `TestHierarchyScoping` class with tests:
 
 ## Verification
 
-1. `python -m pytest tests/ -v` — all tests pass
-2. New test: env var set + TOML set for same field → env var wins via `from_toml()`
-3. New tests: scoped search/recall against mixed-project store
+1. `python -m pytest tests/ -v` — 390 passing ✓
+2. New test: env var set + TOML set for same field → env var wins via `from_toml()` ✓
+3. New tests: scoped search/recall against mixed-project store ✓
+
+## Status: COMPLETE
+
+Session report: `docs/reports/2026-06-09-session-report-3.md`
