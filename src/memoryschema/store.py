@@ -115,9 +115,9 @@ class MemoryStore:
             self._save(entries)
             return new_entry
 
-        # Merge
-        for key in ('type', 'description', 'importance', 'schema',
-                     'body', 'source', 'filepath', 'prompt', 'reasoning'):
+        # Merge (schema and filepath are immutable after creation)
+        for key in ('type', 'description', 'importance',
+                     'body', 'source', 'prompt', 'reasoning'):
             if key in memory_dict and memory_dict[key] is not None:
                 existing[key] = memory_dict[key]
 
