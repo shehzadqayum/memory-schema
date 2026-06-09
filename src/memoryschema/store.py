@@ -37,6 +37,16 @@ class MemoryStore:
         self._path = jsonl_path
         self._cache = None
         self._cache_mtime = None
+        self._audit_path = os.path.join(os.path.dirname(jsonl_path), 'audit.jsonl')
+
+    def _audit(self, operation, name, new_dict=None, prior_entry=None):
+        """Log a mutation to the audit trail. Non-blocking on failure."""
+        try:
+            from memoryschema.audit import log_mutation, _diff_fields
+            changes = _diff_fields(prior_entry, new_dict) if prior_entry and new_dict else None
+            log_mutation(self._audit_path, operation, name, changes, prior_entry)
+        except Exception:
+            pass  # Audit failure must not block mutations
 
     def _load(self):
         """Load all entries from the JSONL file.
@@ -114,7 +124,11 @@ class MemoryStore:
             new_entry['access_count'] = 0
             entries.append(new_entry)
             self._save(entries)
+            self._audit('create', name)
             return new_entry
+
+        # Capture prior state for audit
+        prior_snapshot = dict(existing)
 
         # Merge (schema and filepath are immutable after creation)
         for key in ('type', 'status', 'provenance', 'description', 'importance',
@@ -172,6 +186,7 @@ class MemoryStore:
         existing['last_accessed'] = now
 
         self._save(entries)
+        self._audit('upsert', name, memory_dict, prior_snapshot)
         return existing
 
     def get(self, name):
@@ -257,6 +272,7 @@ class MemoryStore:
             bls = entry.get('backlinks', [])
             entry['backlinks'] = [b for b in bls if b.get('source') != name]
         self._save(new_entries)
+        self._audit('delete', name)
         return True
 
     def archive(self, name):
@@ -266,6 +282,7 @@ class MemoryStore:
             if entry.get('name') == name:
                 entry['status'] = 'archived'
                 self._save(entries)
+                self._audit('archive', name)
                 return True
         return False
 
