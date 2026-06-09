@@ -80,6 +80,9 @@ def parse_memory_content(content, filepath=None):
     # Status (v3, defaults to 'active' when omitted)
     status = root.get('status') or 'active'
 
+    # Provenance (v3, defaults to 'first-party' when omitted)
+    provenance = root.get('provenance') or 'first-party'
+
     # Importance
     importance = None
     importance_str = root.get('importance')
@@ -138,6 +141,7 @@ def parse_memory_content(content, filepath=None):
         'schema': schema,
         'type': type_val,
         'status': status,
+        'provenance': provenance,
         'importance': importance,
         'description': description,
         'observations': observations,
