@@ -153,10 +153,50 @@ Line 390 hardcodes `w_r, w_i, w_v = 0.2, 0.3, 0.5`. The `mode` parameter in `_sc
 
 ---
 
+### DOCS
+
+#### 14. Consolidate three plan docs into one
+**Files to merge:**
+- `docs/plan-hierarchical-nesting.md` (hierarchy.py, store scoping, relation types, CLI --project)
+- `docs/plan-agent-inheritance.md` (inheritance.py, TOML config, rules resolution, CLI commands)
+- `docs/plan-fix-6-inheritance-issues.md` (shared walker, overridden_rules, max_depth, validate_toml_name, doctor checks)
+
+All three are marked COMPLETE. They represent a single feature area (agent hierarchy and inheritance) implemented across three sessions. Consolidate into `docs/plan-hierarchy-and-inheritance.md` with:
+- **Context** — the problem (flat project field → nested agents with inheritance)
+- **Architecture** — hierarchy.py (string ops) vs inheritance.py (filesystem), two matching modes, parent-absolute authority
+- **Implementation summary** — what was built (modules, functions, relation types, CLI, store scoping)
+- **Design decisions** — the key choices and why
+- **Status: COMPLETE** header
+
+Delete the three source files after creating the unified doc. No memory files reference them.
+
+#### 15. Documentation sync pass (after all code fixes)
+
+After fixes 1-14 are applied, update all docs to reflect the new state. Changes are quantitative (counts, versions) and clarifying (type defaults, hook behavior), not structural.
+
+**Files and specific updates:**
+
+| File | Updates |
+|------|---------|
+| `docs/technical-reference.md` | Test count (390 → actual), doctor checks (20), test file count |
+| `docs/implementation-guide.md` | Test count, doctor checks (20), hook reliability note |
+| `README.md` | Test count, test file count, doctor checks (20) |
+| `docs/system-overview.md` | Doctor checks (20) |
+| `docs/schema.md` | Verify type default wording matches fix 4, verify F2 note matches fix 12 |
+| `.claude/rules/memory-schema.md` | Sync with schema.md if Rule 3 (types) or Rule 4 (relations) changed |
+| `src/memoryschema/templates/memory-schema.rules.tpl` | Sync with rules file |
+
+**Search-and-replace targets:** `"390 tests"`, `"18 checks"`, `"25 test files"` — update all occurrences to actual post-fix counts.
+
+This is the final item. No code fix should be considered done until its doc impact is reflected here.
+
+---
+
 ## Verification Plan
 
-After fixes:
-1. `python -m pytest tests/ -v` — all 390+ tests pass
-2. Add new tests for: unscoped entities in Neo4j queries, `_derive_project` with empty segments, hook failure paths
+After all fixes:
+1. `python -m pytest tests/ -v` — all tests pass (count updated in docs)
+2. `python -m pytest tests/ --co -q | tail -1` — get actual test count for doc updates
 3. `python -c "from memoryschema import *"` — imports succeed on Python 3.10 (if fallback added)
-4. `memoryschema doctor` — all checks pass
+4. `memoryschema doctor` — all checks pass (count updated in docs)
+5. `grep -rn "390 tests\|18 checks\|25 test" docs/ README.md .claude/rules/` — no stale counts remain

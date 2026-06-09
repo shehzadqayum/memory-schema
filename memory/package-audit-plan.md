@@ -1,5 +1,5 @@
 <memory:entity schema="2" name="package-audit-plan" type="semantic" importance="9">
-  <memory:description>Full package audit plan — 13 findings across CRITICAL/HIGH/MEDIUM/LOW</memory:description>
+  <memory:description>Full package audit plan — 15 items: 13 code fixes + doc consolidation + doc sync pass</memory:description>
   <memory:observations>
     <memory:observation>CRITICAL: Cypher injection via f-string in neo4j_store.py:109-113 — rel_type interpolated into query, allowlist is only guard</memory:observation>
     <memory:observation>HIGH: Neo4j project scoping missing OR m.project IS NULL for unscoped entities — diverges from JSONL store behavior</memory:observation>
@@ -11,6 +11,8 @@
     <memory:observation>MEDIUM: Upsert merges filepath and schema — unclear mutability semantics</memory:observation>
     <memory:observation>MEDIUM: _derive_project can produce invalid project names from malformed paths</memory:observation>
     <memory:observation>LOW: Dead imports in tags.py (os, discover_memory_files)</memory:observation>
+    <memory:observation>DOCS: Consolidate 3 completed plan docs into docs/plan-hierarchy-and-inheritance.md</memory:observation>
+    <memory:observation>DOCS: Final sync pass — update test counts, doctor checks, type defaults across 7 doc files</memory:observation>
   </memory:observations>
   <memory:reasoning>Three parallel audit agents covered core data path, integration modules, and CLI/tests/package. All agent findings verified against current code — 4 claims disproven. 390 tests passing, package fundamentally sound but needs defense-in-depth improvements.</memory:reasoning>
   <memory:relations>
@@ -23,3 +25,7 @@
 
 Plan location: `.claude/plans/polymorphic-rolling-mccarthy.md`
 Prior residuals: None (from [S4] b3226f3).
+
+## Git Operations
+
+- `1a97271` — `[S1] Full package audit — 13 findings` — Plan committed and pushed
