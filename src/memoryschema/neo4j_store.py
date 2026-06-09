@@ -17,7 +17,7 @@ from datetime import datetime, timezone
 
 from neo4j import GraphDatabase
 
-from memoryschema.config import VALID_RELATION_TYPES as _RELATION_TYPES
+from memoryschema.config import ALL_RELATION_TYPES as _RELATION_TYPES
 
 
 def _now_iso():

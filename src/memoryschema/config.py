@@ -15,8 +15,12 @@ VALID_STATUSES = frozenset({'active', 'superseded', 'archived', 'quarantined'})
 VALID_PROVENANCES = frozenset({'first-party', 'user', 'ingested', 'derived'})
 VALID_RELATION_TYPES = frozenset({
     'USES', 'MODIFIES', 'SUPERSEDES', 'DEPENDS_ON', 'INFORMS', 'CONTRADICTS',
-    'PARENT_OF', 'CHILD_OF',
 })
+# Deprecated in v3: hierarchy is the project field, not relation edges.
+# Accepted on read for backward compatibility, warned on write.
+DEPRECATED_RELATION_TYPES = frozenset({'PARENT_OF', 'CHILD_OF'})
+# Combined set for validation (accepts both active and deprecated)
+ALL_RELATION_TYPES = VALID_RELATION_TYPES | DEPRECATED_RELATION_TYPES
 SCHEMA_VERSION = 3
 
 
@@ -66,7 +70,7 @@ class MemoryConfig:
     # Schema
     schema_version: int = SCHEMA_VERSION
     valid_types: tuple = tuple(sorted(VALID_TYPES))
-    valid_relation_types: tuple = tuple(sorted(VALID_RELATION_TYPES))
+    valid_relation_types: tuple = tuple(sorted(ALL_RELATION_TYPES))
 
     # L0 budget
     l0_token_budget: int = 2000

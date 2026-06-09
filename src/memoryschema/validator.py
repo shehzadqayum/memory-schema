@@ -15,7 +15,11 @@ import re
 import xml.etree.ElementTree as ET
 
 
-from memoryschema.config import VALID_TYPES, VALID_STATUSES, VALID_PROVENANCES, VALID_RELATION_TYPES, SCHEMA_VERSION
+from memoryschema.config import (
+    VALID_TYPES, VALID_STATUSES, VALID_PROVENANCES,
+    VALID_RELATION_TYPES, DEPRECATED_RELATION_TYPES, ALL_RELATION_TYPES,
+    SCHEMA_VERSION,
+)
 
 KEBAB_CASE = re.compile(r'^[a-z0-9]+(-[a-z0-9]+)*$')
 
@@ -192,8 +196,10 @@ def validate(content, filepath=None, strict=False, known_names=None):
             if not rel_type:
                 errors.append(('R1', 'Relation missing type attribute'))
 
-            if rel_type and rel_type not in VALID_RELATION_TYPES:
+            if rel_type and rel_type not in ALL_RELATION_TYPES:
                 errors.append(('R2', f'Invalid relation type "{rel_type}"'))
+            elif rel_type and rel_type in DEPRECATED_RELATION_TYPES:
+                errors.append(('R2', f'Deprecated relation type "{rel_type}" — use project field for hierarchy'))
 
             if target and not KEBAB_CASE.match(target):
                 errors.append(('R3', f'Relation target "{target}" is not kebab-case'))
