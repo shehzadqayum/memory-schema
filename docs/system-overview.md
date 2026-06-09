@@ -32,7 +32,7 @@ The entity is general-purpose. What determines how it is **used** — as a docum
 
 ### Working Memory
 
-Session reasoning — what was asked, what was decided, why. Importance 8-10, strict enforcement (every response writes memory).
+Session reasoning — what was asked, what was decided, why. Importance 10, strict enforcement (every response writes memory).
 
 - `<memory:prompt>` holds the user's input
 - `<memory:reasoning>` holds the narrative thinking
