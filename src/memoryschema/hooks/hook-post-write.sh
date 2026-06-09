@@ -59,6 +59,18 @@ if memory is None:
     print(f'hook: failed to parse {filepath}', file=sys.stderr)
     sys.exit(2)
 
+# Write gate: validate before indexing
+try:
+    from memoryschema.write_gate import gate_check
+    ok, gate_warnings = gate_check(memory)
+    for w in gate_warnings:
+        print(f'hook: gate: {w}', file=sys.stderr)
+    if not ok:
+        print(f'hook: write gate rejected {filepath}', file=sys.stderr)
+        sys.exit(2)
+except ImportError:
+    pass  # write_gate not available — skip validation
+
 # Embed if VOYAGE_API_KEY is set (optional, graceful degradation)
 if os.environ.get('VOYAGE_API_KEY'):
     try:
