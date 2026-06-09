@@ -33,8 +33,8 @@ def run_checks(config):
     def check_python():
         v = sys.version_info
         version = f"{v.major}.{v.minor}.{v.micro}"
-        ok = v >= (3, 10)
-        return ok, version, "Upgrade to Python 3.10+" if not ok else None
+        ok = v >= (3, 11)
+        return ok, version, "Upgrade to Python 3.11+" if not ok else None
     checks.append(_check("python", check_python))
 
     # 2. Package version
