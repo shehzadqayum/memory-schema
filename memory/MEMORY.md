@@ -15,3 +15,4 @@
 - [session-3-close](session-3-close.md) — Session 3 complete — fixed env var precedence, redundant import, added hierarchy integration tests
 - [docs-update-plan](docs-update-plan.md) — Plan to update all documentation for hierarchy and inheritance features
 - [session-4-close](session-4-close.md) — Session 4 complete — full documentation alignment, 8 items across 12 files
+- [package-audit-plan](package-audit-plan.md) — Full package audit plan — 13 findings across CRITICAL/HIGH/MEDIUM/LOW
