@@ -94,8 +94,12 @@ if not indexed:
         store.compute_backlinks()
         if memory.get('embedding'):
             store.compute_associations()
-    except Exception:
-        pass  # Both failed — file still written to disk (L1a)
+        indexed = True
+    except Exception as e:
+        print(f'hook: both stores failed for {filepath}: {e}', file=sys.stderr)
+
+if not indexed:
+    sys.exit(2)
 
 # Update MEMORY.md for compact resilience (working memory only)
 name = memory.get('name', '')
@@ -116,7 +120,7 @@ if name and not name.startswith('tweet-') and not name.startswith('forum-'):
                 f.write(existing)
     except Exception:
         pass  # MEMORY.md update failure does not block indexing
-" 2>/dev/null
+"
 
 EXIT_CODE=$?
 if [ $EXIT_CODE -ne 0 ]; then
