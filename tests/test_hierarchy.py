@@ -248,3 +248,70 @@ class TestValidateProjectName:
         errors = validate_project_name('good.BAD')
         assert len(errors) == 1
         assert 'BAD' in errors[0]
+
+
+class TestDotBoundaryRegression:
+    """Explicit regression tests for sibling-prefix false matches.
+
+    The dot boundary (+ '.') prevents 'org' from matching 'org-other'.
+    These tests use realistic project names to guard against regressions.
+    """
+
+    # is_ancestor_of: org is NOT ancestor of org-other
+    def test_ancestor_sibling_dash(self):
+        assert is_ancestor_of('org', 'org-other') is False
+
+    def test_ancestor_sibling_suffix(self):
+        assert is_ancestor_of('org', 'organization') is False
+
+    def test_ancestor_valid(self):
+        assert is_ancestor_of('org', 'org.team') is True
+
+    # is_descendant_of: org-team is NOT descendant of org
+    def test_descendant_sibling_dash(self):
+        assert is_descendant_of('org-team', 'org') is False
+
+    def test_descendant_sibling_suffix(self):
+        assert is_descendant_of('organization', 'org') is False
+
+    def test_descendant_valid(self):
+        assert is_descendant_of('org.team', 'org') is True
+
+    # project_matches_scope: bidirectional, but boundary respected
+    def test_scope_sibling_dash(self):
+        assert project_matches_scope('org-other', 'org') is False
+
+    def test_scope_sibling_suffix(self):
+        assert project_matches_scope('org', 'organization') is False
+
+    def test_scope_valid_child(self):
+        assert project_matches_scope('org.team', 'org') is True
+
+    def test_scope_valid_parent(self):
+        assert project_matches_scope('org', 'org.team') is True
+
+    # project_matches_filter: subtree only, boundary respected
+    def test_filter_sibling_dash(self):
+        assert project_matches_filter('org-other', 'org') is False
+
+    def test_filter_sibling_suffix(self):
+        assert project_matches_filter('organization', 'org') is False
+
+    def test_filter_valid_child(self):
+        assert project_matches_filter('org.team', 'org') is True
+
+    def test_filter_parent_excluded(self):
+        assert project_matches_filter('org', 'org.team') is False
+
+    # Multi-level sibling boundary
+    def test_scope_deep_sibling(self):
+        assert project_matches_scope('org.team-alpha', 'org.team') is False
+
+    def test_filter_deep_sibling(self):
+        assert project_matches_filter('org.team-alpha', 'org.team') is False
+
+    def test_scope_deep_valid(self):
+        assert project_matches_scope('org.team.alpha', 'org.team') is True
+
+    def test_filter_deep_valid(self):
+        assert project_matches_filter('org.team.alpha', 'org.team') is True
