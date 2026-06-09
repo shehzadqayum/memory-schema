@@ -17,10 +17,7 @@ from datetime import datetime, timezone
 
 from neo4j import GraphDatabase
 
-_RELATION_TYPES = frozenset({
-    'USES', 'MODIFIES', 'SUPERSEDES', 'DEPENDS_ON', 'INFORMS', 'CONTRADICTS',
-    'PARENT_OF', 'CHILD_OF',
-})
+from memoryschema.config import VALID_RELATION_TYPES as _RELATION_TYPES
 
 
 def _now_iso():

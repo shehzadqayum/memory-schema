@@ -15,13 +15,9 @@ import re
 import xml.etree.ElementTree as ET
 
 
-VALID_TYPES = frozenset({'semantic', 'episodic', 'procedural'})
-VALID_RELATION_TYPES = frozenset({
-    'USES', 'MODIFIES', 'SUPERSEDES', 'DEPENDS_ON', 'INFORMS', 'CONTRADICTS',
-    'PARENT_OF', 'CHILD_OF',
-})
+from memoryschema.config import VALID_TYPES, VALID_RELATION_TYPES, SCHEMA_VERSION
+
 KEBAB_CASE = re.compile(r'^[a-z0-9]+(-[a-z0-9]+)*$')
-SCHEMA_VERSION = 2
 
 
 def extract_entity_block(content):

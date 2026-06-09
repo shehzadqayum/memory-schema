@@ -9,6 +9,14 @@ import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
+# Canonical constants — other modules import from here.
+VALID_TYPES = frozenset({'semantic', 'episodic', 'procedural'})
+VALID_RELATION_TYPES = frozenset({
+    'USES', 'MODIFIES', 'SUPERSEDES', 'DEPENDS_ON', 'INFORMS', 'CONTRADICTS',
+    'PARENT_OF', 'CHILD_OF',
+})
+SCHEMA_VERSION = 2
+
 
 @dataclass
 class MemoryConfig:
@@ -54,12 +62,9 @@ class MemoryConfig:
     rerank_model: str = "rerank-2"
 
     # Schema
-    schema_version: int = 2
-    valid_types: tuple = ("semantic", "episodic", "procedural")
-    valid_relation_types: tuple = (
-        "USES", "MODIFIES", "SUPERSEDES", "DEPENDS_ON", "INFORMS", "CONTRADICTS",
-        "PARENT_OF", "CHILD_OF",
-    )
+    schema_version: int = SCHEMA_VERSION
+    valid_types: tuple = tuple(sorted(VALID_TYPES))
+    valid_relation_types: tuple = tuple(sorted(VALID_RELATION_TYPES))
 
     # Retrieval
     recency_decay: float = 0.995
