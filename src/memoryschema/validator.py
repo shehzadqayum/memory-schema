@@ -5,7 +5,7 @@ Validates <memory:> tagged files against the schema specification.
 
 Validation rules:
   V1-V11: Structure (entity element, attributes, children)
-  R1-R5:  Relations (attributes, types, self-reference, duplicates)
+  R1-R6:  Relations (attributes, types, self-reference, duplicates, referential integrity)
   F1, F3: Filesystem (filename match, safe characters)
   Q1-Q7:  Content quality (strict mode only)
 """
@@ -50,13 +50,16 @@ def parse_entity(xml_str):
     return ET.fromstring(strip_namespace(xml_str))
 
 
-def validate(content, filepath=None, strict=False):
+def validate(content, filepath=None, strict=False, known_names=None):
     """Validate memory file content against schema rules.
 
     Args:
         content: File content as string.
         filepath: Optional filepath for filesystem rules (F1, F3).
         strict: If True, include content quality checks (Q1, Q2, Q6, Q7).
+        known_names: Optional set of existing memory names for R6
+            (referential integrity). If provided, relation targets
+            are checked against this set.
 
     Returns:
         List of (rule_id, message) tuples for each validation failure.
@@ -191,6 +194,11 @@ def validate(content, filepath=None, strict=False):
                 if key in seen:
                     errors.append(('R5', f'Duplicate relation: target="{target}" type="{rel_type}"'))
                 seen.add(key)
+
+            # R6: referential integrity (warning in standard, error in strict)
+            if target and known_names is not None and target not in known_names:
+                level = 'R6' if strict else 'R6'
+                errors.append((level, f'Relation target "{target}" does not exist in known memories'))
 
     # Filesystem
     if filepath and name:

@@ -187,10 +187,11 @@ def write(config, file_path):
 @click.option("--confirm", is_flag=True, help="Required. Confirms deletion.")
 @click.pass_obj
 def delete(config, name, confirm):
-    """Remove an entity from the store.
+    """Remove an entity from all stores, .md file, and MEMORY.md.
 
-    WARNING: This permanently deletes the entity from Neo4j and/or JSONL.
-    Does NOT delete the .md file on disk.
+    WARNING: This permanently deletes the entity. Cleans up inbound
+    relations, removes the .md file on disk, and removes the entry
+    from MEMORY.md.
 
     Example:
         memoryschema delete my-memory --confirm
@@ -201,8 +202,44 @@ def delete(config, name, confirm):
 
     store = _get_store(config)
     deleted = store.delete(name)
-    if deleted:
-        click.echo(f"Deleted: {name}")
+    if not deleted:
+        click.echo(f"Error: Entity '{name}' not found.", err=True)
+        sys.exit(1)
+
+    click.echo(f"Deleted from store: {name}")
+
+    # Remove .md file
+    md_path = config.memory_dir / f"{name}.md"
+    if md_path.exists():
+        md_path.unlink()
+        click.echo(f"Deleted file: {md_path}")
+
+    # Remove from MEMORY.md
+    index_path = config.memory_index_path
+    if index_path.exists():
+        lines = index_path.read_text().split('\n')
+        new_lines = [l for l in lines if f'[{name}]' not in l]
+        if len(new_lines) != len(lines):
+            index_path.write_text('\n'.join(new_lines))
+            click.echo(f"Removed from MEMORY.md")
+
+
+@click.command()
+@click.argument("name")
+@click.pass_obj
+def archive(config, name):
+    """Archive a memory (set status=archived).
+
+    Archived memories are excluded from default recall and search
+    but remain in the store. Use --include-inactive to retrieve them.
+
+    Example:
+        memoryschema archive my-memory
+    """
+    store = _get_store(config)
+    archived = store.archive(name)
+    if archived:
+        click.echo(f"Archived: {name}")
     else:
         click.echo(f"Error: Entity '{name}' not found.", err=True)
         sys.exit(1)

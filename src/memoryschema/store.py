@@ -244,13 +244,29 @@ class MemoryStore:
         return results
 
     def delete(self, name):
-        """Delete a memory by name. Returns True if found."""
+        """Delete a memory by name. Cleans up inbound relations. Returns True if found."""
         entries = self._load()
         new_entries = [e for e in entries if e.get('name') != name]
         if len(new_entries) == len(entries):
             return False
+        # Remove inbound relations pointing to the deleted entry
+        for entry in new_entries:
+            rels = entry.get('relations', [])
+            entry['relations'] = [r for r in rels if r.get('target') != name]
+            bls = entry.get('backlinks', [])
+            entry['backlinks'] = [b for b in bls if b.get('source') != name]
         self._save(new_entries)
         return True
+
+    def archive(self, name):
+        """Set a memory's status to archived. Returns True if found."""
+        entries = self._load()
+        for entry in entries:
+            if entry.get('name') == name:
+                entry['status'] = 'archived'
+                self._save(entries)
+                return True
+        return False
 
     def list_all(self, project=None):
         """Return all entries, optionally filtered to a project subtree."""

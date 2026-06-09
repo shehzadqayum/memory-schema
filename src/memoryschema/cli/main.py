@@ -224,7 +224,7 @@ cli.add_command(sync)
 
 # --- Register individual commands ---
 
-from memoryschema.cli.memory_cmd import status, recall, get, list_cmd, write, delete, search
+from memoryschema.cli.memory_cmd import status, recall, get, list_cmd, write, delete, archive, search
 from memoryschema.cli.validate_cmd import validate
 from memoryschema.cli.index_cmd import index, embed, associations
 from memoryschema.cli.lifecycle_cmd import (
@@ -237,6 +237,7 @@ cli.add_command(get)
 cli.add_command(list_cmd, name="list")
 cli.add_command(write)
 cli.add_command(delete)
+cli.add_command(archive)
 cli.add_command(search)
 cli.add_command(validate)
 cli.add_command(index)
