@@ -13,6 +13,7 @@ Usage:
 """
 
 import json
+import math
 import os
 import tempfile
 from datetime import datetime, timezone
@@ -432,9 +433,10 @@ class MemoryStore:
 
         score = recency * w_r + importance * w_i + relevance * w_v
 
+        # Hub bonus: log-scale to prevent rich-get-richer compounding
         backlinks = len(entry.get('backlinks', []))
         if backlinks > 0:
-            score += 0.05 * min(backlinks, 5)
+            score += 0.05 * math.log(1 + backlinks)
 
         return round(min(score, 1.0), 4)
 
