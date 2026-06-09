@@ -134,6 +134,8 @@ score = recency(0.995^hours) × w_r + importance/10 × w_i + cosine_similarity �
 | Structured | 0.3 | 0.5 | 0.2 |
 | Semantic | 0.2 | 0.3 | 0.5 |
 
+Bonuses: hub `+0.05 * min(backlinks, 5)`, text match `+0.1` if query substring found.
+
 ---
 
 ## Rule 8: Storage Layers

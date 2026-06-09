@@ -268,9 +268,16 @@ retrieval_score =
 | Structured | 0.3 | 0.5 | 0.2 |
 | Semantic | 0.2 | 0.3 | 0.5 |
 
-When embedding unavailable: relevance weight redistributed (structured: 0.4 recency, 0.6 importance).
+When embedding unavailable: relevance weight redistributed (40% to recency, 60% to importance).
 
-**Properties:** No explicit tiers. Frequently accessed memories score higher. Connected memories rank higher. Neglected memories decay (0.89 at 24h, 0.70 at 72h, 0.43 at 7d). Important memories resist decay.
+**Bonuses** (added after weighted sum, before clamping to 1.0):
+
+| Bonus | Value | Condition |
+| --- | --- | --- |
+| Hub bonus | `+0.05 * min(backlinks, 5)` | Entry has backlinks (max +0.25) |
+| Text match | `+0.1` | Query substring found in searchable text |
+
+**Properties:** No explicit tiers. Frequently accessed memories score higher. Connected memories rank higher via hub bonus. Neglected memories decay (0.89 at 24h, 0.70 at 72h, 0.43 at 7d). Important memories resist decay.
 
 ---
 
