@@ -1,4 +1,4 @@
-# Centralize env var reads (Session 1 Residual)
+# Centralize env var reads (Session 1 Residual) ✓ 6616ea0
 
 ## Context
 
@@ -57,6 +57,10 @@ Remove `os.environ.get('VOYAGE_API_KEY')` calls. Remove `import os`.
 
 ## Verification
 
-1. `python -m pytest tests/ -v` — all tests pass
-2. `grep -r "os\.environ" src/memoryschema/ --include="*.py"` — only `config.py`
-3. `memoryschema doctor` — 20/20
+1. `python -m pytest tests/ -v` — 384 passing ✓
+2. `grep -r "os\.environ" src/memoryschema/ --include="*.py"` — only `config.py` ✓
+3. `memoryschema doctor` — 20/20 ✓
+
+## Status: COMPLETE
+
+Residual resolved. Session report: `docs/reports/2026-06-09-session-report-2.md`
