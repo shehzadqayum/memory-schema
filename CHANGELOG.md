@@ -46,6 +46,10 @@
 - Relation type constants consolidated — single source of truth in `config.py`
 - Scoring formula: `_searchable_text()` extracted, `precomputed_relevance` param added
 
+### Added (Session 8)
+- `memoryschema reflect` CLI command — wraps `consolidation.reflect()` for episodic clustering and semantic summary synthesis
+- `reflect` exported in `__init__.py` public API
+
 ### Added (Session 6)
 - `docs/hierarchy-and-inheritance.md` — standalone feature reference (420 lines, 8 sections)
 - `docs/plans/` — history directory for completed plan documents
