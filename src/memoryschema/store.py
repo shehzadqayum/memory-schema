@@ -703,6 +703,22 @@ class MemoryStore:
                         queue.append((neighbor, neighbor_score, next_hop))
 
         results = sorted(visited.values(), key=lambda x: x['score'], reverse=True)
+
+        # Rerank stage: use Voyage reranker if available and query provided
+        if query and len(results) > limit:
+            try:
+                from memoryschema.embeddings import rerank as _rerank
+                rerank_candidates = results[:limit * 3]
+                documents = [
+                    f"{r['name']}: {r.get('description', '')}"
+                    for r in rerank_candidates
+                ]
+                reranked = _rerank(query, documents, limit=limit)
+                reranked_indices = {rr['index'] for rr in reranked}
+                results = [rerank_candidates[rr['index']] for rr in reranked]
+            except Exception:
+                pass  # Rerank unavailable — fall back to cascade scoring
+
         # Add provenance and untrusted marker to each result
         for r in results:
             entry = entry_map.get(r['name'])
