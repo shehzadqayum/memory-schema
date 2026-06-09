@@ -123,17 +123,15 @@ def merge_config_dicts(child, parent):
     return merged
 
 
-def resolve_config_chain(project_root, cli_overrides=None):
-    """Full config resolution with inheritance chain.
+def resolve_config_chain(project_root):
+    """Resolve TOML config chain with parent-wins inheritance.
 
-    Resolution order (highest to lowest precedence):
-    1. Environment variables
-    2. cli_overrides dict
-    3. Parent TOML (wins over child on conflict)
-    4. Child TOML
-    5. (MemoryConfig defaults applied at construction time)
+    Returns dict of TOML-resolved values only (child → parent merge).
+    CLI and env var overrides are handled by MemoryConfig.from_toml().
 
-    Returns a dict suitable for MemoryConfig(**result).
+    Resolution within this function:
+    1. Parent TOML (wins over child on conflict)
+    2. Child TOML
     """
     chain = walk_config_chain(project_root)
 
@@ -143,14 +141,6 @@ def resolve_config_chain(project_root, cli_overrides=None):
         raw = load_toml_config(toml_path)
         flat = flatten_toml(raw)
         merged = merge_config_dicts(merged, flat)
-
-    # CLI overrides beat TOML (higher precedence)
-    if cli_overrides:
-        effective = {k: v for k, v in cli_overrides.items() if v is not None}
-        merged = merge_config_dicts(merged, effective)
-
-    # Env vars are NOT read here — MemoryConfig dataclass defaults
-    # handle env vars via field(default_factory). This avoids dual reads.
 
     # Ensure project_root is set
     merged.setdefault('project_root', str(project_root))

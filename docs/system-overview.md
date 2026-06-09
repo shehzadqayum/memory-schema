@@ -104,8 +104,8 @@ Each project folder is an agent. Agents nest via dot-notation: `parent.child.gra
 Config via `memoryschema.toml` files. Resolution order (highest to lowest):
 
 ```
-1. Environment variables     (NEO4J_URI, VOYAGE_API_KEY, etc.)
-2. CLI flags                 (--project, --root)
+1. CLI flags                 (--project, --root — explicit user intent)
+2. Environment variables     (NEO4J_URI, VOYAGE_API_KEY, etc.)
 3. Parent memoryschema.toml  (parent wins over child on conflict)
 4. Child memoryschema.toml
 5. Dataclass defaults

@@ -125,20 +125,21 @@ class MemoryConfig:
         """Create config with TOML file + inheritance chain.
 
         Resolution order (highest to lowest):
-        1. Environment variables
-        2. cli_overrides dict
+        1. CLI flags (explicit user intent)
+        2. Environment variables (ambient deployment config)
         3. Parent memoryschema.toml (wins over child on conflict)
         4. Child memoryschema.toml
         5. Dataclass defaults
         """
         from memoryschema.inheritance import resolve_config_chain, validate_toml_name
-        resolved = resolve_config_chain(Path(project_root).resolve(), cli_overrides)
+        resolved = resolve_config_chain(Path(project_root).resolve())
         # Convert store_path to Path if present as string
         if 'store_path' in resolved and isinstance(resolved['store_path'], str):
             resolved['store_path'] = Path(project_root) / resolved['store_path']
         instance = cls(**{k: v for k, v in resolved.items()
                          if k in cls.__dataclass_fields__})
-        # Env vars override TOML — apply on top of constructed instance
+
+        # Layer 2: Env vars override TOML (but not CLI)
         _ENV_OVERRIDES = {
             'NEO4J_URI': 'neo4j_uri',
             'NEO4J_USER': 'neo4j_user',
@@ -150,6 +151,13 @@ class MemoryConfig:
             val = os.environ.get(env_var)
             if val is not None:
                 setattr(instance, field_name, val)
+
+        # Layer 1: CLI overrides beat everything (applied last = highest priority)
+        if cli_overrides:
+            for field_name, val in cli_overrides.items():
+                if val is not None and field_name in cls.__dataclass_fields__:
+                    setattr(instance, field_name, val)
+
         instance._name_warning = validate_toml_name(Path(project_root).resolve())
         return instance
 

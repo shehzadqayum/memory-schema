@@ -142,8 +142,8 @@ Vector search over-fetches 3x then post-filters (the vector index doesn't suppor
 
 Highest to lowest precedence:
 
-1. **Environment variables** — `NEO4J_URI`, `NEO4J_USER`, `NEO4J_PASSWORD`, `VOYAGE_API_KEY`, `MEMORY_PROJECT`
-2. **CLI flags** — `--project`, `--root`
+1. **CLI flags** — `--project`, `--root` (explicit user intent, highest priority)
+2. **Environment variables** — `NEO4J_URI`, `NEO4J_USER`, `NEO4J_PASSWORD`, `VOYAGE_API_KEY`, `MEMORY_PROJECT`
 3. **Parent `memoryschema.toml`** — parent wins over child on conflict
 4. **Child `memoryschema.toml`**
 5. **Dataclass defaults** — hardcoded fallbacks in `MemoryConfig`
