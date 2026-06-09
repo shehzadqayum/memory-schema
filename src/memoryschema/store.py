@@ -16,6 +16,7 @@ import json
 import math
 import os
 import tempfile
+from contextlib import contextmanager
 from datetime import datetime, timezone
 
 from memoryschema.hierarchy import project_matches_filter, project_matches_scope
@@ -38,6 +39,39 @@ class MemoryStore:
         self._cache = None
         self._cache_mtime = None
         self._audit_path = os.path.join(os.path.dirname(jsonl_path), 'audit.jsonl')
+        self._lock_path = jsonl_path + '.lock'
+
+    @contextmanager
+    def _file_lock(self):
+        """Advisory file lock for read-modify-write atomicity.
+
+        Uses fcntl on Unix. Falls back to no-op on platforms without it.
+        Lock is non-blocking — raises IOError on contention.
+        """
+        lock_dir = os.path.dirname(self._lock_path)
+        if lock_dir:
+            os.makedirs(lock_dir, exist_ok=True)
+        lock_fd = None
+        try:
+            import fcntl
+            lock_fd = open(self._lock_path, 'w')
+            fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            yield
+        except ImportError:
+            yield  # No fcntl (Windows) — fall through without lock
+        except IOError:
+            raise IOError(
+                f'JSONL store locked by another process. '
+                f'Consider Neo4j for concurrent access.'
+            )
+        finally:
+            if lock_fd is not None:
+                try:
+                    import fcntl
+                    fcntl.flock(lock_fd, fcntl.LOCK_UN)
+                except (ImportError, Exception):
+                    pass
+                lock_fd.close()
 
     def _audit(self, operation, name, new_dict=None, prior_entry=None):
         """Log a mutation to the audit trail. Non-blocking on failure."""
@@ -107,6 +141,10 @@ class MemoryStore:
 
         Returns the upserted entry dict.
         """
+        with self._file_lock():
+            return self._upsert_inner(memory_dict)
+
+    def _upsert_inner(self, memory_dict):
         entries = self._load()
         name = memory_dict.get('name')
         existing = None
@@ -261,6 +299,10 @@ class MemoryStore:
 
     def delete(self, name):
         """Delete a memory by name. Cleans up inbound relations. Returns True if found."""
+        with self._file_lock():
+            return self._delete_inner(name)
+
+    def _delete_inner(self, name):
         entries = self._load()
         new_entries = [e for e in entries if e.get('name') != name]
         if len(new_entries) == len(entries):
@@ -277,6 +319,10 @@ class MemoryStore:
 
     def archive(self, name):
         """Set a memory's status to archived. Returns True if found."""
+        with self._file_lock():
+            return self._archive_inner(name)
+
+    def _archive_inner(self, name):
         entries = self._load()
         for entry in entries:
             if entry.get('name') == name:
