@@ -142,6 +142,32 @@ class MemoryStore:
                 existing_pairs.add(pair)
         existing['relations'] = existing_rels
 
+        # Relation side-effects: SUPERSEDES and CONTRADICTS
+        name = memory_dict.get('name') or existing.get('name')
+        entry_map = {e['name']: e for e in entries if 'name' in e}
+        for rel in existing_rels:
+            target_name = rel.get('target')
+            rel_type = rel.get('type')
+            if not target_name or target_name not in entry_map:
+                continue
+
+            # SUPERSEDES → mark target as superseded
+            if rel_type == 'SUPERSEDES':
+                target = entry_map[target_name]
+                if target.get('status', 'active') == 'active':
+                    target['status'] = 'superseded'
+
+            # CONTRADICTS → ensure symmetric edge on target
+            if rel_type == 'CONTRADICTS' and name:
+                target = entry_map[target_name]
+                target_rels = target.get('relations', [])
+                reverse_pair = (name, 'CONTRADICTS')
+                target_pairs = {(r.get('target'), r.get('type'))
+                                for r in target_rels}
+                if reverse_pair not in target_pairs:
+                    target_rels.append({'target': name, 'type': 'CONTRADICTS'})
+                    target['relations'] = target_rels
+
         existing['last_accessed'] = now
 
         self._save(entries)

@@ -118,6 +118,21 @@ class Neo4jMemoryStore:
                     MERGE (s)-[r:{rel_type}]->(t)
                 """, source=name, target=target)
 
+                # SUPERSEDES → mark target as superseded
+                if rel_type == 'SUPERSEDES':
+                    session.run("""
+                        MATCH (t:Memory {name: $target})
+                        WHERE t.status IS NULL OR t.status = 'active'
+                        SET t.status = 'superseded'
+                    """, target=target)
+
+                # CONTRADICTS → ensure symmetric edge
+                if rel_type == 'CONTRADICTS':
+                    session.run("""
+                        MATCH (s:Memory {name: $source}), (t:Memory {name: $target})
+                        MERGE (t)-[:CONTRADICTS]->(s)
+                    """, source=name, target=target)
+
         return self.get(name)
 
     def get(self, name):
