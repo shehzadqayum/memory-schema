@@ -1,3 +1,5 @@
+> Superseded by [docs/hierarchy-and-inheritance.md](../hierarchy-and-inheritance.md). Retained for implementation history.
+
 # Hierarchy and Inheritance — Status: COMPLETE
 
 ## Context
