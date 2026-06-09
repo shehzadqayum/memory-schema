@@ -80,6 +80,7 @@ class MemoryConfig:
     association_k: int = 10
     recall_depth: int = 2
     recall_decay: float = 0.8
+    max_inherit_depth: int = 3  # max hierarchy levels for scope matching
 
     def __post_init__(self):
         self.project_root = Path(self.project_root).resolve()

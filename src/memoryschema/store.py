@@ -566,7 +566,7 @@ class MemoryStore:
         return scored
 
     def recall(self, query=None, name=None, depth=2, decay=0.8, limit=10,
-               project=None, include_inactive=False):
+               project=None, include_inactive=False, max_inherit_depth=3):
         """Cascade recall with spreading activation.
 
         Finds seed memories, then expands through relations, backlinks,
@@ -589,7 +589,9 @@ class MemoryStore:
 
         if project is not None:
             entry_map = {k: v for k, v in entry_map.items()
-                         if project_matches_scope(v.get('project', ''), project)}
+                         if project_matches_scope(
+                             v.get('project', ''), project,
+                             max_depth=max_inherit_depth)}
             entries = [e for e in entries if e.get('name') in entry_map]
 
         if not entry_map:

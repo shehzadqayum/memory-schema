@@ -58,7 +58,10 @@ def recall(config, query, limit, project, as_json):
         memoryschema recall "auth flow" --project ict.auth
     """
     store = _get_store(config)
-    results = store.recall(query=query, limit=limit, project=project)
+    results = store.recall(
+        query=query, limit=limit, project=project,
+        max_inherit_depth=config.max_inherit_depth,
+    )
 
     if as_json:
         click.echo(json.dumps(results, indent=2))
