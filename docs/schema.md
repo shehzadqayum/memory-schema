@@ -247,8 +247,9 @@ Re-saving with an existing `name` performs a merge, not a replacement.
 | Rule | Description |
 | --- | --- |
 | F1 | Filename matches the `name` attribute: `<name>.md` |
-| F2 | File is in the correct directory for its scope |
 | F3 | Filename is filesystem-safe (no spaces, special characters beyond hyphens) |
+
+F2 (directory scope validation) is not implemented — memory files are not restricted by directory. Project scoping is handled via the `<memory:project>` element or filepath-based derivation.
 
 ---
 
