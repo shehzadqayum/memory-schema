@@ -85,8 +85,8 @@ def cli(ctx, project, root):
               help="Deploy Neo4j Docker container as part of initialization.")
 @click.option("--scopes", default="working",
               help="Comma-separated scope guidelines to install: working, corpus. Default: working.")
-@click.option("--neo4j-password", default="changeme",
-              help="Neo4j password for docker-compose.yml. Default: changeme.")
+@click.option("--neo4j-password", default=None,
+              help="Neo4j password for docker-compose.yml. Random if not set.")
 @click.pass_obj
 def init(config, with_neo4j, scopes, neo4j_password):
     """Initialize a new project with the memory system.
@@ -101,7 +101,12 @@ def init(config, with_neo4j, scopes, neo4j_password):
         memoryschema init --project my-project --scopes working,corpus --with-neo4j
     """
     import os
+    import secrets
     from importlib.resources import files as pkg_files
+
+    # Generate random password if not provided
+    if neo4j_password is None:
+        neo4j_password = secrets.token_urlsafe(16)
 
     created = []
 

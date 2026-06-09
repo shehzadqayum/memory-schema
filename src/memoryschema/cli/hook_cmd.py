@@ -9,8 +9,15 @@ from pathlib import Path
 import click
 
 
-def _settings_path():
-    """Path to Claude Code global settings."""
+def _settings_path(per_project=False, project_root=None):
+    """Path to Claude Code settings file.
+
+    Args:
+        per_project: If True, use project-level .claude/settings.json.
+        project_root: Project root directory (required if per_project).
+    """
+    if per_project and project_root:
+        return Path(project_root) / ".claude" / "settings.json"
     return Path.home() / ".claude" / "settings.json"
 
 
@@ -33,15 +40,17 @@ def hook():
 
 @hook.command()
 @click.option("--timeout", default=10, type=int, help="Hook timeout in seconds. Default: 10.")
+@click.option("--per-project", is_flag=True, help="Install to project-level .claude/settings.json instead of global.")
 @click.pass_obj
-def install(config, timeout):
-    """Add PostToolUse Write hook to ~/.claude/settings.json.
+def install(config, timeout, per_project):
+    """Add PostToolUse Write hook to settings.json.
 
-    Registers the memory indexing hook that fires on every Write
-    to memory/*.md files.
+    By default installs to ~/.claude/settings.json (global).
+    Use --per-project to install to the project's .claude/settings.json.
 
     Example:
         memoryschema hook install
+        memoryschema hook install --per-project
         memoryschema hook install --timeout 15
     """
     hook_path = _hook_script_path()
@@ -50,7 +59,10 @@ def install(config, timeout):
         click.echo("Fix: Reinstall with 'pip install memory-schema'.", err=True)
         sys.exit(1)
 
-    settings_file = _settings_path()
+    settings_file = _settings_path(
+        per_project=per_project,
+        project_root=config.project_root if per_project else None,
+    )
     settings = {}
     if settings_file.exists():
         with open(settings_file) as f:

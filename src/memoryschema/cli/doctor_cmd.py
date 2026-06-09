@@ -120,6 +120,34 @@ def run_checks(config):
             return True, "no parent found", None
     checks.append(_check("rules_inherit", check_rules_inheritance))
 
+    # 7d. Rules attestation — hash of effective rule set
+    def check_rules_hash():
+        try:
+            import hashlib
+            from memoryschema.inheritance import resolve_rules
+            effective, _ = resolve_rules(config.project_root)
+            if not effective:
+                return True, "no rules", None
+            content_hash = hashlib.sha256()
+            for rule in effective:
+                path = rule['full_path']
+                content_hash.update(path.read_bytes())
+            digest = content_hash.hexdigest()[:12]
+            # Store hash for delta detection
+            hash_file = config.project_root / '.claude' / '.rules-hash'
+            prior = None
+            if hash_file.exists():
+                prior = hash_file.read_text().strip()
+            hash_file.parent.mkdir(parents=True, exist_ok=True)
+            hash_file.write_text(digest)
+            if prior and prior != digest:
+                return True, f"changed: {prior} → {digest}", \
+                    "Parent rules may have been updated. Run: memoryschema rules --conflicts"
+            return True, f"hash: {digest}", None
+        except Exception as e:
+            return True, f"skipped: {e}", None
+    checks.append(_check("rules_hash", check_rules_hash))
+
     # 8. JSONL store
     def check_store():
         if config.store_path.exists():
