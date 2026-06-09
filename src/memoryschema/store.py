@@ -395,6 +395,17 @@ class MemoryStore:
             except (ValueError, TypeError):
                 pass
 
+        # Type-dependent recency modifier
+        entry_type = entry.get('type', 'semantic')
+        if entry_type == 'semantic':
+            recency = 1.0  # no decay — persistent knowledge
+        elif entry_type == 'procedural':
+            # Access reinforcement: frequently accessed procedures decay slower
+            access_count = min(entry.get('access_count') or 0, 10)
+            dampen = 1 - access_count / 20  # 1.0 at 0 access → 0.5 at 10
+            recency = recency ** dampen  # raise to fractional power = slower decay
+        # episodic: standard decay (no modification)
+
         importance = entry.get('importance', 5)
         if importance is None:
             importance = 5
