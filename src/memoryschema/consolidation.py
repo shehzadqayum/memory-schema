@@ -21,9 +21,9 @@ from memoryschema.store import MemoryStore
 def _embedding_text(memory):
     """Compose the text to embed for a memory.
 
-    Uses description + observations + prompt + reasoning.
+    Uses name + description + observations + prompt + reasoning.
     """
-    parts = [memory.get('description', '')]
+    parts = [memory.get('name', ''), memory.get('description', '')]
     parts.extend(memory.get('observations', []))
     if memory.get('prompt'):
         parts.append(memory['prompt'])

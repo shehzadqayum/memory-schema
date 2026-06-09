@@ -63,7 +63,7 @@ if memory is None:
 if os.environ.get('VOYAGE_API_KEY'):
     try:
         from memoryschema.embeddings import embed_text
-        parts = [memory.get('description', ''), ' '.join(memory.get('observations', []))]
+        parts = [memory.get('name', ''), memory.get('description', ''), ' '.join(memory.get('observations', []))]
         if memory.get('prompt'):
             parts.append(memory['prompt'])
         if memory.get('reasoning'):

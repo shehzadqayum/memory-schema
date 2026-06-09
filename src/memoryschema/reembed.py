@@ -19,9 +19,10 @@ import time
 def compose_embedding_text(entry, max_chars=2000):
     """Compose full embedding text from all available fields.
 
-    Uses description + observations + prompt + reasoning.
+    Uses name + description + observations + prompt + reasoning.
+    Body excluded (may contain unstructured content).
     """
-    parts = [entry.get('description', '')]
+    parts = [entry.get('name', ''), entry.get('description', '')]
     parts.extend(entry.get('observations', []))
     if entry.get('prompt'):
         parts.append(entry['prompt'])

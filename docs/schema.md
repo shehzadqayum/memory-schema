@@ -274,10 +274,24 @@ When embedding unavailable: relevance weight redistributed (40% to recency, 60% 
 
 | Bonus | Value | Condition |
 | --- | --- | --- |
-| Hub bonus | `+0.05 * min(backlinks, 5)` | Entry has backlinks (max +0.25) |
+| Hub bonus | `+0.05 * ln(1 + backlinks)` | Entry has backlinks (log-scale, diminishing returns) |
 | Text match | `+0.1` | Query substring found in searchable text |
 
 **Properties:** No explicit tiers. Frequently accessed memories score higher. Connected memories rank higher via hub bonus. Neglected memories decay (0.89 at 24h, 0.70 at 72h, 0.43 at 7d). Important memories resist decay.
+
+---
+
+## Embedding Input
+
+The following fields are concatenated and embedded via Voyage AI:
+
+```
+name + description + observations (joined) + prompt + reasoning
+```
+
+Truncated to 2,000 characters. Body text is **excluded** (it may contain unstructured markdown or code that degrades embedding quality). For corpus entries with long body text, chunk separately.
+
+Reasoning has a soft length ceiling of 500 words (strict-mode quality check Q8).
 
 ---
 

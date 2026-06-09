@@ -166,6 +166,13 @@ def validate(content, filepath=None, strict=False, known_names=None):
                 if word_count > 50:
                     errors.append(('Q7', f'Observation {i} has {word_count} words, recommended max 50'))
 
+        # Q8: reasoning length (affects embedding quality)
+        reasoning_elem = root.find('reasoning')
+        if reasoning_elem is not None and reasoning_elem.text:
+            reasoning_words = len(reasoning_elem.text.split())
+            if reasoning_words > 500:
+                errors.append(('Q8', f'Reasoning has {reasoning_words} words, recommended max 500'))
+
     # Relations
     relations_elems = root.findall('relations')
     if relations_elems:
