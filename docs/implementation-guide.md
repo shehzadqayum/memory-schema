@@ -4,7 +4,7 @@ How to deploy the memory system in a new project using the `memory-schema` packa
 
 ## Prerequisites
 
-- Python 3.10+
+- Python 3.11+
 - Docker (optional, for Neo4j L2b)
 - Voyage AI API key (optional, for embeddings L2a)
 - Claude Code (optional, for hook integration)

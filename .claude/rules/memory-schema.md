@@ -151,7 +151,7 @@ score = recency(0.995^hours) × w_r + importance/10 × w_i + cosine_similarity �
 ## Enforcement
 
 These rules are enforced by:
-- **Validator:** V1-V10 (structure), R1-R5 (relations), F1-F3 (filesystem)
+- **Validator:** V1-V10 (structure), R1-R5 (relations), F1, F3 (filesystem)
 - **PostToolUse hook:** Parses, embeds, indexes on every Write to `memory/*.md`
 - **Compact resilience:** Working memory entries auto-appended to MEMORY.md by the hook
 

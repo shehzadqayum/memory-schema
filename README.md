@@ -285,7 +285,7 @@ pytest tests/ --cov=memoryschema --cov-report=term-missing
 pytest tests/test_store.py -v
 ```
 
-**390 tests** across 25 test files covering all modules:
+**390 tests** across 24 test files covering all modules:
 
 | Category | Files | Tests | What's tested |
 |----------|------:|------:|---------------|

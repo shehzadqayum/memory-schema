@@ -135,7 +135,7 @@ from memoryschema import Neo4jMemoryStore, embed_text, embed_batch, rerank
 | `memoryschema.store` | JSONL store + `get_store()` factory |
 | `memoryschema.neo4j_store` | Neo4j store (O(1) upsert, vector k-NN, graph) |
 | `memoryschema.embeddings` | Voyage AI: embed_text, embed_batch, rerank |
-| `memoryschema.validator` | Schema validation (V1-V10, R1-R5, F1-F3) |
+| `memoryschema.validator` | Schema validation (V1-V10, R1-R5, F1, F3) |
 | `memoryschema.schema` | Create Neo4j indexes and constraints |
 | `memoryschema.consolidation` | Batch index un-indexed files |
 | `memoryschema.migration` | JSONL ↔ Neo4j migration |
@@ -167,7 +167,7 @@ from memoryschema import Neo4jMemoryStore, embed_text, embed_batch, rerank
 
 ### Coverage
 
-390 tests across 25 files. 20/20 doctor checks. Target: 100% module coverage.
+390 tests across 24 files. 20/20 doctor checks. Target: 100% module coverage.
 
 | Category | Test files | Tests |
 |----------|-----------|------:|
@@ -192,7 +192,7 @@ from memoryschema import Neo4jMemoryStore, embed_text, embed_batch, rerank
 
 | Check | What | Fix on failure |
 |-------|------|----------------|
-| python | Python >= 3.10 | Upgrade |
+| python | Python >= 3.11 | Upgrade |
 | package | importable, version | Reinstall |
 | config | MemoryConfig loads | Show missing env vars |
 | memory_dir | memory/ exists | `memoryschema init` |
