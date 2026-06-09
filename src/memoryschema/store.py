@@ -438,6 +438,16 @@ class MemoryStore:
         if backlinks > 0:
             score += 0.05 * math.log(1 + backlinks)
 
+        # Trust multiplier: ingested content ranks lower by default
+        provenance = entry.get('provenance', 'first-party')
+        trust_multipliers = {
+            'first-party': 1.0,
+            'user': 1.0,
+            'derived': 0.9,
+            'ingested': 0.7,
+        }
+        score *= trust_multipliers.get(provenance, 0.8)
+
         return round(min(score, 1.0), 4)
 
     def _score_all_entries(self, entries, query, query_embedding):
@@ -628,6 +638,13 @@ class MemoryStore:
                         queue.append((neighbor, neighbor_score, next_hop))
 
         results = sorted(visited.values(), key=lambda x: x['score'], reverse=True)
+        # Add provenance and untrusted marker to each result
+        for r in results:
+            entry = entry_map.get(r['name'])
+            if entry:
+                prov = entry.get('provenance', 'first-party')
+                r['provenance'] = prov
+                r['untrusted'] = prov == 'ingested'
         return results[:limit]
 
 

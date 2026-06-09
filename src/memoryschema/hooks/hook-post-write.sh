@@ -101,9 +101,11 @@ if not indexed:
 if not indexed:
     sys.exit(2)
 
-# Update MEMORY.md for compact resilience (working memory only)
+# Update MEMORY.md — L0 gating: ingested content never enters MEMORY.md
+# L0 is reserved for first-party/user/derived content (closes injection channel)
 name = memory.get('name', '')
-if name and not name.startswith('tweet-') and not name.startswith('forum-'):
+provenance = memory.get('provenance', 'first-party')
+if name and provenance != 'ingested':
     try:
         memory_dir = os.path.dirname(filepath)
         index_path = os.path.join(memory_dir, 'MEMORY.md')
