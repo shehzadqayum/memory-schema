@@ -1,8 +1,8 @@
-# Documentation Update: Hierarchy & Inheritance
+# Full Documentation Alignment
 
 ## Context
 
-All documentation is stale after 3 sessions of feature work. hierarchy.py (9 public functions), inheritance.py (10 public functions), PARENT_OF/CHILD_OF relation types, TOML config, `memoryschema rules`, `memoryschema config`, `--project` on recall/search, and 20/20 doctor checks are implemented but undocumented. CHANGELOG is the only current doc.
+All documentation is stale after 3 sessions of feature work. hierarchy.py (9 functions), inheritance.py (10 functions), PARENT_OF/CHILD_OF relation types, TOML config, new CLI commands, --project scoping, and 20/20 doctor checks are implemented but undocumented. This covers ALL documentation — user-facing docs, templates, rules, examples, and completed plan files.
 
 ## Prior Residuals (from [S4] bb6de28)
 
@@ -10,45 +10,50 @@ None.
 
 ## Items
 
-### Item 1: docs/schema.md — Add hierarchy + new relation types
+### Item 1: docs/schema.md
+- Add PARENT_OF, CHILD_OF to Relation Types table
+- New section "Dot-Notation Project Hierarchy" — naming, ancestor/descendant, examples
+- New section "Hierarchy Scoping" — bidirectional (recall) vs subtree-only (search/list), max_depth, unscoped entity visibility
 
-- Add PARENT_OF, CHILD_OF to Relation Types table (after existing 6)
-- Add new section "Dot-Notation Project Hierarchy" — naming convention, ancestor/descendant, examples
-- Add new section "Hierarchy Scoping" — bidirectional (recall) vs subtree-only (search/list), max_depth, unscoped entity visibility
+### Item 2: docs/system-overview.md
+- New "Agent Hierarchy" section — projects as agents, containment model, shared memory
+- New "Configuration Inheritance" section — TOML chain, resolution order (env > CLI > parent TOML > child TOML > defaults), parent-absolute authority
+- New "Rules Inheritance" section — parent wins on conflict, child adds unique, conditional autonomy
 
-### Item 2: docs/system-overview.md — Add agent model + inheritance
+### Item 3: docs/technical-reference.md
+- Add `memoryschema.hierarchy` module with all public functions
+- Add `memoryschema.inheritance` module with all public functions
+- Add `MemoryConfig.from_toml()`, `config_file_path`, `project_segments`, `parent_project_name`
+- Add `memoryschema rules` and `memoryschema config` CLI commands
+- Update test count to 390, doctor to 20/20
 
-- Add "Agent Hierarchy" section — projects as agents, parent contains child, shared memory space
-- Add "Configuration Inheritance" section — TOML chain, resolution order diagram (env > CLI > parent TOML > child TOML > defaults), parent-absolute authority
-- Add "Rules Inheritance" section — parent wins on filename conflict, child adds unique rules, conditional autonomy when parent absent
-
-### Item 3: docs/technical-reference.md — Add module references
-
-- Add `memoryschema.hierarchy` module entry with all public functions
-- Add `memoryschema.inheritance` module entry with all public functions
-- Add `MemoryConfig.from_toml()`, `config_file_path`, `project_segments`, `parent_project_name` to config docs
-- Add `memoryschema rules` and `memoryschema config` to CLI commands
-- Update test count: 390
-
-### Item 4: docs/implementation-guide.md — Add TOML + nested agents
-
-- Add step for TOML configuration after init
-- Add example of nested agent setup (parent + child directories with TOML files)
+### Item 4: docs/implementation-guide.md
+- Add TOML configuration step after init
+- Add nested agent setup example (parent + child with TOML files)
 - Add `memoryschema config --chain` and `memoryschema rules --conflicts` to verification
 
-### Item 5: README.md — Add hierarchy features to all sections
-
-- Update intro to mention hierarchical agent support
+### Item 5: README.md
+- Update intro for hierarchical agent support
 - Add "TOML Configuration" subsection after "Initialize Project"
-- Add `memoryschema rules` and `memoryschema config` to CLI Reference
-- Add `--project` option to recall/search entries
+- Add `memoryschema rules`, `memoryschema config` to CLI Reference
+- Add `--project` to recall/search entries
 - Add "Hierarchical Inheritance" to Architecture section
-- Update test count and doctor count (390 tests, 20/20)
+- Update counts (390 tests, 20/20 doctor)
 
-### Item 6: .claude/rules/memory-schema.md — Add PARENT_OF, CHILD_OF
+### Item 6: .claude/rules/memory-schema.md + template
+- Update Rule 4: add PARENT_OF, CHILD_OF with semantics
+- Add hierarchy scoping note after Rule 4
+- Update `src/memoryschema/templates/memory-schema.rules.tpl` to match (source for `init`)
 
-- Update Rule 4 Relations table: add PARENT_OF and CHILD_OF with semantics
-- Add note about hierarchy scoping behavior after Rule 4
+### Item 7: Completed plan files — mark historical
+- `docs/plan-hierarchical-nesting.md` — add "Status: COMPLETE" header
+- `docs/plan-agent-inheritance.md` — add "Status: COMPLETE" header
+- `docs/plan-fix-6-inheritance-issues.md` — add "Status: COMPLETE" header
+
+### Item 8: CLI self-documentation alignment
+- `src/memoryschema/cli/main.py` top-level docstring: add "Diagnostics & Inheritance" section listing `rules`, `config` commands
+- `src/memoryschema/cli/main.py` `init` docstring: mention `memoryschema.toml` generation
+- `src/memoryschema/cli/doctor_cmd.py` `doctor` docstring: mention toml_config and rules_inherit checks
 
 ## Files to Modify
 
@@ -56,15 +61,24 @@ None.
 |------|--------|
 | `docs/schema.md` | PARENT_OF/CHILD_OF, dot-notation, scoping sections |
 | `docs/system-overview.md` | Agent hierarchy, config inheritance, rules inheritance |
-| `docs/technical-reference.md` | hierarchy.py, inheritance.py modules, new CLI, test count |
+| `docs/technical-reference.md` | hierarchy.py, inheritance.py, new CLI, counts |
 | `docs/implementation-guide.md` | TOML step, nested agent example |
-| `README.md` | Hierarchy intro, TOML config, CLI commands, architecture |
+| `README.md` | Hierarchy intro, TOML, CLI commands, architecture, counts |
 | `.claude/rules/memory-schema.md` | PARENT_OF/CHILD_OF in Rule 4 |
+| `src/memoryschema/templates/memory-schema.rules.tpl` | Same Rule 4 update |
+| `docs/plan-hierarchical-nesting.md` | Status: COMPLETE header |
+| `docs/plan-agent-inheritance.md` | Status: COMPLETE header |
+| `docs/plan-fix-6-inheritance-issues.md` | Status: COMPLETE header |
+| `src/memoryschema/cli/main.py` | Top-level + init docstrings |
+| `src/memoryschema/cli/doctor_cmd.py` | Doctor docstring |
 
 ## Verification
 
-1. All doc files reference current module names and function signatures
-2. Relation types table has 8 entries (6 original + PARENT_OF + CHILD_OF)
-3. CLI reference lists `rules`, `config`, `--project` on recall/search
-4. Test count is 390, doctor is 20/20 in all docs
-5. `python -m pytest tests/ -v` — still 390 passing (docs-only changes)
+1. Relation types tables have 8 entries everywhere (schema.md, rules, template)
+2. CLI reference lists `rules`, `config`, `--project` on recall/search
+3. `memoryschema --help` shows rules + config in a "Diagnostics" section
+4. `memoryschema init --help` mentions memoryschema.toml
+5. `memoryschema doctor --help` mentions toml_config + rules_inherit
+6. Test count is 390, doctor is 20/20 in all docs
+7. Template and rules file are in sync
+8. `python -m pytest tests/ -v` — 390 passing (docs-only changes)
