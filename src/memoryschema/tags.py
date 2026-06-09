@@ -7,10 +7,8 @@ Pure Python, zero external dependencies (stdlib xml.etree only).
 Reuses XML parsing primitives from validator.py (DRY).
 """
 
-import os
 import xml.etree.ElementTree as ET
 
-from memoryschema.discovery import discover_memory_files
 from memoryschema.validator import extract_entity_block, parse_entity
 
 
