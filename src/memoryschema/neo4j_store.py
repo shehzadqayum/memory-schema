@@ -13,15 +13,9 @@ Usage:
     results = store.recall(query='hello')
 """
 
-import os
 from datetime import datetime, timezone
 
 from neo4j import GraphDatabase
-
-
-_DEFAULT_URI = os.environ.get('NEO4J_URI', 'bolt://localhost:7687')
-_DEFAULT_USER = os.environ.get('NEO4J_USER', 'neo4j')
-_DEFAULT_PASSWORD = os.environ.get('NEO4J_PASSWORD', 'changeme')
 
 _RELATION_TYPES = frozenset({
     'USES', 'MODIFIES', 'SUPERSEDES', 'DEPENDS_ON', 'INFORMS', 'CONTRADICTS',
@@ -40,20 +34,20 @@ class Neo4jMemoryStore:
         """Initialize Neo4j connection.
 
         Args:
-            uri: Bolt URI. Default from NEO4J_URI env or bolt://localhost:7687.
-            user: Username. Default from NEO4J_USER env or 'neo4j'.
-            password: Password. Default from NEO4J_PASSWORD env or 'changeme'.
+            uri: Bolt URI. Defaults via MemoryConfig.
+            user: Username. Defaults via MemoryConfig.
+            password: Password. Defaults via MemoryConfig.
             config: Optional MemoryConfig instance (overrides individual params).
         """
+        if config is None and uri is None:
+            from memoryschema.config import MemoryConfig
+            config = MemoryConfig()
         if config:
             uri = uri or config.neo4j_uri
             user = user or config.neo4j_user
             password = password or config.neo4j_password
 
-        self._driver = GraphDatabase.driver(
-            uri or _DEFAULT_URI,
-            auth=(user or _DEFAULT_USER, password or _DEFAULT_PASSWORD),
-        )
+        self._driver = GraphDatabase.driver(uri, auth=(user, password))
         with self._driver.session() as session:
             session.run('RETURN 1')
 

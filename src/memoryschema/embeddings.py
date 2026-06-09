@@ -9,8 +9,6 @@ Usage:
     vector = embed_text("hello world")  # 1024-dim list of floats
 """
 
-import os
-
 import voyageai
 
 
@@ -31,14 +29,15 @@ def get_client(api_key=None, config=None):
     if _cached_client is not None and api_key is None:
         return _cached_client
 
+    if api_key is None and config is None:
+        from memoryschema.config import MemoryConfig
+        config = MemoryConfig()
     if api_key is None and config:
         api_key = config.voyage_api_key
-    if api_key is None:
-        api_key = os.environ.get('VOYAGE_API_KEY')
 
     client = voyageai.Client(api_key=api_key)
 
-    if api_key is None or api_key == os.environ.get('VOYAGE_API_KEY'):
+    if config is not None:
         _cached_client = client
 
     return client
