@@ -25,6 +25,7 @@ Indexing & Embeddings:
     index          Batch index un-indexed files
     embed          Re-embed entries by prefix or all
     associations   Show or recompute k-NN associations
+    reflect        Cluster episodic entries → semantic summaries
 
 Migration & Data:
     migrate        Migrate between JSONL and Neo4j
@@ -260,8 +261,10 @@ from memoryschema.cli.rules_cmd import rules
 from memoryschema.cli.config_cmd import config_cmd
 
 from memoryschema.cli.eval_cmd import eval_cmd
+from memoryschema.cli.reflect_cmd import reflect as reflect_cmd
 
 cli.add_command(doctor)
 cli.add_command(rules)
 cli.add_command(config_cmd, name="config")
 cli.add_command(eval_cmd, name="eval")
+cli.add_command(reflect_cmd, name="reflect")

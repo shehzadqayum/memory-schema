@@ -38,7 +38,7 @@ from memoryschema.validator import (
     extract_entity_block,
     parse_entity,
 )
-from memoryschema.consolidation import consolidate
+from memoryschema.consolidation import consolidate, reflect
 from memoryschema.inheritance import resolve_config_chain, resolve_rules
 from memoryschema.hierarchy import (
     parse_project_path,
@@ -65,6 +65,7 @@ __all__ = [
     "extract_entity_block",
     "parse_entity",
     "consolidate",
+    "reflect",
     # Hierarchy
     "parse_project_path",
     "parent_project",
