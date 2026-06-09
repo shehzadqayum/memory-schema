@@ -1,86 +1,70 @@
-# Fix 3 issues: env var precedence, redundant import, integration tests ✓ 5f7b1ef
+# Documentation Update: Hierarchy & Inheritance
 
 ## Context
 
-Code review identified 3 issues: (1) env var vs TOML precedence is inverted — TOML wins over env vars because `from_toml()` passes resolved values as explicit kwargs, bypassing `default_factory`. The docstring claims env vars are highest priority but they're actually below TOML. (2) Redundant inline import at `store.py:283`. (3) No integration tests for hierarchy scoping in the store.
+All documentation is stale after 3 sessions of feature work. hierarchy.py (9 public functions), inheritance.py (10 public functions), PARENT_OF/CHILD_OF relation types, TOML config, `memoryschema rules`, `memoryschema config`, `--project` on recall/search, and 20/20 doctor checks are implemented but undocumented. CHANGELOG is the only current doc.
 
-## Prior Residuals (from [S4] ccac373)
+## Prior Residuals (from [S4] bb6de28)
 
 None.
 
-## Fix 1: Env var precedence inversion (BUG)
+## Items
 
-**Problem:** `from_toml()` passes TOML values as explicit kwargs to `MemoryConfig(**resolved)`. Dataclass `default_factory` (which reads env vars) only runs when a field has no explicit value. So TOML beats env vars — opposite of intended design.
+### Item 1: docs/schema.md — Add hierarchy + new relation types
 
-**Fix:** In `from_toml()`, after constructing the instance, overlay env vars on top for the fields that have env var mappings. This restores the intended precedence: env vars > CLI > parent TOML > child TOML > defaults.
+- Add PARENT_OF, CHILD_OF to Relation Types table (after existing 6)
+- Add new section "Dot-Notation Project Hierarchy" — naming convention, ancestor/descendant, examples
+- Add new section "Hierarchy Scoping" — bidirectional (recall) vs subtree-only (search/list), max_depth, unscoped entity visibility
 
-**File:** `src/memoryschema/config.py` lines 109-129
+### Item 2: docs/system-overview.md — Add agent model + inheritance
 
-```python
-@classmethod
-def from_toml(cls, project_root, cli_overrides=None):
-    """Create config with TOML file + inheritance chain.
+- Add "Agent Hierarchy" section — projects as agents, parent contains child, shared memory space
+- Add "Configuration Inheritance" section — TOML chain, resolution order diagram (env > CLI > parent TOML > child TOML > defaults), parent-absolute authority
+- Add "Rules Inheritance" section — parent wins on filename conflict, child adds unique rules, conditional autonomy when parent absent
 
-    Resolution order (highest to lowest):
-    1. Environment variables
-    2. cli_overrides dict
-    3. Parent memoryschema.toml (wins over child on conflict)
-    4. Child memoryschema.toml
-    5. Dataclass defaults
-    """
-    from memoryschema.inheritance import resolve_config_chain, validate_toml_name
-    resolved = resolve_config_chain(Path(project_root).resolve(), cli_overrides)
-    if 'store_path' in resolved and isinstance(resolved['store_path'], str):
-        resolved['store_path'] = Path(project_root) / resolved['store_path']
-    instance = cls(**{k: v for k, v in resolved.items()
-                     if k in cls.__dataclass_fields__})
-    # Env vars override TOML — apply on top of constructed instance
-    _ENV_OVERRIDES = {
-        'NEO4J_URI': 'neo4j_uri',
-        'NEO4J_USER': 'neo4j_user',
-        'NEO4J_PASSWORD': 'neo4j_password',
-        'VOYAGE_API_KEY': 'voyage_api_key',
-        'MEMORY_PROJECT': 'project_name',
-    }
-    for env_var, field_name in _ENV_OVERRIDES.items():
-        val = os.environ.get(env_var)
-        if val is not None:
-            setattr(instance, field_name, val)
-    instance._name_warning = validate_toml_name(Path(project_root).resolve())
-    return instance
-```
+### Item 3: docs/technical-reference.md — Add module references
 
-## Fix 2: Redundant inline import (cleanup)
+- Add `memoryschema.hierarchy` module entry with all public functions
+- Add `memoryschema.inheritance` module entry with all public functions
+- Add `MemoryConfig.from_toml()`, `config_file_path`, `project_segments`, `parent_project_name` to config docs
+- Add `memoryschema rules` and `memoryschema config` to CLI commands
+- Update test count: 390
 
-**File:** `src/memoryschema/store.py` line 283
+### Item 4: docs/implementation-guide.md — Add TOML + nested agents
 
-Remove `from memoryschema.hierarchy import project_matches_filter` — already imported at module level on line 20.
+- Add step for TOML configuration after init
+- Add example of nested agent setup (parent + child directories with TOML files)
+- Add `memoryschema config --chain` and `memoryschema rules --conflicts` to verification
 
-## Fix 3: Integration tests for hierarchy scoping
+### Item 5: README.md — Add hierarchy features to all sections
 
-**File:** `tests/test_store.py`
+- Update intro to mention hierarchical agent support
+- Add "TOML Configuration" subsection after "Initialize Project"
+- Add `memoryschema rules` and `memoryschema config` to CLI Reference
+- Add `--project` option to recall/search entries
+- Add "Hierarchical Inheritance" to Architecture section
+- Update test count and doctor count (390 tests, 20/20)
 
-Add `TestHierarchyScoping` class with tests:
-- `test_search_project_returns_children` — parent project sees child entities
-- `test_search_project_excludes_unrelated` — unrelated project filtered out
-- `test_recall_project_scope_bidirectional` — child sees parent memories
-- `test_unscoped_entity_visible_everywhere` — entity with no project field visible in all scoped queries
+### Item 6: .claude/rules/memory-schema.md — Add PARENT_OF, CHILD_OF
+
+- Update Rule 4 Relations table: add PARENT_OF and CHILD_OF with semantics
+- Add note about hierarchy scoping behavior after Rule 4
 
 ## Files to Modify
 
 | File | Change |
 |------|--------|
-| `src/memoryschema/config.py` | Fix `from_toml()` env var overlay + docstring |
-| `src/memoryschema/store.py` | Remove redundant import at line 283 |
-| `tests/test_store.py` | Add `TestHierarchyScoping` integration tests |
-| `tests/test_inheritance.py` | Add test verifying env vars beat TOML in `from_toml()` |
+| `docs/schema.md` | PARENT_OF/CHILD_OF, dot-notation, scoping sections |
+| `docs/system-overview.md` | Agent hierarchy, config inheritance, rules inheritance |
+| `docs/technical-reference.md` | hierarchy.py, inheritance.py modules, new CLI, test count |
+| `docs/implementation-guide.md` | TOML step, nested agent example |
+| `README.md` | Hierarchy intro, TOML config, CLI commands, architecture |
+| `.claude/rules/memory-schema.md` | PARENT_OF/CHILD_OF in Rule 4 |
 
 ## Verification
 
-1. `python -m pytest tests/ -v` — 390 passing ✓
-2. New test: env var set + TOML set for same field → env var wins via `from_toml()` ✓
-3. New tests: scoped search/recall against mixed-project store ✓
-
-## Status: COMPLETE
-
-Session report: `docs/reports/2026-06-09-session-report-3.md`
+1. All doc files reference current module names and function signatures
+2. Relation types table has 8 entries (6 original + PARENT_OF + CHILD_OF)
+3. CLI reference lists `rules`, `config`, `--project` on recall/search
+4. Test count is 390, doctor is 20/20 in all docs
+5. `python -m pytest tests/ -v` — still 390 passing (docs-only changes)
