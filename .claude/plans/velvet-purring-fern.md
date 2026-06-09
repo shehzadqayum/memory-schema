@@ -1,4 +1,4 @@
-# Full Documentation Alignment
+# Full Documentation Alignment ✓ b3226f3
 
 ## Context
 
@@ -74,11 +74,15 @@ None.
 
 ## Verification
 
-1. Relation types tables have 8 entries everywhere (schema.md, rules, template)
-2. CLI reference lists `rules`, `config`, `--project` on recall/search
-3. `memoryschema --help` shows rules + config in a "Diagnostics" section
-4. `memoryschema init --help` mentions memoryschema.toml
-5. `memoryschema doctor --help` mentions toml_config + rules_inherit
-6. Test count is 390, doctor is 20/20 in all docs
-7. Template and rules file are in sync
-8. `python -m pytest tests/ -v` — 390 passing (docs-only changes)
+1. Relation types tables have 8 entries everywhere ✓
+2. CLI reference lists `rules`, `config`, `--project` ✓
+3. `memoryschema --help` shows Diagnostics section ✓
+4. `memoryschema init --help` mentions TOML ✓
+5. `memoryschema doctor --help` mentions 20-point ✓
+6. Test count 390, doctor 20/20 in all docs ✓
+7. Template and rules file in sync ✓
+8. 390 tests passing ✓
+
+## Status: COMPLETE
+
+Session report: `docs/reports/2026-06-09-session-report-4.md`
