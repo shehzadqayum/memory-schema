@@ -52,6 +52,35 @@
 - Scoring bonuses documented: hub `+0.05*min(backlinks,5)`, text match `+0.1`
 - Cross-references to new reference doc from README, system-overview, tech-ref, impl-guide
 
+### Added (Session 7 — v3 Remediation)
+- **Schema v3:** `status` attribute (active/superseded/archived/quarantined), `provenance` attribute (first-party/user/ingested/derived)
+- **Lifecycle:** SUPERSEDES consumption (auto-supersede targets), CONTRADICTS symmetry (auto-reverse), delete with full cleanup (MEMORY.md + .md file + inbound relations), archive command, R6 referential integrity validation
+- **L0 budget:** MEMORY.md token budget (2000 default) with score-based eviction via `l0_budget.py`
+- **Reflection:** `reflect()` function — clusters episodic entries, synthesises semantic summaries with LLM/mechanical fallback
+- **Trust:** provenance field, trust-weighted retrieval (ingested=0.7x), L0 gating (ingested blocked from MEMORY.md), pre-consolidation write gate with consistency probe
+- **Audit:** append-only `memory/audit.jsonl` with field-level change tracking
+- **Hygiene:** per-project hook install (`--per-project`), random Neo4j password on init, rules hash attestation in doctor
+- **Retrieval:** Voyage reranker wired into recall, BM25 lexical channel replacing substring boost, progressive disclosure with category grouping in MEMORY.md
+- **Evaluation:** `tests/eval/` harness with 50-entity fixture store, recall@k/MRR/nDCG metrics, poisoning red-team suite, `memoryschema eval` CLI command
+- **Concurrency:** advisory file lock (`fcntl`) for JSONL read-modify-write
+- **Config:** `max_inherit_depth` (default 3), `l0_token_budget` (default 2000) — both TOML-configurable
+- `scripts/docs_sync.py` — CI-ready documentation drift checker
+
+### Changed (Session 7)
+- Schema version bumped from 2 to 3
+- PARENT_OF/CHILD_OF relation types deprecated (accept on read, warn on write)
+- Config precedence reordered: CLI > env vars > parent TOML > child TOML > defaults
+- Hub bonus: linear `0.05*min(bl,5)` → log-scale `0.05*ln(1+bl)`
+- Type system active: semantic=no decay, episodic=standard, procedural=access-reinforced
+- Importance decoupled from scope — full 1-10 range by salience
+- Working memory: selective-write rule replaces mandatory every-response write
+- Embedding input standardized: name+description+observations+prompt+reasoning (body excluded)
+
+### Fixed (Session 7)
+- Doctor Python version check: 3.10 → 3.11 (matches requires-python)
+- Q8 strict-mode check for reasoning length (>500 words)
+- V11 status validation, V12 provenance validation
+
 ### Fixed (Session 6)
 - Doctor Python version check aligned to 3.11 (was 3.10)
 - Doctor check count in tech-ref and impl-guide: 18 → 20

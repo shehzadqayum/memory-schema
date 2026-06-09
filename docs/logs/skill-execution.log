@@ -103,3 +103,55 @@
 2026-06-09 19:33:58	session-open	START	—	—
 2026-06-09 19:34:50	session-open	END	completed	New session. Last S4: 3aa0777. 1 residual carried. No pending work.
 2026-06-09 19:41:32	plan-commit	START	—	—
+2026-06-09 19:44:04	plan-commit	END	completed	v3 plan committed a1aff31, pushed. 28 issues, 7 phases, 1 residual addressing.
+2026-06-09 19:45:44	implement	START	—	—
+2026-06-09 19:51:22	implement	END	completed	Phase 0: docs-sync.py created, impl-guide count fixed, hook scope warning added. 1fa9148
+2026-06-09 19:51:48	implement	START	—	—
+2026-06-09 20:02:09	implement	END	completed	Phase 1.1: status field (schema v3) — VALID_STATUSES, V11, search/recall filtering. 8b9411e
+2026-06-09 20:02:42	implement	START	—	—
+2026-06-09 20:08:30	implement	END	completed	Phase 1.2: SUPERSEDES sets target superseded, CONTRADICTS auto-reverse. e5e7757
+2026-06-09 20:10:04	implement	START	—	—
+2026-06-09 20:14:21	implement	END	completed	Phase 1.3: delete/archive with full cleanup, R6 referential integrity. e35ac2d
+2026-06-09 20:16:28	implement	START	—	—
+2026-06-09 20:19:21	implement	END	completed	Phase 1.4: L0 token budget (2000 default), score-based eviction, hook integration. 13cf5cc
+2026-06-09 20:19:52	implement	START	—	—
+2026-06-09 20:22:27	implement	END	completed	Phase 1.5: reflect() with clustering + LLM/mechanical synthesis. Phase 1 COMPLETE. 94b43d6
+2026-06-09 20:23:13	implement	START	—	—
+2026-06-09 20:26:19	implement	END	completed	Phase 2.1: Importance decoupled from scope, selective-write rule. a01d126
+2026-06-09 20:26:42	implement	START	—	—
+2026-06-09 20:29:12	implement	END	completed	Phase 2.2: Type semantics implemented — semantic=no decay, procedural=access-reinforced. 3db1da8
+2026-06-09 20:29:40	implement	START	—	—
+2026-06-09 20:32:13	implement	END	completed	Phase 2.3: Hub bonus switched to log-scale ln(1+backlinks). 57c3cc8
+2026-06-09 20:32:53	implement	START	—	—
+2026-06-09 21:22:52	implement	END	completed	Phase 2.4: Embedding input specified, standardized, Q8 reasoning check. Phase 2 COMPLETE. 63962ec
+2026-06-09 21:23:24	implement	START	—	—
+2026-06-09 21:28:03	implement	END	completed	Phase 3.1: Provenance field added (first-party|user|ingested|derived). 4ab8504
+2026-06-09 21:58:23	implement	START	—	—
+2026-06-09 22:03:33	implement	END	completed	Phase 3.2: Trust multipliers, L0 gating (ingested blocked), untrusted flag in recall. 5707e15
+2026-06-09 22:46:50	implement	START	—	—
+2026-06-09 22:49:34	implement	END	completed	Phase 3.3: Write gate with provenance enforcement + consistency probe. d622367
+2026-06-09 22:50:44	implement	START	—	—
+2026-06-09 23:10:49	implement	END	completed	Phase 3.4: Audit log — append-only memory/audit.jsonl with field-level change tracking. 87925aa
+2026-06-09 23:11:19	implement	START	—	—
+2026-06-09 23:14:57	implement	END	completed	Phase 3.5: Per-project hook, random Neo4j password, rules hash attestation. Phase 3 COMPLETE. 03229db
+2026-06-09 23:17:17	implement	START	—	—
+2026-06-09 23:20:45	implement	END	completed	Phase 4.1: PARENT_OF/CHILD_OF deprecated, hierarchy = project field. f0502aa
+2026-06-09 23:21:07	implement	START	—	—
+2026-06-09 23:23:46	implement	END	completed	Phase 4.2: 18 dot-boundary regression tests added. 408 total tests. 4d89486
+2026-06-09 23:24:22	implement	START	—	—
+2026-06-09 23:26:22	implement	END	completed	Phase 4.3: Iterative over-fetch widening 3x→9x→100x. e432914
+2026-06-09 23:27:07	implement	START	—	—
+2026-06-09 23:30:51	implement	END	completed	Phase 4.4: Precedence reordered CLI > env > TOML. 68853ee
+2026-06-09 23:31:13	implement	START	—	—
+2026-06-09 23:34:07	implement	END	completed	Phase 4.5: Advisory fcntl file lock for JSONL mutations. 34eb41b
+2026-06-09 23:34:42	implement	START	—	—
+2026-06-09 23:38:33	implement	END	completed	Phase 4.6: max_inherit_depth=3 default, TOML configurable. Phase 4 COMPLETE. Resolves session 5 residual. a3fe9c5
+2026-06-09 23:39:00	implement	START	—	—
+2026-06-09 23:40:59	implement	END	completed	Phase 5.1: Voyage reranker wired into recall (3x over-fetch, graceful degradation). 695dde4
+2026-06-09 23:41:17	implement	START	—	—
+2026-06-09 23:44:27	implement	END	completed	Phase 5.2: BM25 lexical scoring replaces +0.1 substring boost. 8f7d1ab
+2026-06-09 23:44:45	implement	START	—	—
+2026-06-09 23:47:36	implement	END	completed	Phase 5.3: Progressive disclosure — categorize_index() with type headers. Phase 5 COMPLETE. adc8c71
+2026-06-09 23:48:10	implement	START	—	—
+2026-06-09 23:58:25	implement	END	completed	Phase 6: Evaluation harness — fixtures, metrics, poisoning suite, eval CLI. ALL PHASES COMPLETE. 6cfa4d5
+2026-06-09 23:58:54	checkpoint	START	—	—
