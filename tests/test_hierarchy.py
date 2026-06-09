@@ -155,6 +155,26 @@ class TestProjectMatchesScope:
     def test_deep_ancestor(self):
         assert project_matches_scope('a', 'a.b.c.d') is True
 
+    # Fix 4: max_depth parameter
+    def test_max_depth_none_unlimited(self):
+        assert project_matches_scope('a.b.c.d', 'a', max_depth=None) is True
+
+    def test_max_depth_1_direct_only(self):
+        assert project_matches_scope('a.b', 'a', max_depth=1) is True
+        assert project_matches_scope('a.b.c', 'a', max_depth=1) is False
+
+    def test_max_depth_2(self):
+        assert project_matches_scope('a.b.c', 'a', max_depth=2) is True
+        assert project_matches_scope('a.b.c.d', 'a', max_depth=2) is False
+
+    def test_max_depth_bidirectional(self):
+        # read-up also respects max_depth
+        assert project_matches_scope('a', 'a.b', max_depth=1) is True
+        assert project_matches_scope('a', 'a.b.c', max_depth=1) is False
+
+    def test_max_depth_exact_match_always(self):
+        assert project_matches_scope('a.b', 'a.b', max_depth=0) is True
+
 
 class TestProjectMatchesFilter:
     def test_exact(self):

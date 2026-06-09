@@ -7,12 +7,15 @@ from unittest.mock import patch
 import pytest
 
 from memoryschema.inheritance import (
+    _walk_upward,
     find_toml_config,
     load_toml_config,
     flatten_toml,
     walk_config_chain,
     merge_config_dicts,
     resolve_config_chain,
+    overridden_rules,
+    validate_toml_name,
     rules_ancestry,
     resolve_rules,
 )
@@ -147,6 +150,18 @@ class TestWalkConfigChain:
         _write_toml(child / 'memoryschema.toml', '[project]\nname = "child"')
         chain = walk_config_chain(child)
         assert len(chain) == 2  # child + parent, skipped projects/
+
+    def test_deep_nesting_finds_grandparent(self, tmp_path):
+        """Fix 1: deep structures (>2 intermediate dirs) still find ancestors."""
+        gp = tmp_path / 'grandparent'
+        child = gp / 'src' / 'packages' / 'subprojects' / 'child'
+        child.mkdir(parents=True)
+        _write_toml(gp / 'memoryschema.toml', '[project]\nname = "gp"')
+        _write_toml(child / 'memoryschema.toml', '[project]\nname = "child"')
+        chain = walk_config_chain(child)
+        assert len(chain) == 2
+        assert chain[0] == child / 'memoryschema.toml'
+        assert chain[1] == gp / 'memoryschema.toml'
 
     def test_child_only_no_parent(self, tmp_path):
         child = tmp_path / 'projects' / 'child'
@@ -352,3 +367,96 @@ class TestResolveRules:
         rules = resolve_rules(tmp_path)
         filenames = [r['filename'] for r in rules]
         assert filenames == sorted(filenames)
+
+
+# --- Shared walker (Fix 1 & 2) ---
+
+class TestWalkUpward:
+    def test_collects_matches(self, tmp_path):
+        child = tmp_path / 'a' / 'b'
+        child.mkdir(parents=True)
+        (tmp_path / 'marker').touch()
+        (child / 'marker').touch()
+        results = _walk_upward(child, lambda d: d / 'marker' if (d / 'marker').exists() else None)
+        assert len(results) >= 2
+
+    def test_skips_non_matches(self, tmp_path):
+        child = tmp_path / 'a' / 'b' / 'c'
+        child.mkdir(parents=True)
+        (tmp_path / 'marker').touch()
+        # No marker in a/ or b/
+        results = _walk_upward(child, lambda d: d / 'marker' if (d / 'marker').exists() else None)
+        assert len(results) == 1
+
+    def test_respects_max_depth(self, tmp_path):
+        child = tmp_path / 'a' / 'b' / 'c'
+        child.mkdir(parents=True)
+        results = _walk_upward(child, lambda d: d, max_depth=2)
+        assert len(results) == 2  # child + one parent, not three
+
+
+# --- Overridden rules (Fix 3) ---
+
+class TestOverriddenRules:
+    def test_no_parent(self, tmp_path):
+        _make_rules(tmp_path / '.claude' / 'rules', ['a.md'])
+        assert overridden_rules(tmp_path) == []
+
+    def test_no_conflict(self, tmp_path):
+        parent = tmp_path / 'parent'
+        child = parent / 'projects' / 'child'
+        _make_rules(parent / '.claude' / 'rules', ['parent.md'])
+        _make_rules(child / '.claude' / 'rules', ['child.md'])
+        assert overridden_rules(child) == []
+
+    def test_conflict_detected(self, tmp_path):
+        parent = tmp_path / 'parent'
+        child = parent / 'projects' / 'child'
+        _make_rules(parent / '.claude' / 'rules', ['shared.md'])
+        _make_rules(child / '.claude' / 'rules', ['shared.md', 'unique.md'])
+        overridden = overridden_rules(child)
+        assert len(overridden) == 1
+        assert overridden[0]['filename'] == 'shared.md'
+        assert 'parent' in str(overridden[0]['parent_path'])
+        assert 'child' in str(overridden[0]['child_path'])
+
+    def test_multiple_conflicts(self, tmp_path):
+        parent = tmp_path / 'parent'
+        child = parent / 'projects' / 'child'
+        _make_rules(parent / '.claude' / 'rules', ['a.md', 'b.md'])
+        _make_rules(child / '.claude' / 'rules', ['a.md', 'b.md', 'c.md'])
+        overridden = overridden_rules(child)
+        assert len(overridden) == 2
+        assert {o['filename'] for o in overridden} == {'a.md', 'b.md'}
+
+
+# --- TOML name validation (Fix 5) ---
+
+class TestValidateTomlName:
+    def test_no_toml(self, tmp_path):
+        assert validate_toml_name(tmp_path) is None
+
+    def test_no_name_in_toml(self, tmp_path):
+        _write_toml(tmp_path / 'memoryschema.toml', '[retrieval]\nrecall_depth = 3')
+        assert validate_toml_name(tmp_path) is None
+
+    def test_matching_name(self, tmp_path):
+        # Create a projects/myproject structure so _derive_project works
+        child = tmp_path / 'projects' / 'myproject'
+        child.mkdir(parents=True)
+        _write_toml(child / 'memoryschema.toml', '[project]\nname = "myproject"')
+        assert validate_toml_name(child) is None
+
+    def test_mismatched_name(self, tmp_path):
+        child = tmp_path / 'projects' / 'myproject'
+        child.mkdir(parents=True)
+        _write_toml(child / 'memoryschema.toml', '[project]\nname = "wrong-name"')
+        warning = validate_toml_name(child)
+        assert warning is not None
+        assert 'wrong-name' in warning
+        assert 'myproject' in warning
+
+    def test_no_derivable_project(self, tmp_path):
+        # No projects/ in path, so _derive_project returns None — no warning
+        _write_toml(tmp_path / 'memoryschema.toml', '[project]\nname = "anything"')
+        assert validate_toml_name(tmp_path) is None

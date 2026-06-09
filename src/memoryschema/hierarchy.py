@@ -83,13 +83,19 @@ def is_descendant_of(candidate, project):
     return candidate.startswith(project + '.')
 
 
-def project_matches_scope(entry_project, scope_project):
+def project_matches_scope(entry_project, scope_project, max_depth=None):
     """True if entry is within scope (bidirectional).
 
     Used for recall — child sees parent memories (inheritance),
     parent sees child memories (read-down).
 
     Matches: exact, ancestor, or descendant.
+
+    Args:
+        max_depth: Maximum hierarchy levels of separation allowed.
+            None = unlimited (default, backward compatible).
+            1 = only direct parent/child.
+            2 = up to grandparent/grandchild.
 
     project_matches_scope('a.b', 'a') -> True   (descendant)
     project_matches_scope('a', 'a.b') -> True   (ancestor, inheritance)
@@ -102,8 +108,20 @@ def project_matches_scope(entry_project, scope_project):
         return False
     if entry_project == scope_project:
         return True
-    return (entry_project.startswith(scope_project + '.') or
-            scope_project.startswith(entry_project + '.'))
+
+    is_related = (entry_project.startswith(scope_project + '.') or
+                  scope_project.startswith(entry_project + '.'))
+    if not is_related:
+        return False
+
+    if max_depth is None:
+        return True
+
+    # Count separation: difference in depth between the two projects
+    entry_depth = entry_project.count('.')
+    scope_depth = scope_project.count('.')
+    separation = abs(entry_depth - scope_depth)
+    return separation <= max_depth
 
 
 def project_matches_filter(entry_project, filter_project):

@@ -5,7 +5,8 @@ Implements parent-absolute authority:
   - Parent's config values override child's on key conflict
   - Child self-governs when parent is absent
 
-Walk stops at a gap (no memoryschema.toml or .claude/rules/).
+Uses marker-based upward walk — intermediate directories without
+markers are skipped, walk continues to filesystem root (up to max_depth).
 """
 
 import os
@@ -45,6 +46,37 @@ _ENV_FIELD_MAP = {
 TOML_FILENAME = 'memoryschema.toml'
 
 
+# --- Shared walker (Fixes 1 & 2) ---
+
+def _walk_upward(start, predicate, max_depth=20):
+    """Walk upward from start, collecting results where predicate matches.
+
+    Args:
+        start: Starting directory.
+        predicate: Callable(Path) → value or None. Non-None values are collected.
+        max_depth: Maximum parent directories to traverse. Default 20.
+
+    Returns results in child-first order. Skips intermediate directories
+    where predicate returns None. Stops at filesystem root or max_depth.
+    """
+    results = []
+    current = Path(start).resolve()
+
+    for _ in range(max_depth):
+        value = predicate(current)
+        if value is not None:
+            results.append(value)
+
+        parent = current.parent
+        if parent == current:
+            break  # filesystem root
+        current = parent
+
+    return results
+
+
+# --- TOML loading ---
+
 def find_toml_config(project_root):
     """Find memoryschema.toml in the given directory.
 
@@ -79,34 +111,14 @@ def flatten_toml(toml_dict):
     return flat
 
 
+# --- Config chain ---
+
 def walk_config_chain(project_root):
     """Walk upward from project_root collecting memoryschema.toml paths.
 
-    Returns child-first order. Skips intermediate directories (e.g.
-    projects/) that don't have a TOML file. Stops after 2 consecutive
-    non-TOML directories above the starting point (no managed agents above).
+    Returns child-first order. Skips intermediate directories.
     """
-    chain = []
-    current = Path(project_root).resolve()
-    misses = 0
-
-    while True:
-        toml_path = find_toml_config(current)
-        if toml_path is not None:
-            chain.append(toml_path)
-            misses = 0
-        else:
-            if current != Path(project_root).resolve():
-                misses += 1
-                if misses > 2:
-                    break
-
-        parent = current.parent
-        if parent == current:
-            break  # filesystem root
-        current = parent
-
-    return chain
+    return _walk_upward(project_root, find_toml_config)
 
 
 def merge_config_dicts(child, parent):
@@ -139,12 +151,10 @@ def resolve_config_chain(project_root, cli_overrides=None):
     for toml_path in chain:
         raw = load_toml_config(toml_path)
         flat = flatten_toml(raw)
-        # Each parent in the chain overrides what came before
         merged = merge_config_dicts(merged, flat)
 
     # CLI overrides beat TOML (higher precedence)
     if cli_overrides:
-        # Filter out None values from CLI defaults
         effective = {k: v for k, v in cli_overrides.items() if v is not None}
         merged = merge_config_dicts(merged, effective)
 
@@ -160,37 +170,30 @@ def resolve_config_chain(project_root, cli_overrides=None):
     # Ensure project_root is set
     merged.setdefault('project_root', str(project_root))
 
+    # Advisory: validate TOML project name matches directory structure (Fix 5)
+    name_warning = validate_toml_name(project_root)
+    if name_warning:
+        merged.setdefault('_name_warning', name_warning)
+
     return merged
+
+
+# --- Rules ---
+
+def _rules_dir_predicate(directory):
+    """Predicate for _walk_upward: returns rules dir Path or None."""
+    rules_dir = directory / '.claude' / 'rules'
+    if rules_dir.is_dir():
+        return rules_dir
+    return None
 
 
 def rules_ancestry(project_root):
     """Walk upward collecting .claude/rules/ directories.
 
-    Returns child-first order. Skips intermediate directories (e.g.
-    projects/) that don't have rules. Stops after 2 consecutive
-    non-rules directories above the starting point.
+    Returns child-first order. Skips intermediate directories.
     """
-    dirs = []
-    current = Path(project_root).resolve()
-    misses = 0
-
-    while True:
-        rules_dir = current / '.claude' / 'rules'
-        if rules_dir.is_dir():
-            dirs.append(rules_dir)
-            misses = 0
-        else:
-            if current != Path(project_root).resolve():
-                misses += 1
-                if misses > 2:
-                    break
-
-        parent = current.parent
-        if parent == current:
-            break  # filesystem root
-        current = parent
-
-    return dirs
+    return _walk_upward(project_root, _rules_dir_predicate)
 
 
 def resolve_rules(project_root):
@@ -207,11 +210,6 @@ def resolve_rules(project_root):
 
     child_dir = dirs[0]
 
-    # Collect child's own filenames first
-    child_filenames = set()
-    if child_dir.is_dir():
-        child_filenames = {p.name for p in child_dir.glob('*.md')}
-
     # Start with child's rules
     rules_map = {}
     for path in sorted(child_dir.glob('*.md')):
@@ -222,12 +220,10 @@ def resolve_rules(project_root):
             'is_inherited': False,
         }
 
-    # Walk parent dirs (dirs[1:] are parents, nearest first, but we want
-    # root-ancestor to win, so process in reverse = root first)
+    # Parent dirs override — process root-ancestor first so highest wins
     for rules_dir in reversed(dirs[1:]):
         for path in sorted(rules_dir.glob('*.md')):
             filename = path.name
-            # Parent always overwrites — whether child had it or not
             rules_map[filename] = {
                 'filename': filename,
                 'source_dir': rules_dir,
@@ -236,3 +232,59 @@ def resolve_rules(project_root):
             }
 
     return sorted(rules_map.values(), key=lambda r: r['filename'])
+
+
+def overridden_rules(project_root):
+    """Return child rules that are shadowed by a parent (Fix 3).
+
+    Returns list of dicts:
+        {'filename': str, 'child_path': Path, 'parent_path': Path}
+    """
+    dirs = rules_ancestry(project_root)
+    if len(dirs) < 2:
+        return []
+
+    child_dir = dirs[0]
+    child_files = {p.name: p for p in child_dir.glob('*.md')}
+
+    parent_files = {}
+    for rules_dir in reversed(dirs[1:]):
+        for path in rules_dir.glob('*.md'):
+            parent_files[path.name] = path  # root-ancestor wins
+
+    overridden = []
+    for filename, child_path in sorted(child_files.items()):
+        if filename in parent_files:
+            overridden.append({
+                'filename': filename,
+                'child_path': child_path,
+                'parent_path': parent_files[filename],
+            })
+
+    return overridden
+
+
+# --- TOML name validation (Fix 5) ---
+
+def validate_toml_name(project_root):
+    """Check if project.name in TOML matches the directory structure.
+
+    Returns a warning string if mismatched, or None if valid/no TOML.
+    Advisory only — does not prevent operation.
+    """
+    from memoryschema.tags import _derive_project
+
+    toml_path = find_toml_config(project_root)
+    if toml_path is None:
+        return None
+
+    raw = load_toml_config(toml_path)
+    toml_name = raw.get('project', {}).get('name')
+    if not toml_name:
+        return None
+
+    derived = _derive_project(str(project_root))
+    if derived and derived != toml_name:
+        return (f"TOML project.name '{toml_name}' does not match "
+                f"directory-derived name '{derived}'")
+    return None

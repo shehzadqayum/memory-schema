@@ -87,6 +87,39 @@ def run_checks(config):
         return False, "No scope guidelines found", "Run: memoryschema init --scopes working"
     checks.append(_check("guidelines", check_guidelines))
 
+    # 7b. TOML config
+    def check_toml():
+        toml_path = config.project_root / "memoryschema.toml"
+        if not toml_path.exists():
+            return True, "not present (using defaults)", None
+        try:
+            from memoryschema.inheritance import load_toml_config, validate_toml_name
+            raw = load_toml_config(toml_path)
+            if not raw:
+                return False, "parse error", "Check memoryschema.toml syntax"
+            warning = validate_toml_name(config.project_root)
+            if warning:
+                return True, f"valid ({warning})", None
+            name = raw.get('project', {}).get('name', '?')
+            return True, f"valid (project: {name})", None
+        except Exception as e:
+            return False, str(e)[:60], "Check memoryschema.toml"
+    checks.append(_check("toml_config", check_toml))
+
+    # 7c. Rules inheritance
+    def check_rules_inheritance():
+        try:
+            from memoryschema.inheritance import overridden_rules
+            overridden = overridden_rules(config.project_root)
+            if overridden:
+                names = ", ".join(o['filename'] for o in overridden)
+                return True, f"{len(overridden)} overridden: {names}", \
+                    "Run: memoryschema rules --conflicts"
+            return True, "no conflicts", None
+        except Exception:
+            return True, "no parent found", None
+    checks.append(_check("rules_inherit", check_rules_inheritance))
+
     # 8. JSONL store
     def check_store():
         if config.store_path.exists():
