@@ -233,12 +233,15 @@ class TestResolveConfigChain:
         assert 'project_root' in result
         assert 'neo4j_uri' not in result  # no TOML, no values
 
-    def test_env_var_overrides_toml(self, tmp_path):
+    def test_env_vars_not_in_chain(self, tmp_path):
+        """Fix 7: resolve_config_chain does NOT read env vars.
+        Env vars are handled by MemoryConfig dataclass defaults."""
         _write_toml(tmp_path / 'memoryschema.toml',
                      '[neo4j]\nuri = "bolt://toml:7687"')
         with patch.dict(os.environ, {'NEO4J_URI': 'bolt://env:7687'}):
             result = resolve_config_chain(tmp_path)
-        assert result['neo4j_uri'] == 'bolt://env:7687'
+        # TOML value survives — env var override happens at MemoryConfig level
+        assert result['neo4j_uri'] == 'bolt://toml:7687'
 
     def test_cli_overrides_toml(self, tmp_path):
         _write_toml(tmp_path / 'memoryschema.toml',
@@ -291,7 +294,7 @@ class TestRulesAncestry:
 class TestResolveRules:
     def test_single_project(self, tmp_path):
         _make_rules(tmp_path / '.claude' / 'rules', ['memory-schema.md', 'memory-working.md'])
-        rules = resolve_rules(tmp_path)
+        rules, _ = resolve_rules(tmp_path)
         assert len(rules) == 2
         assert all(not r['is_inherited'] for r in rules)
 
@@ -300,7 +303,7 @@ class TestResolveRules:
         child = parent / 'projects' / 'child'
         _make_rules(parent / '.claude' / 'rules', ['memory-working.md'])
         _make_rules(child / '.claude' / 'rules', ['memory-working.md'])
-        rules = resolve_rules(child)
+        rules, _ = resolve_rules(child)
         conflict = [r for r in rules if r['filename'] == 'memory-working.md']
         assert len(conflict) == 1
         assert 'parent' in str(conflict[0]['source_dir'])
@@ -311,7 +314,7 @@ class TestResolveRules:
         child = parent / 'projects' / 'child'
         _make_rules(parent / '.claude' / 'rules', ['memory-schema.md'])
         _make_rules(child / '.claude' / 'rules', ['custom.md'])
-        rules = resolve_rules(child)
+        rules, _ = resolve_rules(child)
         filenames = [r['filename'] for r in rules]
         assert 'memory-schema.md' in filenames
         assert 'custom.md' in filenames
@@ -323,19 +326,19 @@ class TestResolveRules:
         child = parent / 'projects' / 'child'
         _make_rules(parent / '.claude' / 'rules', ['memory-schema.md', 'memory-working.md'])
         _make_rules(child / '.claude' / 'rules', ['custom.md'])
-        rules = resolve_rules(child)
+        rules, _ = resolve_rules(child)
         assert len(rules) == 3
         inherited = [r for r in rules if r['is_inherited']]
         assert len(inherited) == 2
 
     def test_no_rules(self, tmp_path):
-        rules = resolve_rules(tmp_path)
+        rules, _ = resolve_rules(tmp_path)
         assert rules == []
 
     def test_child_only_no_parent(self, tmp_path):
         child = tmp_path / 'projects' / 'child'
         _make_rules(child / '.claude' / 'rules', ['memory-schema.md'])
-        rules = resolve_rules(child)
+        rules, _ = resolve_rules(child)
         assert len(rules) == 1
         assert rules[0]['is_inherited'] is False
 
@@ -346,7 +349,7 @@ class TestResolveRules:
         _make_rules(gp / '.claude' / 'rules', ['shared.md'])
         _make_rules(parent / '.claude' / 'rules', ['shared.md'])
         _make_rules(child / '.claude' / 'rules', ['shared.md'])
-        rules = resolve_rules(child)
+        rules, _ = resolve_rules(child)
         shared = [r for r in rules if r['filename'] == 'shared.md']
         assert len(shared) == 1
         assert 'gp' in str(shared[0]['source_dir'])  # grandparent wins
@@ -356,7 +359,7 @@ class TestResolveRules:
         child = parent / 'projects' / 'child'
         _make_rules(parent / '.claude' / 'rules', ['parent-only.md', 'shared.md'])
         _make_rules(child / '.claude' / 'rules', ['child-only.md', 'shared.md'])
-        rules = resolve_rules(child)
+        rules, _ = resolve_rules(child)
         by_name = {r['filename']: r for r in rules}
         assert by_name['parent-only.md']['is_inherited'] is True
         assert by_name['shared.md']['is_inherited'] is True  # parent wins
@@ -364,7 +367,7 @@ class TestResolveRules:
 
     def test_sorted_by_filename(self, tmp_path):
         _make_rules(tmp_path / '.claude' / 'rules', ['z-rule.md', 'a-rule.md', 'm-rule.md'])
-        rules = resolve_rules(tmp_path)
+        rules, _ = resolve_rules(tmp_path)
         filenames = [r['filename'] for r in rules]
         assert filenames == sorted(filenames)
 

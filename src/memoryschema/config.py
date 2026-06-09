@@ -1,8 +1,8 @@
 """
 Centralized configuration for the memory system.
 
-All environment variables, defaults, and path resolution live here.
-No other module in the package reads os.environ directly.
+Environment variables are read here via dataclass field defaults.
+TOML inheritance is handled by inheritance.py (no env var reads there).
 """
 
 import os
@@ -117,13 +117,16 @@ class MemoryConfig:
         4. Child memoryschema.toml
         5. Dataclass defaults
         """
-        from memoryschema.inheritance import resolve_config_chain
+        from memoryschema.inheritance import resolve_config_chain, validate_toml_name
         resolved = resolve_config_chain(Path(project_root).resolve(), cli_overrides)
         # Convert store_path to Path if present as string
         if 'store_path' in resolved and isinstance(resolved['store_path'], str):
             resolved['store_path'] = Path(project_root) / resolved['store_path']
-        return cls(**{k: v for k, v in resolved.items()
-                      if k in cls.__dataclass_fields__})
+        instance = cls(**{k: v for k, v in resolved.items()
+                         if k in cls.__dataclass_fields__})
+        # Advisory name validation (Fix 8: diagnostic on instance, not in dict)
+        instance._name_warning = validate_toml_name(Path(project_root).resolve())
+        return instance
 
     @property
     def project_segments(self) -> list[str]:

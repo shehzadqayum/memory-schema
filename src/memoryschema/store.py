@@ -17,6 +17,8 @@ import os
 import tempfile
 from datetime import datetime, timezone
 
+from memoryschema.hierarchy import project_matches_filter, project_matches_scope
+
 
 def _now_iso():
     """Return current UTC time as ISO 8601 string."""
@@ -191,7 +193,6 @@ class MemoryStore:
             if type is not None and entry.get('type') != type:
                 continue
             if project is not None:
-                from memoryschema.hierarchy import project_matches_filter
                 if not project_matches_filter(entry.get('project', ''), project):
                     continue
             if query is not None:
@@ -225,7 +226,6 @@ class MemoryStore:
         """Return all entries, optionally filtered to a project subtree."""
         entries = self._load()
         if project is not None:
-            from memoryschema.hierarchy import project_matches_filter
             entries = [e for e in entries
                        if project_matches_filter(e.get('project', ''), project)]
         return entries
@@ -240,7 +240,6 @@ class MemoryStore:
         entry_map = {e['name']: e for e in entries if 'name' in e}
 
         if project is not None:
-            from memoryschema.hierarchy import project_matches_filter
             scoped_names = {name for name, e in entry_map.items()
                            if project_matches_filter(e.get('project', ''), project)}
         else:
@@ -473,7 +472,6 @@ class MemoryStore:
         entry_map = {e['name']: e for e in entries if 'name' in e}
 
         if project is not None:
-            from memoryschema.hierarchy import project_matches_scope
             entry_map = {k: v for k, v in entry_map.items()
                          if project_matches_scope(v.get('project', ''), project)}
             entries = [e for e in entries if e.get('name') in entry_map]

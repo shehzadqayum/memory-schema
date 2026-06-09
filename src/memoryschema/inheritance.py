@@ -9,7 +9,6 @@ Uses marker-based upward walk — intermediate directories without
 markers are skipped, walk continues to filesystem root (up to max_depth).
 """
 
-import os
 import tomllib
 from pathlib import Path
 
@@ -32,15 +31,6 @@ _TOML_FIELD_MAP = {
     'retrieval.association_k': 'association_k',
     'retrieval.recall_depth': 'recall_depth',
     'retrieval.recall_decay': 'recall_decay',
-}
-
-# Environment variable → MemoryConfig field name
-_ENV_FIELD_MAP = {
-    'NEO4J_URI': 'neo4j_uri',
-    'NEO4J_USER': 'neo4j_user',
-    'NEO4J_PASSWORD': 'neo4j_password',
-    'VOYAGE_API_KEY': 'voyage_api_key',
-    'MEMORY_PROJECT': 'project_name',
 }
 
 TOML_FILENAME = 'memoryschema.toml'
@@ -158,22 +148,11 @@ def resolve_config_chain(project_root, cli_overrides=None):
         effective = {k: v for k, v in cli_overrides.items() if v is not None}
         merged = merge_config_dicts(merged, effective)
 
-    # Environment variables beat everything
-    env_overrides = {}
-    for env_var, field_name in _ENV_FIELD_MAP.items():
-        val = os.environ.get(env_var)
-        if val is not None:
-            env_overrides[field_name] = val
-    if env_overrides:
-        merged = merge_config_dicts(merged, env_overrides)
+    # Env vars are NOT read here — MemoryConfig dataclass defaults
+    # handle env vars via field(default_factory). This avoids dual reads.
 
     # Ensure project_root is set
     merged.setdefault('project_root', str(project_root))
-
-    # Advisory: validate TOML project name matches directory structure (Fix 5)
-    name_warning = validate_toml_name(project_root)
-    if name_warning:
-        merged.setdefault('_name_warning', name_warning)
 
     return merged
 
@@ -199,31 +178,38 @@ def rules_ancestry(project_root):
 def resolve_rules(project_root):
     """Resolve effective rules with parent-wins inheritance.
 
-    Returns list of dicts:
-        {'filename': str, 'source_dir': Path, 'full_path': Path, 'is_inherited': bool}
+    Returns (effective, overridden) tuple:
+        effective: list of {'filename', 'source_dir', 'full_path', 'is_inherited'}
+        overridden: list of {'filename', 'child_path', 'parent_path'}
 
+    Single walk — both results computed from the same ancestry traversal.
     Parent wins on filename conflict. Child's unique rules are additive.
     """
     dirs = rules_ancestry(project_root)
     if not dirs:
-        return []
+        return [], []
 
     child_dir = dirs[0]
 
+    # Collect child files for override detection
+    child_files = {p.name: p for p in child_dir.glob('*.md')}
+
     # Start with child's rules
     rules_map = {}
-    for path in sorted(child_dir.glob('*.md')):
-        rules_map[path.name] = {
-            'filename': path.name,
+    for name, path in sorted(child_files.items()):
+        rules_map[name] = {
+            'filename': name,
             'source_dir': child_dir,
             'full_path': path,
             'is_inherited': False,
         }
 
     # Parent dirs override — process root-ancestor first so highest wins
+    parent_files = {}
     for rules_dir in reversed(dirs[1:]):
         for path in sorted(rules_dir.glob('*.md')):
             filename = path.name
+            parent_files[filename] = path
             rules_map[filename] = {
                 'filename': filename,
                 'source_dir': rules_dir,
@@ -231,26 +217,7 @@ def resolve_rules(project_root):
                 'is_inherited': True,
             }
 
-    return sorted(rules_map.values(), key=lambda r: r['filename'])
-
-
-def overridden_rules(project_root):
-    """Return child rules that are shadowed by a parent (Fix 3).
-
-    Returns list of dicts:
-        {'filename': str, 'child_path': Path, 'parent_path': Path}
-    """
-    dirs = rules_ancestry(project_root)
-    if len(dirs) < 2:
-        return []
-
-    child_dir = dirs[0]
-    child_files = {p.name: p for p in child_dir.glob('*.md')}
-
-    parent_files = {}
-    for rules_dir in reversed(dirs[1:]):
-        for path in rules_dir.glob('*.md'):
-            parent_files[path.name] = path  # root-ancestor wins
+    effective = sorted(rules_map.values(), key=lambda r: r['filename'])
 
     overridden = []
     for filename, child_path in sorted(child_files.items()):
@@ -261,6 +228,15 @@ def overridden_rules(project_root):
                 'parent_path': parent_files[filename],
             })
 
+    return effective, overridden
+
+
+def overridden_rules(project_root):
+    """Return child rules that are shadowed by a parent.
+
+    Thin wrapper around resolve_rules() — single walk.
+    """
+    _, overridden = resolve_rules(project_root)
     return overridden
 
 

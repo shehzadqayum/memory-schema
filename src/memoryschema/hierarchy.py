@@ -101,11 +101,13 @@ def project_matches_scope(entry_project, scope_project, max_depth=None):
     project_matches_scope('a', 'a.b') -> True   (ancestor, inheritance)
     project_matches_scope('a.b', 'a.b') -> True (exact)
     project_matches_scope('x', 'a') -> False    (unrelated)
-    project_matches_scope(None, 'a') -> False
+    project_matches_scope(None, 'a') -> True   (unscoped = universal)
     project_matches_scope('a', None) -> False
     """
-    if not entry_project or not scope_project:
+    if not scope_project:
         return False
+    if not entry_project:
+        return True  # unscoped entities are universally visible
     if entry_project == scope_project:
         return True
 
@@ -133,11 +135,13 @@ def project_matches_filter(entry_project, filter_project):
     project_matches_filter('a', 'a.b') -> False  (parent, not included)
     project_matches_filter('a.b', 'a.b') -> True (exact)
     project_matches_filter('x', 'a') -> False    (unrelated)
-    project_matches_filter(None, 'a') -> False
+    project_matches_filter(None, 'a') -> True   (unscoped = universal)
     project_matches_filter('a', None) -> False
     """
-    if not entry_project or not filter_project:
+    if not filter_project:
         return False
+    if not entry_project:
+        return True  # unscoped entities are universally visible
     if entry_project == filter_project:
         return True
     return entry_project.startswith(filter_project + '.')

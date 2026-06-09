@@ -140,8 +140,10 @@ class TestProjectMatchesScope:
     def test_unrelated(self):
         assert project_matches_scope('x', 'a') is False
 
-    def test_none_entry(self):
-        assert project_matches_scope(None, 'a') is False
+    def test_none_entry_universal(self):
+        # Fix 9: unscoped entities are universally visible
+        assert project_matches_scope(None, 'a') is True
+        assert project_matches_scope('', 'a') is True
 
     def test_none_scope(self):
         assert project_matches_scope('a', None) is False
@@ -189,8 +191,10 @@ class TestProjectMatchesFilter:
     def test_unrelated(self):
         assert project_matches_filter('x', 'a') is False
 
-    def test_none_entry(self):
-        assert project_matches_filter(None, 'a') is False
+    def test_none_entry_universal(self):
+        # Fix 9: unscoped entities are universally visible
+        assert project_matches_filter(None, 'a') is True
+        assert project_matches_filter('', 'a') is True
 
     def test_none_filter(self):
         assert project_matches_filter('a', None) is False

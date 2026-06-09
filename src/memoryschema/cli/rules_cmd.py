@@ -20,10 +20,9 @@ def rules(config, as_json, conflicts):
         memoryschema rules --conflicts
         memoryschema rules --json
     """
-    from memoryschema.inheritance import resolve_rules, overridden_rules
+    from memoryschema.inheritance import resolve_rules
 
-    resolved = resolve_rules(config.project_root)
-    overridden = overridden_rules(config.project_root)
+    resolved, overridden = resolve_rules(config.project_root)
     overridden_names = {o['filename'] for o in overridden}
 
     if conflicts:
