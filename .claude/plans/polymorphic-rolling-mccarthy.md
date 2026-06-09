@@ -16,7 +16,7 @@ None.
 
 ### CRITICAL
 
-#### 1. Cypher injection via f-string in neo4j_store.py
+#### 1. Cypher injection via f-string in neo4j_store.py ✓ bbf9fc5
 **File:** `src/memoryschema/neo4j_store.py:109-113`
 ```python
 session.run(f"""
@@ -33,7 +33,7 @@ session.run(f"""
 
 ### HIGH
 
-#### 2. Neo4j project scoping reimplements hierarchy logic
+#### 2. Neo4j project scoping reimplements hierarchy logic ✓ 0634851
 **File:** `src/memoryschema/neo4j_store.py:170-174, 189-191, 402-407, 431-434`
 
 The Neo4j store reimplements hierarchy matching with raw string operations:
@@ -49,7 +49,7 @@ The JSONL store uses `project_matches_filter()` / `project_matches_scope()` from
 
 **Fix:** Add `OR m.project IS NULL` to `list_all`, `search`, and `_vector_search` WHERE clauses to match JSONL store behavior for unscoped entities.
 
-#### 3. Relation type constants duplicated in 4 places
+#### 3. Relation type constants duplicated in 4 places ✓ 233880f
 **Files:**
 - `config.py:59-62` (tuple)
 - `validator.py:19-22` (frozenset)
@@ -60,7 +60,7 @@ All four currently match (8 types). But any addition requires updating 4 files. 
 
 **Fix:** Single source of truth. Import from `config.py` or define in a shared constants module. The other three should reference it.
 
-#### 4. tags.py defaults `type` to empty string instead of `semantic`
+#### 4. tags.py defaults `type` to empty string instead of `semantic` ✓ 03dec29
 **File:** `src/memoryschema/tags.py:75`
 ```python
 type_val = root.get('type', '')
@@ -69,14 +69,14 @@ Schema says type defaults to `semantic` when omitted. Empty string is not a vali
 
 **Fix:** Change to `root.get('type') or 'semantic'` (use `or` not default, since the attribute could be explicitly empty).
 
-#### 5. Hook script silent failure when both stores fail
+#### 5. Hook script silent failure when both stores fail ✓ 9e2e313
 **File:** `src/memoryschema/hooks/hook-post-write.sh:85-98`
 
 If both Neo4j and JSONL upserts fail, the Python block exits 0 (line 119 redirects stderr to /dev/null). The bash wrapper checks `$?` but it's 0, so the hook reports success. The memory file is written (L1a) but never indexed (L1b+).
 
 **Fix:** Track whether indexing succeeded and `sys.exit(2)` if both fail. Remove `2>/dev/null` or make it conditional.
 
-#### 6. `tomllib` import without Python 3.10 fallback
+#### 6. `tomllib` import without Python 3.10 fallback ✓ 2a9cacb
 **File:** `src/memoryschema/inheritance.py:12`
 ```python
 import tomllib
@@ -96,28 +96,28 @@ and add `tomli; python_version < "3.11"` to dependencies.
 
 ### MEDIUM
 
-#### 7. Duplicated scoring logic in store.py
+#### 7. Duplicated scoring logic in store.py ✓ 4ac85fb
 **File:** `src/memoryschema/store.py:320-360` (`_score_entry`) and `362-457` (`_score_all_entries`)
 
 `_score_all_entries` reimplements the recency/importance/relevance formula inline for the numpy path (lines 392-412), duplicating `_score_entry`. The two can diverge — the numpy path hardcodes `w_r, w_i, w_v = 0.2, 0.3, 0.5` (semantic mode only, line 390), while `_score_entry` supports both modes.
 
 **Fix:** Extract the weight selection and score computation into a shared helper.
 
-#### 8. Upsert merges `filepath` and `schema` — unclear semantics
+#### 8. Upsert merges `filepath` and `schema` — unclear semantics ✓ 7757856
 **File:** `src/memoryschema/store.py:119-122`
 
 `filepath` is server-managed and `schema` version shouldn't change per-upsert, but both are in the merge loop. Not a bug today, but could cause confusion.
 
 **Fix:** Document the policy or exclude them from the merge loop.
 
-#### 9. `_derive_project` can produce invalid project names
+#### 9. `_derive_project` can produce invalid project names ✓ 4d784a3
 **File:** `src/memoryschema/tags.py:17-39`
 
 A path like `projects//child/` produces empty segments, creating invalid dot-notation. No validation after derivation.
 
 **Fix:** After deriving, validate segments are non-empty and kebab-case before returning.
 
-#### 10. Hook script stderr suppressed
+#### 10. Hook script stderr suppressed ✓ 9e2e313
 **File:** `src/memoryschema/hooks/hook-post-write.sh:119`
 ```bash
 " 2>/dev/null
@@ -130,14 +130,14 @@ All Python stderr is discarded, including parse errors (line 60: `sys.exit(2)`).
 
 ### LOW
 
-#### 11. Dead imports in tags.py
+#### 11. Dead imports in tags.py ✓ 70b8f5b
 - Line 10: `import os` — unused
 - Line 13: `from memoryschema.discovery import discover_memory_files` — unused
 
-#### 12. F2 validation rule not implemented
+#### 12. F2 validation rule not implemented ✓ 19e6faf
 Validator docstring references F1 and F3. F2 (directory scope validation) is mentioned in docs/schema.md but not implemented. This is intentional — memories don't have directory-based scope enforcement — but the docs should be updated to reflect this.
 
-#### 13. `_score_all_entries` numpy path uses semantic mode only
+#### 13. `_score_all_entries` numpy path uses semantic mode only ✓ 4ac85fb
 Line 390 hardcodes `w_r, w_i, w_v = 0.2, 0.3, 0.5`. The `mode` parameter in `_score_entry` is never passed through. All recalls use semantic weights even for structured queries.
 
 ---
@@ -155,7 +155,7 @@ Line 390 hardcodes `w_r, w_i, w_v = 0.2, 0.3, 0.5`. The `mode` parameter in `_sc
 
 ### DOCS
 
-#### 14. Consolidate three plan docs into one
+#### 14. Consolidate three plan docs into one ✓ 3038cb4
 **Files to merge:**
 - `docs/plan-hierarchical-nesting.md` (hierarchy.py, store scoping, relation types, CLI --project)
 - `docs/plan-agent-inheritance.md` (inheritance.py, TOML config, rules resolution, CLI commands)
@@ -170,7 +170,7 @@ All three are marked COMPLETE. They represent a single feature area (agent hiera
 
 Delete the three source files after creating the unified doc. No memory files reference them.
 
-#### 15. Documentation sync pass (after all code fixes)
+#### 15. Documentation sync pass (after all code fixes) ✓ 710dc70
 
 After fixes 1-14 are applied, update all docs to reflect the new state. Changes are quantitative (counts, versions) and clarifying (type defaults, hook behavior), not structural.
 
@@ -200,3 +200,11 @@ After all fixes:
 3. `python -c "from memoryschema import *"` — imports succeed on Python 3.10 (if fallback added)
 4. `memoryschema doctor` — all checks pass (count updated in docs)
 5. `grep -rn "390 tests\|18 checks\|25 test" docs/ README.md .claude/rules/` — no stale counts remain
+
+## Status: COMPLETE
+
+15/15 items implemented. 390 tests passing. 15 [S2] commits.
+Session report: `docs/reports/2026-06-09-session-report-5.md`
+
+Residuals:
+- Neo4j max_depth not honored (architectural — Cypher can't call Python)

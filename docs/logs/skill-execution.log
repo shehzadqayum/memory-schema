@@ -43,3 +43,31 @@
 2026-06-09 16:55:58	plan-commit	START	—	—
 2026-06-09 16:58:57	plan-commit	END	completed	Plan synced, committed 1a97271, pushed. 13 findings, 0 prior residuals.
 2026-06-09 17:11:48	plan-commit	START	—	—
+2026-06-09 17:13:13	plan-commit	END	completed	Plan expanded to 15 items, committed 1b6539f, pushed. Added doc consolidation + sync pass.
+2026-06-09 17:14:11	implement	START	—	—
+2026-06-09 17:17:34	implement	END	completed	Item 1: Cypher injection defense hardened in neo4j_store.py. bbf9fc5
+2026-06-09 17:19:56	implement	START	—	—
+2026-06-09 17:23:09	implement	END	completed	Item 2: Neo4j unscoped entity visibility — 5 queries fixed. 0634851
+2026-06-09 17:23:37	implement	START	—	—
+2026-06-09 17:27:06	implement	END	completed	Item 3: Relation type constants consolidated into config.py. 233880f
+2026-06-09 17:27:40	implement	START	—	—
+2026-06-09 17:29:25	implement	END	completed	Item 4: tags.py type default fixed to semantic. 03dec29
+2026-06-09 17:30:31	implement	START	—	—
+2026-06-09 17:34:16	implement	END	completed	Items 5+10: Hook exit 2 on dual failure, stderr unsuppressed. 9e2e313
+2026-06-09 17:39:08	implement	START	—	—
+2026-06-09 17:43:06	implement	END	completed	Item 6: requires-python bumped to >=3.11 for tomllib. 2a9cacb
+2026-06-09 17:43:31	implement	START	—	—
+2026-06-09 17:49:18	implement	END	completed	Items 7+13: Scoring deduplication via precomputed_relevance + _searchable_text. 4ac85fb
+2026-06-09 17:51:13	implement	START	—	—
+2026-06-09 17:57:45	implement	END	completed	Item 8: schema and filepath immutable in upsert. 7757856
+2026-06-09 17:58:18	implement	START	—	—
+2026-06-09 18:01:32	implement	END	completed	Item 9: _derive_project validates kebab-case segments. 4d784a3
+2026-06-09 18:01:52	implement	START	—	—
+2026-06-09 18:04:43	implement	END	completed	Item 11: Removed dead imports os and discover_memory_files from tags.py. 70b8f5b
+2026-06-09 18:14:36	implement	START	—	—
+2026-06-09 18:16:57	implement	END	completed	Item 12: F2 removed from schema.md validation rules, documented as not implemented. 19e6faf
+2026-06-09 18:17:52	implement	START	—	—
+2026-06-09 18:20:14	implement	END	completed	Item 14: Consolidated 3 plan docs into plan-hierarchy-and-inheritance.md. 3038cb4
+2026-06-09 18:20:45	implement	START	—	—
+2026-06-09 18:24:01	implement	END	completed	Item 15: Final doc sync — 6 files, all stale counts updated. 710dc70. ALL ITEMS COMPLETE.
+2026-06-09 18:24:17	checkpoint	START	—	—

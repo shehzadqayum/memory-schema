@@ -32,3 +32,22 @@
 - Direct `os.environ` reads removed from `neo4j_store.py` and `embeddings.py` — centralized in `config.py`
 - Env var precedence inversion in `from_toml()` — env vars now correctly override TOML values
 - Redundant inline import in `store.py` `compute_associations()`
+- **Cypher injection defense** — explicit ValueError on invalid relation types in `neo4j_store.py`
+- **Neo4j unscoped entities** — `OR m.project IS NULL` in all 5 project-scoped queries
+- **Type default** — `tags.py` now defaults type to `semantic` when omitted (was empty string)
+- **Hook reliability** — exit 2 when both Neo4j and JSONL fail; stderr no longer suppressed
+- **Upsert immutability** — `schema` and `filepath` excluded from merge (immutable after creation)
+- **`_derive_project` validation** — segments validated as non-empty kebab-case
+- **Scoring deduplication** — numpy path uses `_score_entry` with `precomputed_relevance`
+- **Dead imports** — removed unused `os` and `discover_memory_files` from `tags.py`
+
+### Changed (Session 5)
+- `requires-python` bumped from `>=3.10` to `>=3.11` (for `tomllib` stdlib)
+- Relation type constants consolidated — single source of truth in `config.py`
+- Scoring formula: `_searchable_text()` extracted, `precomputed_relevance` param added
+
+### Removed
+- `docs/plan-hierarchical-nesting.md` — consolidated into `plan-hierarchy-and-inheritance.md`
+- `docs/plan-agent-inheritance.md` — consolidated
+- `docs/plan-fix-6-inheritance-issues.md` — consolidated
+- F2 validation rule removed from `docs/schema.md` (was never implemented)
