@@ -46,6 +46,22 @@
 - Relation type constants consolidated — single source of truth in `config.py`
 - Scoring formula: `_searchable_text()` extracted, `precomputed_relevance` param added
 
+### Added (Session 6)
+- `docs/hierarchy-and-inheritance.md` — standalone feature reference (420 lines, 8 sections)
+- `docs/plans/` — history directory for completed plan documents
+- Scoring bonuses documented: hub `+0.05*min(backlinks,5)`, text match `+0.1`
+- Cross-references to new reference doc from README, system-overview, tech-ref, impl-guide
+
+### Fixed (Session 6)
+- Doctor Python version check aligned to 3.11 (was 3.10)
+- Doctor check count in tech-ref and impl-guide: 18 → 20
+- Phantom `memory/user/<name>.md` path removed from schema.md
+- Working memory importance: "8-10" → "10" in system-overview.md
+
+### Changed (Session 6)
+- `docs/plan-hierarchy-and-inheritance.md` moved to `docs/plans/` with superseded note
+- tech-ref hierarchy/inheritance module rows now link to reference doc instead of inline function lists
+
 ### Removed
 - `docs/plan-hierarchical-nesting.md` — consolidated into `plan-hierarchy-and-inheritance.md`
 - `docs/plan-agent-inheritance.md` — consolidated
