@@ -18,10 +18,7 @@ As many entities as the thinking requires. The entity is small by design — vol
 
 ## Importance
 
-Working memory entities should use importance **7-10**:
-- 10: critical decisions, architectural changes, user corrections
-- 8-9: significant findings, evaluations, initiative records
-- 7: routine session reasoning
+All working memory entities MUST use importance **10**. Every response generates a memory event — there is no tiered importance within working memory.
 
 ## Type guidance
 
