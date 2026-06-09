@@ -1,8 +1,11 @@
-"""L0 (MEMORY.md) token budget enforcement.
+"""L0 (MEMORY.md) token budget enforcement and progressive disclosure.
 
 Keeps MEMORY.md under a configurable token budget by evicting
 the lowest-scoring entries. Evicted entries persist in L1+ stores;
 only their L0 index visibility is removed.
+
+Progressive disclosure: entries are grouped by type under section
+headers. The index points to retrieval — it does not substitute.
 
 Token estimation: chars / 4 (conservative approximation).
 """
@@ -105,3 +108,79 @@ def enforce_budget(index_path, store_path=None, token_budget=DEFAULT_TOKEN_BUDGE
         'tokens_before': tokens_before,
         'tokens_after': tokens_after,
     }
+
+
+# Category headers for progressive disclosure
+_CATEGORY_ORDER = ['semantic', 'procedural', 'episodic']
+_CATEGORY_HEADERS = {
+    'semantic': '### Knowledge',
+    'procedural': '### Procedures',
+    'episodic': '### Session History',
+}
+
+
+def categorize_index(index_path, store_path=None):
+    """Reorganize MEMORY.md entries under type-based category headers.
+
+    Groups entries by memory type (semantic, procedural, episodic)
+    with one-line section headers. Preserves the title line.
+    Entries without a known type go under Knowledge (default).
+
+    Args:
+        index_path: Path to MEMORY.md.
+        store_path: Path to store.jsonl (for type lookup).
+
+    Returns:
+        Number of entries categorized, or 0 if no changes.
+    """
+    if not os.path.exists(index_path):
+        return 0
+
+    with open(index_path, 'r') as f:
+        content = f.read()
+
+    entries, other_lines = parse_index_entries(content)
+    if not entries:
+        return 0
+
+    # Look up types from store
+    type_map = {}
+    if store_path and os.path.exists(store_path):
+        try:
+            from memoryschema.store import MemoryStore
+            store = MemoryStore(store_path)
+            for name, _ in entries:
+                entry = store.get(name)
+                if entry:
+                    type_map[name] = entry.get('type', 'semantic')
+        except Exception:
+            pass
+
+    # Group entries by category
+    categories = {cat: [] for cat in _CATEGORY_ORDER}
+    for name, line in entries:
+        entry_type = type_map.get(name, 'semantic')
+        if entry_type not in categories:
+            entry_type = 'semantic'
+        categories[entry_type].append(line)
+
+    # Reconstruct: title + non-entry lines first, then categories
+    title_lines = [l for l in other_lines if l.strip() and not l.startswith('###')]
+    output = []
+    for line in title_lines:
+        output.append(line)
+    output.append('')
+
+    for cat in _CATEGORY_ORDER:
+        cat_entries = categories[cat]
+        if cat_entries:
+            output.append(_CATEGORY_HEADERS[cat])
+            output.extend(cat_entries)
+            output.append('')
+
+    final = '\n'.join(output).strip() + '\n'
+
+    with open(index_path, 'w') as f:
+        f.write(final)
+
+    return len(entries)

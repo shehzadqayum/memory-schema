@@ -142,6 +142,12 @@ if name and provenance != 'ingested':
                       file=sys.stderr)
         except Exception:
             pass  # Budget enforcement failure does not block
+        # Progressive disclosure: group entries by type
+        try:
+            from memoryschema.l0_budget import categorize_index
+            categorize_index(index_path, store_path)
+        except Exception:
+            pass  # Categorization failure does not block
     except Exception:
         pass  # MEMORY.md update failure does not block indexing
 "
