@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "XML-based memory entity system with JSONL/Neo4j storage, Voyage AI embeddings, and Claude Code integration"
 readme = "README.md"
 license = "MIT"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 keywords = ["memory", "schema", "claude", "neo4j", "embeddings", "knowledge-graph"]
 
 dependencies = [
