@@ -105,12 +105,21 @@ class Neo4jMemoryStore:
             for rel in relations:
                 target = rel.get('target')
                 rel_type = rel.get('type')
-                if target and rel_type and rel_type in _RELATION_TYPES and target != name:
-                    session.run(f"""
-                        MATCH (s:Memory {{name: $source}})
-                        MERGE (t:Memory {{name: $target}})
-                        MERGE (s)-[r:{rel_type}]->(t)
-                    """, source=name, target=target)
+                if not (target and rel_type and target != name):
+                    continue
+                # SECURITY: Neo4j does not support parameterized relationship
+                # types. The allowlist check below is the security boundary —
+                # rel_type is interpolated into the Cypher query via f-string.
+                if rel_type not in _RELATION_TYPES:
+                    raise ValueError(
+                        f"Invalid relation type {rel_type!r}, "
+                        f"must be one of: {', '.join(sorted(_RELATION_TYPES))}"
+                    )
+                session.run(f"""
+                    MATCH (s:Memory {{name: $source}})
+                    MERGE (t:Memory {{name: $target}})
+                    MERGE (s)-[r:{rel_type}]->(t)
+                """, source=name, target=target)
 
         return self.get(name)
 
