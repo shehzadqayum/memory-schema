@@ -54,3 +54,4 @@ Prior residuals: R1 Neo4j max_depth → addressing in Phase 4.6.
 - `adc8c71` — `[S2] Phase 5.3 — Progressive disclosure with category grouping` — Knowledge/Procedures/History headers
 - `6cfa4d5` — `[S2] Phase 6 — Evaluation harness with fixtures, metrics, poisoning suite` — 19 eval tests, 427 total
 - `d299bf7` — `[S3] Session 7 checkpoint — v3 complete, 25/25 PASS` — Feedback commit
+- `15d8e4d` — `[S4] session close — Memory System v3 complete` — Unit of work ID
