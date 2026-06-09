@@ -40,6 +40,11 @@ Lifecycle:
 
 Hook Management:
     hook           Manage PostToolUse hook (install, uninstall, status, test)
+
+Diagnostics & Inheritance:
+    doctor         20-point health check (TOML, rules inheritance, tests)
+    rules          Show effective rules with inheritance markers
+    config         Show effective config with inheritance chain
 """
 
 import click
@@ -87,7 +92,10 @@ def init(config, with_neo4j, scopes, neo4j_password):
     """Initialize a new project with the memory system.
 
     Creates memory/ directory, docker-compose.yml, .env.example,
-    and .claude/rules/ files. Optionally deploys Neo4j.
+    memoryschema.toml, and .claude/rules/ files. Optionally deploys Neo4j.
+
+    For nested agents, run init inside the parent project. The TOML config
+    supports hierarchical inheritance via dot-notation project names.
 
     Example:
         memoryschema init --project my-project --scopes working,corpus --with-neo4j

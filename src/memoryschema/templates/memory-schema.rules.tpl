@@ -80,7 +80,7 @@ Three types. Optional — defaults to `semantic` if omitted.
 
 ## Rule 4: Relations
 
-Six typed links connect entities explicitly. All optional.
+Eight typed links connect entities explicitly. All optional.
 
 | Type | Meaning |
 |------|---------|
@@ -90,8 +90,12 @@ Six typed links connect entities explicitly. All optional.
 | `DEPENDS_ON` | A requires B to be true/valid |
 | `INFORMS` | A provides context for B |
 | `CONTRADICTS` | A and B conflict |
+| `PARENT_OF` | A is the parent agent of B |
+| `CHILD_OF` | A is a child agent of B |
 
 Rules: target must be a valid memory name. No self-references. No duplicate target+type pairs.
+
+**Hierarchy scoping:** Projects use dot-notation (`parent.child.grandchild`). Parent agents see child memories (containment). Child agents see parent memories during recall (inheritance). Unscoped entities are universally visible.
 
 ---
 

@@ -127,7 +127,7 @@ Three memory types. Optional — defaults to `semantic` if omitted.
 
 ## Relation Types
 
-Six relation types define explicit connections between memories.
+Eight relation types define explicit connections between memories.
 
 | Type | Direction | Meaning |
 | --- | --- | --- |
@@ -137,8 +137,37 @@ Six relation types define explicit connections between memories.
 | `DEPENDS_ON` | A → B | A requires B to be true/valid |
 | `INFORMS` | A → B | A provides context for B |
 | `CONTRADICTS` | A ↔ B | A and B conflict |
+| `PARENT_OF` | A → B | A is the parent agent of B |
+| `CHILD_OF` | A → B | A is a child agent of B |
 
 **Rules:** Target must be a valid memory name. No self-references. No invented types. Deduplicated on upsert.
+
+### Dot-Notation Project Hierarchy
+
+Projects use dot-notation to encode agent nesting: `parent.child.grandchild`.
+
+```
+parse_project_path('org.team.sub')  →  ['org', 'team', 'sub']
+parent_project('org.team.sub')      →  'org.team'
+ancestor_projects('org.team.sub')   →  ['org.team', 'org']
+```
+
+Each segment must be kebab-case. No leading/trailing dots. No empty segments.
+
+### Hierarchy Scoping
+
+Two matching modes control memory visibility across the hierarchy:
+
+**Bidirectional (recall)** — `project_matches_scope(entry, scope)`:
+- Child sees parent memories (inheritance)
+- Parent sees child memories (containment)
+- Unscoped entities (no project field) are universally visible
+- Optional `max_depth` limits how many levels up/down a match can reach
+
+**Subtree-only (search/list)** — `project_matches_filter(entry, filter)`:
+- Parent sees children (containment)
+- Children do NOT see parent (no upward inheritance)
+- Unscoped entities are universally visible
 
 ### Three Connection Types
 

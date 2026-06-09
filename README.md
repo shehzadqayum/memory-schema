@@ -1,6 +1,6 @@
 # memory-schema
 
-XML-based memory entity system with JSONL/Neo4j storage, Voyage AI embeddings, and Claude Code integration.
+XML-based memory entity system with JSONL/Neo4j storage, Voyage AI embeddings, hierarchical agent nesting, and Claude Code integration.
 
 ## Quickstart
 
@@ -70,6 +70,23 @@ memoryschema init --project my-project --scopes working
 ```
 
 Works immediately. Add Neo4j later with `memoryschema neo4j deploy`.
+
+### TOML Configuration
+
+`memoryschema init` generates a `memoryschema.toml` config file. For nested agents, config inherits upward — parent TOML values override child on conflict:
+
+```bash
+# Parent agent
+memoryschema --project org init
+
+# Child agent (inside parent)
+cd projects/team-alpha
+memoryschema --project org.team-alpha init
+
+# Inspect inheritance
+memoryschema config --chain
+memoryschema rules --conflicts
+```
 
 ---
 
@@ -175,12 +192,12 @@ Each external service is optional. The system degrades gracefully:
 | Command | Description |
 |---------|-------------|
 | `memoryschema status` | Backend, node count, store path |
-| `memoryschema recall <query>` | Semantic search with cascade |
+| `memoryschema recall <query> [--project]` | Semantic search with cascade (scoped to hierarchy) |
 | `memoryschema get <name>` | Retrieve single entity |
 | `memoryschema list` | List entities with filters |
 | `memoryschema write <file>` | Parse, validate, embed, index |
 | `memoryschema delete <name> --confirm` | Remove entity |
-| `memoryschema search <text>` | Keyword search |
+| `memoryschema search <text> [--project]` | Keyword search (scoped to subtree) |
 | `memoryschema validate [path]` | Schema validation |
 
 ### Indexing
@@ -204,6 +221,15 @@ Each external service is optional. The system degrades gracefully:
 | `memoryschema export` | Portable archive |
 | `memoryschema import <source>` | Import from archive |
 
+### Diagnostics & Inheritance
+| Command | Description |
+|---------|-------------|
+| `memoryschema doctor` | 20-point health check (includes TOML + rules inheritance) |
+| `memoryschema rules` | Show effective rules with inheritance markers |
+| `memoryschema rules --conflicts` | Show child rules overridden by parent |
+| `memoryschema config` | Show effective config |
+| `memoryschema config --chain` | Show config inheritance chain with sources |
+
 All query commands support `--json` for agent consumption. All destructive commands require `--confirm`.
 
 ---
@@ -223,6 +249,8 @@ All query commands support `--json` for agent consumption. All destructive comma
 ```
 L0: MEMORY.md → L1a: Markdown files → L1b: JSONL → L2a: Embeddings → L2b: Neo4j
 ```
+
+**Hierarchical Inheritance:** Projects nest as agents via dot-notation (`parent.child`). Parent's config and rules override child's on conflict. Config via `memoryschema.toml` files with upward chain walking. Env vars > CLI > parent TOML > child TOML > defaults. See `docs/system-overview.md` for details.
 
 ---
 
@@ -257,7 +285,7 @@ pytest tests/ --cov=memoryschema --cov-report=term-missing
 pytest tests/test_store.py -v
 ```
 
-**262 tests** across 15 test files covering all 21 modules:
+**390 tests** across 25 test files covering all modules:
 
 | Category | Files | Tests | What's tested |
 |----------|------:|------:|---------------|

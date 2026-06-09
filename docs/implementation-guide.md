@@ -167,3 +167,38 @@ def test_my_entity():
 6. Start Claude Code
 
 The schema is the same across all projects. Only the guidelines change.
+
+## TOML Configuration
+
+`memoryschema init` generates a `memoryschema.toml` file:
+
+```toml
+[project]
+name = "my-project"
+
+[neo4j]
+uri = "bolt://localhost:7687"
+
+[retrieval]
+recall_depth = 2
+```
+
+Config inherits upward — parent TOML values override child on conflict. Environment variables override everything.
+
+## Nested Agent Setup
+
+```bash
+# Parent agent
+memoryschema --project org init --with-neo4j
+
+# Child agent (inside parent directory)
+cd projects/team-alpha
+memoryschema --project org.team-alpha init
+```
+
+Verify inheritance:
+
+```bash
+memoryschema config --chain     # shows config sources
+memoryschema rules --conflicts  # shows overridden rules
+```

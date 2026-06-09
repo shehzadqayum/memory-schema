@@ -287,9 +287,10 @@ def run_checks(config):
 @click.option("--fix", "auto_fix", is_flag=True, help="Auto-fix fixable issues (init, deploy, hook install).")
 @click.pass_obj
 def doctor(config, as_json, auto_fix):
-    """Run diagnostic checks on the memory system.
+    """Run 20-point diagnostic checks on the memory system.
 
     Checks every component — Python, package, config, filesystem,
+    TOML config validity, rules inheritance conflicts,
     Docker, Neo4j, Voyage AI, hook, tests — and reports status
     with cause and remediation for any failures.
 

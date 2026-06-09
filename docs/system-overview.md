@@ -88,6 +88,43 @@ memoryschema doctor --fix    # Auto-remediation suggestions
 
 Every failed check prints what went wrong and the exact command to fix it.
 
+## Agent Hierarchy
+
+Each project folder is an agent. Agents nest via dot-notation: `parent.child.grandchild`.
+
+**Containment model:** Parent's scope includes everything in the child's scope. Agents communicate through shared memories — the memory graph is the communication bus.
+
+**Memory visibility:**
+- Parent always sees child memories (containment)
+- Child sees parent memories during recall (inheritance)
+- Unscoped entities (no project field) are universally visible
+
+## Configuration Inheritance
+
+Config via `memoryschema.toml` files. Resolution order (highest to lowest):
+
+```
+1. Environment variables     (NEO4J_URI, VOYAGE_API_KEY, etc.)
+2. CLI flags                 (--project, --root)
+3. Parent memoryschema.toml  (parent wins over child on conflict)
+4. Child memoryschema.toml
+5. Dataclass defaults
+```
+
+**Parent-absolute authority:** Parent's config values override child's. Child can only set values the parent didn't define. Child has full autonomy when parent is absent.
+
+Use `memoryschema config --chain` to inspect the resolution chain.
+
+## Rules Inheritance
+
+Rules are `.claude/rules/*.md` files. Inheritance follows the same parent-wins model:
+
+- Parent's rule replaces child's on filename conflict
+- Child's unique rules are additive
+- Child has full control when parent is absent
+
+Use `memoryschema rules --conflicts` to see overridden rules.
+
 ## Full Specification
 
 - **Schema:** `docs/schema.md` — the authoritative structural reference
