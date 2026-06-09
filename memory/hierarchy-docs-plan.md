@@ -29,4 +29,4 @@ Prior residuals: R1 Neo4j max_depth → deferring (architectural).
 - `95dfb1c` — `[S2] Document scoring bonuses (hub + text match)` — Item 7: scoring docs
 - `d175037` — `[S2] Add cross-references to hierarchy-and-inheritance.md` — Item 8: xrefs
 - `8302dd6` — `[S2] CHANGELOG session 6 entries + verify template sync` — Item 9: final
-- (pending) — `[S3] Session 6 checkpoint — 9/9 audited PASS` — Feedback commit
+- `267553c` — `[S3] Session 6 checkpoint — 9/9 audited PASS` — Feedback commit
