@@ -16,3 +16,4 @@
 - [docs-update-plan](docs-update-plan.md) — Plan to update all documentation for hierarchy and inheritance features
 - [session-4-close](session-4-close.md) — Session 4 complete — full documentation alignment, 8 items across 12 files
 - [package-audit-plan](package-audit-plan.md) — Full package audit plan — 13 findings across CRITICAL/HIGH/MEDIUM/LOW
+- [session-5-close](session-5-close.md) — Session 5 complete — full package audit, 15 items, 13 code fixes + 2 doc items

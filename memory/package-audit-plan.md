@@ -43,4 +43,4 @@ Prior residuals: None (from [S4] b3226f3).
 - `19e6faf` — `[S2] Remove F2 from validation rules` — Item 12: docs alignment
 - `3038cb4` — `[S2] Consolidate 3 plan docs into plan-hierarchy-and-inheritance` — Item 14: unified doc
 - `710dc70` — `[S2] Final documentation sync — counts, Python version, F2 note` — Item 15: doc sync
-- (pending) — `[S3] Session 5 checkpoint — 15/15 audited PASS` — Feedback commit
+- `23d474b` — `[S3] Session 5 checkpoint — 15/15 audited PASS` — Feedback commit
