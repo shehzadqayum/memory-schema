@@ -25,6 +25,7 @@ _DEFAULT_PASSWORD = os.environ.get('NEO4J_PASSWORD', 'changeme')
 
 _RELATION_TYPES = frozenset({
     'USES', 'MODIFIES', 'SUPERSEDES', 'DEPENDS_ON', 'INFORMS', 'CONTRADICTS',
+    'PARENT_OF', 'CHILD_OF',
 })
 
 
@@ -169,9 +170,16 @@ class Neo4jMemoryStore:
                 name=name)
             return result.single()['deleted'] > 0
 
-    def list_all(self):
+    def list_all(self, project=None):
         with self._driver.session() as session:
-            result = session.run("MATCH (m:Memory) RETURN m")
+            if project is not None:
+                result = session.run("""
+                    MATCH (m:Memory)
+                    WHERE m.project = $project OR m.project STARTS WITH $project_prefix
+                    RETURN m
+                """, project=project, project_prefix=project + '.')
+            else:
+                result = session.run("MATCH (m:Memory) RETURN m")
             return [self._node_to_dict(r['m']) for r in result]
 
     # --- Search ---
@@ -184,29 +192,39 @@ class Neo4jMemoryStore:
                     CALL db.index.fulltext.queryNodes('memory_fulltext', $search_query)
                     YIELD node, score
                     WHERE ($filter_type IS NULL OR node.type = $filter_type)
-                      AND ($filter_project IS NULL OR node.project = $filter_project)
+                      AND ($filter_project IS NULL
+                           OR node.project = $filter_project
+                           OR node.project STARTS WITH $filter_project_prefix)
                     RETURN node
                     LIMIT $result_limit
                 """, search_query=query, filter_type=type,
-                    filter_project=project, result_limit=limit)
+                    filter_project=project,
+                    filter_project_prefix=(project + '.') if project else None,
+                    result_limit=limit)
             else:
                 clauses = ["MATCH (m:Memory)"]
                 wheres = []
                 if type:
                     wheres.append("m.type = $filter_type")
                 if project:
-                    wheres.append("m.project = $filter_project")
+                    wheres.append("(m.project = $filter_project OR m.project STARTS WITH $filter_project_prefix)")
                 if wheres:
                     clauses.append("WHERE " + " AND ".join(wheres))
                 clauses.append("RETURN m AS node LIMIT $result_limit")
                 result = session.run(' '.join(clauses),
-                                     filter_type=type, filter_project=project, result_limit=limit)
+                                     filter_type=type, filter_project=project,
+                                     filter_project_prefix=(project + '.') if project else None,
+                                     result_limit=limit)
             return [self._node_to_dict(r.get('node') or r.get('m')) for r in result]
 
     # --- Recall ---
 
-    def recall(self, query=None, name=None, depth=2, decay=0.8, limit=10):
-        """Cascade recall with spreading activation via Neo4j."""
+    def recall(self, query=None, name=None, depth=2, decay=0.8, limit=10, project=None):
+        """Cascade recall with spreading activation via Neo4j.
+
+        If project is set, scopes traversal to the project hierarchy
+        (bidirectional: child sees parent, parent sees child).
+        """
         query_embedding = None
         if query:
             try:
@@ -221,7 +239,7 @@ class Neo4jMemoryStore:
             if entry:
                 seeds = [entry]
         elif query and query_embedding:
-            seeds = self._vector_search(query_embedding, top_k=3)
+            seeds = self._vector_search(query_embedding, top_k=3, project=project)
         else:
             return []
 
@@ -260,7 +278,7 @@ class Neo4jMemoryStore:
             next_hop = current_hop + 1
             hop_score = current_score * decay
 
-            neighbors = self._get_neighbors(current['name'])
+            neighbors = self._get_neighbors(current['name'], project=project)
 
             for neighbor_info in neighbors:
                 neighbor = neighbor_info['entry']
@@ -293,26 +311,46 @@ class Neo4jMemoryStore:
 
     # --- Associations ---
 
-    def compute_backlinks(self):
+    def compute_backlinks(self, project=None):
         """Backlinks are implicit in Neo4j — count nodes with incoming relations."""
         with self._driver.session() as session:
-            result = session.run("""
-                MATCH (m:Memory)<-[r]-(:Memory)
-                WHERE type(r) IN $rel_types
-                WITH m, count(r) AS bl
-                WHERE bl > 0
-                RETURN count(m) AS n
-            """, rel_types=list(_RELATION_TYPES))
+            if project is not None:
+                result = session.run("""
+                    MATCH (m:Memory)<-[r]-(s:Memory)
+                    WHERE type(r) IN $rel_types
+                      AND (m.project = $project OR m.project STARTS WITH $project_prefix)
+                      AND (s.project = $project OR s.project STARTS WITH $project_prefix)
+                    WITH m, count(r) AS bl
+                    WHERE bl > 0
+                    RETURN count(m) AS n
+                """, rel_types=list(_RELATION_TYPES),
+                    project=project, project_prefix=project + '.')
+            else:
+                result = session.run("""
+                    MATCH (m:Memory)<-[r]-(:Memory)
+                    WHERE type(r) IN $rel_types
+                    WITH m, count(r) AS bl
+                    WHERE bl > 0
+                    RETURN count(m) AS n
+                """, rel_types=list(_RELATION_TYPES))
             return result.single()['n']
 
-    def compute_associations(self, k=10):
+    def compute_associations(self, k=10, project=None):
         """Compute k-NN associations using vector index."""
         with self._driver.session() as session:
-            result = session.run("""
-                MATCH (m:Memory)
-                WHERE m.embedding IS NOT NULL
-                RETURN m.name AS name
-            """)
+            if project is not None:
+                result = session.run("""
+                    MATCH (m:Memory)
+                    WHERE m.embedding IS NOT NULL
+                      AND (m.project = $project OR m.project STARTS WITH $project_prefix)
+                    RETURN m.name AS name
+                """, project=project, project_prefix=project + '.')
+            else:
+                result = session.run("""
+                    MATCH (m:Memory)
+                    WHERE m.embedding IS NOT NULL
+                    RETURN m.name AS name
+                """)
             names = [r['name'] for r in result]
 
             if len(names) < 2:
@@ -363,13 +401,27 @@ class Neo4jMemoryStore:
 
     # --- Internal helpers ---
 
-    def _vector_search(self, query_embedding, top_k=10):
+    def _vector_search(self, query_embedding, top_k=10, project=None):
         with self._driver.session() as session:
-            result = session.run("""
-                CALL db.index.vector.queryNodes('memory_embedding', $top_k, $embedding)
-                YIELD node, score
-                RETURN node, score
-            """, embedding=query_embedding, top_k=top_k)
+            if project is not None:
+                # Over-fetch and post-filter for scope (vector index has no pre-filter)
+                result = session.run("""
+                    CALL db.index.vector.queryNodes('memory_embedding', $oversample, $embedding)
+                    YIELD node, score
+                    WHERE node.project = $project
+                       OR node.project STARTS WITH $project_prefix
+                       OR $project STARTS WITH (node.project + '.')
+                    RETURN node, score
+                    LIMIT $top_k
+                """, embedding=query_embedding, top_k=top_k,
+                    oversample=top_k * 3, project=project,
+                    project_prefix=project + '.')
+            else:
+                result = session.run("""
+                    CALL db.index.vector.queryNodes('memory_embedding', $top_k, $embedding)
+                    YIELD node, score
+                    RETURN node, score
+                """, embedding=query_embedding, top_k=top_k)
             entries = []
             for r in result:
                 entry = self._node_to_dict(r['node'])
@@ -377,14 +429,23 @@ class Neo4jMemoryStore:
                 entries.append(entry)
             return entries
 
-    def _get_neighbors(self, name):
+    def _get_neighbors(self, name, project=None):
         neighbors = []
+        scope_clause = ""
+        scope_params = {}
+        if project is not None:
+            scope_clause = """
+                AND (n.project = $scope_project
+                     OR n.project STARTS WITH $scope_prefix
+                     OR $scope_project STARTS WITH (n.project + '.'))"""
+            scope_params = {'scope_project': project, 'scope_prefix': project + '.'}
+
         with self._driver.session() as session:
-            result = session.run("""
-                MATCH (m:Memory {name: $name})-[r]->(n:Memory)
-                WHERE type(r) IN $rel_types
+            result = session.run(f"""
+                MATCH (m:Memory {{name: $name}})-[r]->(n:Memory)
+                WHERE type(r) IN $rel_types{scope_clause}
                 RETURN n, type(r) AS rel_type
-            """, name=name, rel_types=list(_RELATION_TYPES))
+            """, name=name, rel_types=list(_RELATION_TYPES), **scope_params)
             for r in result:
                 neighbors.append({
                     'entry': self._node_to_dict(r['n']),
@@ -392,11 +453,11 @@ class Neo4jMemoryStore:
                     'rel_type': r['rel_type'],
                 })
 
-            result = session.run("""
-                MATCH (n:Memory)-[r]->(m:Memory {name: $name})
-                WHERE type(r) IN $rel_types
+            result = session.run(f"""
+                MATCH (n:Memory)-[r]->(m:Memory {{name: $name}})
+                WHERE type(r) IN $rel_types{scope_clause}
                 RETURN n, type(r) AS rel_type
-            """, name=name, rel_types=list(_RELATION_TYPES))
+            """, name=name, rel_types=list(_RELATION_TYPES), **scope_params)
             for r in result:
                 neighbors.append({
                     'entry': self._node_to_dict(r['n']),
@@ -404,10 +465,17 @@ class Neo4jMemoryStore:
                     'rel_type': r['rel_type'],
                 })
 
-            result = session.run("""
-                MATCH (m:Memory {name: $name})-[a:ASSOCIATED_WITH]->(n:Memory)
+            assoc_scope = ""
+            if project is not None:
+                assoc_scope = """
+                    AND (n.project = $scope_project
+                         OR n.project STARTS WITH $scope_prefix
+                         OR $scope_project STARTS WITH (n.project + '.'))"""
+            result = session.run(f"""
+                MATCH (m:Memory {{name: $name}})-[a:ASSOCIATED_WITH]->(n:Memory)
+                WHERE true{assoc_scope}
                 RETURN n, a.score AS score
-            """, name=name)
+            """, name=name, **scope_params)
             for r in result:
                 neighbors.append({
                     'entry': self._node_to_dict(r['n']),

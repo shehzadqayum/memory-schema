@@ -17,16 +17,25 @@ from memoryschema.validator import extract_entity_block, parse_entity
 def _derive_project(filepath):
     """Extract project name from filepath.
 
-    Looks for 'projects/<name>/' segment in the path.
-    Returns the project name or None.
+    Looks for 'projects/<name>/' segments in the path.
+    Supports nested projects: projects/parent/projects/child/ -> parent.child
+
+    Returns the project name (dot-notation) or None.
     """
     if not filepath:
         return None
     normalized = filepath.replace('\\', '/')
     parts = normalized.split('/')
-    for i, part in enumerate(parts):
-        if part == 'projects' and i + 1 < len(parts):
-            return parts[i + 1]
+    segments = []
+    i = 0
+    while i < len(parts):
+        if parts[i] == 'projects' and i + 1 < len(parts):
+            segments.append(parts[i + 1])
+            i += 2
+        else:
+            i += 1
+    if segments:
+        return '.'.join(segments)
     return None
 
 

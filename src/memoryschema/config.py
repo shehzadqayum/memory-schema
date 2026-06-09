@@ -58,6 +58,7 @@ class MemoryConfig:
     valid_types: tuple = ("semantic", "episodic", "procedural")
     valid_relation_types: tuple = (
         "USES", "MODIFIES", "SUPERSEDES", "DEPENDS_ON", "INFORMS", "CONTRADICTS",
+        "PARENT_OF", "CHILD_OF",
     )
 
     # Retrieval
@@ -99,3 +100,15 @@ class MemoryConfig:
     def env_example_path(self) -> Path:
         """Path to .env.example."""
         return self.project_root / ".env.example"
+
+    @property
+    def project_segments(self) -> list[str]:
+        """Split project_name into hierarchy segments."""
+        from memoryschema.hierarchy import parse_project_path
+        return parse_project_path(self.project_name)
+
+    @property
+    def parent_project_name(self) -> str | None:
+        """Parent project name, or None if root."""
+        from memoryschema.hierarchy import parent_project
+        return parent_project(self.project_name)

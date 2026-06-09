@@ -18,6 +18,7 @@ import xml.etree.ElementTree as ET
 VALID_TYPES = frozenset({'semantic', 'episodic', 'procedural'})
 VALID_RELATION_TYPES = frozenset({
     'USES', 'MODIFIES', 'SUPERSEDES', 'DEPENDS_ON', 'INFORMS', 'CONTRADICTS',
+    'PARENT_OF', 'CHILD_OF',
 })
 KEBAB_CASE = re.compile(r'^[a-z0-9]+(-[a-z0-9]+)*$')
 SCHEMA_VERSION = 2

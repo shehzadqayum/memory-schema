@@ -40,20 +40,25 @@ def status(config, as_json):
 @click.command()
 @click.argument("query")
 @click.option("--limit", "-n", default=10, type=int, help="Maximum results. Default: 10.")
+@click.option("--project", "-p", default=None, help="Scope recall to this project hierarchy.")
 @click.option("--json", "as_json", is_flag=True, help="Output as JSON for agent consumption.")
 @click.pass_obj
-def recall(config, query, limit, as_json):
+def recall(config, query, limit, project, as_json):
     """Semantic search across memories.
 
     Finds seed memories via vector similarity, then cascades through
     relations, backlinks, and associations.
 
+    Use --project to scope recall to a project and its hierarchy
+    (parent sees children, children inherit from parent).
+
     Example:
         memoryschema recall "order block definition"
         memoryschema recall "schema v2 changes" --limit 5
+        memoryschema recall "auth flow" --project ict.auth
     """
     store = _get_store(config)
-    results = store.recall(query=query, limit=limit)
+    results = store.recall(query=query, limit=limit, project=project)
 
     if as_json:
         click.echo(json.dumps(results, indent=2))
@@ -206,18 +211,22 @@ def delete(config, name, confirm):
 @click.command()
 @click.argument("text")
 @click.option("--type", "type_filter", help="Filter by type.")
+@click.option("--project", "-p", default=None, help="Filter to this project subtree.")
 @click.option("--limit", "-n", default=10, type=int, help="Maximum results. Default: 10.")
 @click.option("--json", "as_json", is_flag=True, help="Output as JSON for agent consumption.")
 @click.pass_obj
-def search(config, text, type_filter, limit, as_json):
+def search(config, text, type_filter, project, limit, as_json):
     """Full-text keyword search (not semantic — substring match).
+
+    Use --project to filter results to a project subtree.
 
     Example:
         memoryschema search "order block"
         memoryschema search "schema" --type semantic
+        memoryschema search "auth" --project ict
     """
     store = _get_store(config)
-    results = store.search(query=text, type=type_filter, limit=limit)
+    results = store.search(query=text, type=type_filter, project=project, limit=limit)
 
     if as_json:
         click.echo(json.dumps([{k: v for k, v in r.items() if k != 'embedding'} for r in results], indent=2))

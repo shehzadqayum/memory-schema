@@ -39,6 +39,16 @@ from memoryschema.validator import (
     parse_entity,
 )
 from memoryschema.consolidation import consolidate
+from memoryschema.hierarchy import (
+    parse_project_path,
+    parent_project,
+    ancestor_projects,
+    is_ancestor_of,
+    is_descendant_of,
+    project_matches_scope,
+    project_matches_filter,
+    validate_project_name,
+)
 
 __all__ = [
     "__version__",
@@ -54,6 +64,15 @@ __all__ = [
     "extract_entity_block",
     "parse_entity",
     "consolidate",
+    # Hierarchy
+    "parse_project_path",
+    "parent_project",
+    "ancestor_projects",
+    "is_ancestor_of",
+    "is_descendant_of",
+    "project_matches_scope",
+    "project_matches_filter",
+    "validate_project_name",
     # Lazy imports (optional deps)
     "Neo4jMemoryStore",
     "embed_text",

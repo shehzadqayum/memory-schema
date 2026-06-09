@@ -17,6 +17,7 @@ from neo4j import GraphDatabase
 
 _RELATION_TYPES = frozenset({
     'USES', 'MODIFIES', 'SUPERSEDES', 'DEPENDS_ON', 'INFORMS', 'CONTRADICTS',
+    'PARENT_OF', 'CHILD_OF',
 })
 
 

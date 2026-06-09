@@ -190,8 +190,10 @@ class MemoryStore:
         for entry in entries:
             if type is not None and entry.get('type') != type:
                 continue
-            if project is not None and entry.get('project') != project:
-                continue
+            if project is not None:
+                from memoryschema.hierarchy import project_matches_filter
+                if not project_matches_filter(entry.get('project', ''), project):
+                    continue
             if query is not None:
                 q = query.lower()
                 searchable = ' '.join([
@@ -219,40 +221,58 @@ class MemoryStore:
         self._save(new_entries)
         return True
 
-    def list_all(self):
-        """Return all entries."""
-        return self._load()
+    def list_all(self, project=None):
+        """Return all entries, optionally filtered to a project subtree."""
+        entries = self._load()
+        if project is not None:
+            from memoryschema.hierarchy import project_matches_filter
+            entries = [e for e in entries
+                       if project_matches_filter(e.get('project', ''), project)]
+        return entries
 
-    def compute_backlinks(self):
+    def compute_backlinks(self, project=None):
         """Recompute all backlinks from relation data.
 
+        If project is set, only compute for entries in that project subtree.
         Returns the number of entries that have backlinks.
         """
         entries = self._load()
         entry_map = {e['name']: e for e in entries if 'name' in e}
 
+        if project is not None:
+            from memoryschema.hierarchy import project_matches_filter
+            scoped_names = {name for name, e in entry_map.items()
+                           if project_matches_filter(e.get('project', ''), project)}
+        else:
+            scoped_names = None
+
         for entry in entries:
-            entry['backlinks'] = []
+            if scoped_names is None or entry.get('name') in scoped_names:
+                entry['backlinks'] = []
 
         for entry in entries:
             source_name = entry.get('name')
             if not source_name:
                 continue
+            if scoped_names is not None and source_name not in scoped_names:
+                continue
             for rel in entry.get('relations', []):
                 target = rel.get('target')
                 rel_type = rel.get('type')
                 if target and target in entry_map:
-                    entry_map[target]['backlinks'].append({
-                        'source': source_name,
-                        'type': rel_type,
-                    })
+                    if scoped_names is None or target in scoped_names:
+                        entry_map[target]['backlinks'].append({
+                            'source': source_name,
+                            'type': rel_type,
+                        })
 
         self._save(entries)
         return sum(1 for e in entries if e.get('backlinks'))
 
-    def compute_associations(self, k=10):
+    def compute_associations(self, k=10, project=None):
         """Compute k-nearest neighbors from embedding proximity.
 
+        If project is set, only compute for entries in that project subtree.
         Uses numpy for vectorized cosine similarity when available,
         falls back to pure Python otherwise.
 
@@ -260,6 +280,10 @@ class MemoryStore:
         """
         entries = self._load()
         embedded = [e for e in entries if e.get('embedding')]
+        if project is not None:
+            from memoryschema.hierarchy import project_matches_filter
+            embedded = [e for e in embedded
+                        if project_matches_filter(e.get('project', ''), project)]
 
         if len(embedded) < 2:
             return 0
@@ -434,16 +458,25 @@ class MemoryStore:
             scored.append((entry, score))
         return scored
 
-    def recall(self, query=None, name=None, depth=2, decay=0.8, limit=10):
+    def recall(self, query=None, name=None, depth=2, decay=0.8, limit=10, project=None):
         """Cascade recall with spreading activation.
 
         Finds seed memories, then expands through relations, backlinks,
         and associations up to depth hops.
 
+        If project is set, scopes traversal to the project hierarchy
+        (bidirectional: child sees parent, parent sees child).
+
         Returns ranked list of dicts with score, hop, channel fields.
         """
         entries = self._load()
         entry_map = {e['name']: e for e in entries if 'name' in e}
+
+        if project is not None:
+            from memoryschema.hierarchy import project_matches_scope
+            entry_map = {k: v for k, v in entry_map.items()
+                         if project_matches_scope(v.get('project', ''), project)}
+            entries = [e for e in entries if e.get('name') in entry_map]
 
         if not entry_map:
             return []
