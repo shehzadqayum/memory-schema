@@ -30,3 +30,4 @@ Prior residuals: R1 Neo4j max_depth → deferring (architectural).
 - `d175037` — `[S2] Add cross-references to hierarchy-and-inheritance.md` — Item 8: xrefs
 - `8302dd6` — `[S2] CHANGELOG session 6 entries + verify template sync` — Item 9: final
 - `267553c` — `[S3] Session 6 checkpoint — 9/9 audited PASS` — Feedback commit
+- `3aa0777` — `[S4] session close — hierarchy reference doc + alignment` — Unit of work ID
