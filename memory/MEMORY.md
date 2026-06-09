@@ -11,3 +11,4 @@
 - [session-1-close](session-1-close.md) — Session 1 complete — package setup, hierarchy, inheritance, 11 code review fixes
 - [centralize-env-vars](centralize-env-vars.md) — Plan to centralize os.environ reads into config.py — resolving session 1 residual
 - [session-2-close](session-2-close.md) — Session 2 complete — centralized env var reads, resolved session 1 residual
+- [fix-env-precedence](fix-env-precedence.md) — Plan to fix env var precedence inversion, redundant import, and add hierarchy integration tests

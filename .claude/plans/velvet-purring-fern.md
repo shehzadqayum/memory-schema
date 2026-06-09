@@ -1,66 +1,82 @@
-# Centralize env var reads (Session 1 Residual) ✓ 6616ea0
+# Fix 3 issues: env var precedence, redundant import, integration tests
 
 ## Context
 
-From `[S4] 5fc565b` residual ledger: `os.environ` reads in `neo4j_store.py` and `embeddings.py` are direct, not routed through `config.py`. This creates dual read paths that can diverge.
+Code review identified 3 issues: (1) env var vs TOML precedence is inverted — TOML wins over env vars because `from_toml()` passes resolved values as explicit kwargs, bypassing `default_factory`. The docstring claims env vars are highest priority but they're actually below TOML. (2) Redundant inline import at `store.py:283`. (3) No integration tests for hierarchy scoping in the store.
 
-Currently 5 direct `os.environ` reads outside `config.py`:
-- `neo4j_store.py:22-24` — `NEO4J_URI`, `NEO4J_USER`, `NEO4J_PASSWORD` as module-level defaults
-- `embeddings.py:37,41` — `VOYAGE_API_KEY` in `get_client()`
+## Prior Residuals (from [S4] ccac373)
 
-`config.py` already reads the same 4 env vars via `field(default_factory)`. The module-level reads are fallbacks for when no `config` is passed to constructors.
+None.
 
-## Prior Residuals (from [S4] 5fc565b)
+## Fix 1: Env var precedence inversion (BUG)
 
-- R1: os.environ reads in neo4j_store.py and embeddings.py → addressing (this plan)
+**Problem:** `from_toml()` passes TOML values as explicit kwargs to `MemoryConfig(**resolved)`. Dataclass `default_factory` (which reads env vars) only runs when a field has no explicit value. So TOML beats env vars — opposite of intended design.
 
-## Fix
+**Fix:** In `from_toml()`, after constructing the instance, overlay env vars on top for the fields that have env var mappings. This restores the intended precedence: env vars > CLI > parent TOML > child TOML > defaults.
 
-### `neo4j_store.py`
-Remove module-level `_DEFAULT_*` constants. In `Neo4jMemoryStore.__init__()`, when no `config` and no explicit params, import and use `MemoryConfig` defaults directly:
+**File:** `src/memoryschema/config.py` lines 109-129
 
 ```python
-def __init__(self, uri=None, user=None, password=None, config=None):
-    if config is None and uri is None:
-        from memoryschema.config import MemoryConfig
-        config = MemoryConfig()
-    if config:
-        uri = uri or config.neo4j_uri
-        user = user or config.neo4j_user
-        password = password or config.neo4j_password
-    self._driver = GraphDatabase.driver(uri, auth=(user, password))
+@classmethod
+def from_toml(cls, project_root, cli_overrides=None):
+    """Create config with TOML file + inheritance chain.
+
+    Resolution order (highest to lowest):
+    1. Environment variables
+    2. cli_overrides dict
+    3. Parent memoryschema.toml (wins over child on conflict)
+    4. Child memoryschema.toml
+    5. Dataclass defaults
+    """
+    from memoryschema.inheritance import resolve_config_chain, validate_toml_name
+    resolved = resolve_config_chain(Path(project_root).resolve(), cli_overrides)
+    if 'store_path' in resolved and isinstance(resolved['store_path'], str):
+        resolved['store_path'] = Path(project_root) / resolved['store_path']
+    instance = cls(**{k: v for k, v in resolved.items()
+                     if k in cls.__dataclass_fields__})
+    # Env vars override TOML — apply on top of constructed instance
+    _ENV_OVERRIDES = {
+        'NEO4J_URI': 'neo4j_uri',
+        'NEO4J_USER': 'neo4j_user',
+        'NEO4J_PASSWORD': 'neo4j_password',
+        'VOYAGE_API_KEY': 'voyage_api_key',
+        'MEMORY_PROJECT': 'project_name',
+    }
+    for env_var, field_name in _ENV_OVERRIDES.items():
+        val = os.environ.get(env_var)
+        if val is not None:
+            setattr(instance, field_name, val)
+    instance._name_warning = validate_toml_name(Path(project_root).resolve())
+    return instance
 ```
 
-Remove `import os` (no longer needed).
+## Fix 2: Redundant inline import (cleanup)
 
-### `embeddings.py`
-In `get_client()`, when no `api_key` and no `config`, import and use `MemoryConfig` defaults:
+**File:** `src/memoryschema/store.py` line 283
 
-```python
-if api_key is None and config is None:
-    from memoryschema.config import MemoryConfig
-    config = MemoryConfig()
-if api_key is None and config:
-    api_key = config.voyage_api_key
-```
+Remove `from memoryschema.hierarchy import project_matches_filter` — already imported at module level on line 20.
 
-Remove `os.environ.get('VOYAGE_API_KEY')` calls. Remove `import os`.
+## Fix 3: Integration tests for hierarchy scoping
+
+**File:** `tests/test_store.py`
+
+Add `TestHierarchyScoping` class with tests:
+- `test_search_project_returns_children` — parent project sees child entities
+- `test_search_project_excludes_unrelated` — unrelated project filtered out
+- `test_recall_project_scope_bidirectional` — child sees parent memories
+- `test_unscoped_entity_visible_everywhere` — entity with no project field visible in all scoped queries
 
 ## Files to Modify
 
 | File | Change |
 |------|--------|
-| `src/memoryschema/neo4j_store.py` | Remove `_DEFAULT_*` constants, use `MemoryConfig()` fallback |
-| `src/memoryschema/embeddings.py` | Remove `os.environ` reads, use `MemoryConfig()` fallback |
-| `tests/test_neo4j_store.py` | Update mocks (no more module-level env reads) |
-| `tests/test_embeddings.py` | Update mocks |
+| `src/memoryschema/config.py` | Fix `from_toml()` env var overlay + docstring |
+| `src/memoryschema/store.py` | Remove redundant import at line 283 |
+| `tests/test_store.py` | Add `TestHierarchyScoping` integration tests |
+| `tests/test_inheritance.py` | Add test verifying env vars beat TOML in `from_toml()` |
 
 ## Verification
 
-1. `python -m pytest tests/ -v` — 384 passing ✓
-2. `grep -r "os\.environ" src/memoryschema/ --include="*.py"` — only `config.py` ✓
-3. `memoryschema doctor` — 20/20 ✓
-
-## Status: COMPLETE
-
-Residual resolved. Session report: `docs/reports/2026-06-09-session-report-2.md`
+1. `python -m pytest tests/ -v` — all tests pass
+2. New test: env var set + TOML set for same field → env var wins via `from_toml()`
+3. New tests: scoped search/recall against mixed-project store
