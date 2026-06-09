@@ -4,7 +4,7 @@ Memory schema validator.
 Validates <memory:> tagged files against the schema specification.
 
 Validation rules:
-  V1-V10: Structure (entity element, attributes, children)
+  V1-V11: Structure (entity element, attributes, children)
   R1-R5:  Relations (attributes, types, self-reference, duplicates)
   F1, F3: Filesystem (filename match, safe characters)
   Q1-Q7:  Content quality (strict mode only)
@@ -15,7 +15,7 @@ import re
 import xml.etree.ElementTree as ET
 
 
-from memoryschema.config import VALID_TYPES, VALID_RELATION_TYPES, SCHEMA_VERSION
+from memoryschema.config import VALID_TYPES, VALID_STATUSES, VALID_RELATION_TYPES, SCHEMA_VERSION
 
 KEBAB_CASE = re.compile(r'^[a-z0-9]+(-[a-z0-9]+)*$')
 
@@ -121,6 +121,11 @@ def validate(content, filepath=None, strict=False):
                 errors.append(('V5', f'Importance {importance} out of range, must be 1-10'))
         except ValueError:
             errors.append(('V5', f'Importance "{importance_str}" is not a valid integer'))
+
+    # V11: status is valid (optional field, v3)
+    status_val = root.get('status')
+    if status_val and status_val not in VALID_STATUSES:
+        errors.append(('V11', f'Invalid status "{status_val}", must be one of: {", ".join(sorted(VALID_STATUSES))}'))
 
     # V6: exactly one <memory:description>
     descriptions = root.findall('description')

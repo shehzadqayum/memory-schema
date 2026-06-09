@@ -11,11 +11,12 @@ from pathlib import Path
 
 # Canonical constants — other modules import from here.
 VALID_TYPES = frozenset({'semantic', 'episodic', 'procedural'})
+VALID_STATUSES = frozenset({'active', 'superseded', 'archived', 'quarantined'})
 VALID_RELATION_TYPES = frozenset({
     'USES', 'MODIFIES', 'SUPERSEDES', 'DEPENDS_ON', 'INFORMS', 'CONTRADICTS',
     'PARENT_OF', 'CHILD_OF',
 })
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 
 @dataclass

@@ -116,7 +116,7 @@ class MemoryStore:
             return new_entry
 
         # Merge (schema and filepath are immutable after creation)
-        for key in ('type', 'description', 'importance',
+        for key in ('type', 'status', 'description', 'importance',
                      'body', 'source', 'prompt', 'reasoning'):
             if key in memory_dict and memory_dict[key] is not None:
                 existing[key] = memory_dict[key]
@@ -179,17 +179,21 @@ class MemoryStore:
                 return entry
         return None
 
-    def search(self, query=None, type=None, project=None, limit=10):
+    def search(self, query=None, type=None, project=None, limit=10,
+               include_inactive=False):
         """Search memories by query text, type, and/or project.
 
         Query does case-insensitive substring match across
         name, description, observations, prompt, reasoning, and body.
         Returns list of matching entry dicts (up to limit).
+        Excludes non-active entries unless include_inactive=True.
         """
         entries = self._load()
         results = []
 
         for entry in entries:
+            if not include_inactive and entry.get('status', 'active') != 'active':
+                continue
             if type is not None and entry.get('type') != type:
                 continue
             if project is not None:
@@ -433,7 +437,8 @@ class MemoryStore:
             scored.append((entry, score))
         return scored
 
-    def recall(self, query=None, name=None, depth=2, decay=0.8, limit=10, project=None):
+    def recall(self, query=None, name=None, depth=2, decay=0.8, limit=10,
+               project=None, include_inactive=False):
         """Cascade recall with spreading activation.
 
         Finds seed memories, then expands through relations, backlinks,
@@ -441,11 +446,18 @@ class MemoryStore:
 
         If project is set, scopes traversal to the project hierarchy
         (bidirectional: child sees parent, parent sees child).
+        Excludes non-active entries unless include_inactive=True.
 
         Returns ranked list of dicts with score, hop, channel fields.
         """
         entries = self._load()
         entry_map = {e['name']: e for e in entries if 'name' in e}
+
+        # Filter by status (active only by default)
+        if not include_inactive:
+            entry_map = {k: v for k, v in entry_map.items()
+                         if v.get('status', 'active') == 'active'}
+            entries = [e for e in entries if e.get('name') in entry_map]
 
         if project is not None:
             entry_map = {k: v for k, v in entry_map.items()

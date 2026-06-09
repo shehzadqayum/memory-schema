@@ -77,6 +77,9 @@ def parse_memory_content(content, filepath=None):
     # Type (defaults to 'semantic' per schema when omitted)
     type_val = root.get('type') or 'semantic'
 
+    # Status (v3, defaults to 'active' when omitted)
+    status = root.get('status') or 'active'
+
     # Importance
     importance = None
     importance_str = root.get('importance')
@@ -134,6 +137,7 @@ def parse_memory_content(content, filepath=None):
         'name': name,
         'schema': schema,
         'type': type_val,
+        'status': status,
         'importance': importance,
         'description': description,
         'observations': observations,
