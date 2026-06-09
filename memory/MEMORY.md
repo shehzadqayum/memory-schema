@@ -9,3 +9,4 @@
 - [agent-inheritance-implemented](agent-inheritance-implemented.md) — Implemented agent rules and config inheritance with parent-absolute authority
 - [inheritance-review-fixes](inheritance-review-fixes.md) — Plan for 11 inheritance code review fixes across two phases
 - [session-1-close](session-1-close.md) — Session 1 complete — package setup, hierarchy, inheritance, 11 code review fixes
+- [centralize-env-vars](centralize-env-vars.md) — Plan to centralize os.environ reads into config.py — resolving session 1 residual

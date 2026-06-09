@@ -1,72 +1,62 @@
-# Inheritance Code Review Fixes
+# Centralize env var reads (Session 1 Residual)
 
 ## Context
 
-Two rounds of code review identified 11 issues total (6 original + 5 follow-up) in the inheritance and hierarchy implementation. Fixes 1-6 are implemented (uncommitted on fix/inheritance-issues branch). Fixes 7-11 are planned.
+From `[S4] 5fc565b` residual ledger: `os.environ` reads in `neo4j_store.py` and `embeddings.py` are direct, not routed through `config.py`. This creates dual read paths that can diverge.
 
-## Prior Residuals
+Currently 5 direct `os.environ` reads outside `config.py`:
+- `neo4j_store.py:22-24` — `NEO4J_URI`, `NEO4J_USER`, `NEO4J_PASSWORD` as module-level defaults
+- `embeddings.py:37,41` — `VOYAGE_API_KEY` in `get_client()`
 
-None.
+`config.py` already reads the same 4 env vars via `field(default_factory)`. The module-level reads are fallbacks for when no `config` is passed to constructors.
 
-## Phase 1: Fixes 1-6 ✓ 8816f12
+## Prior Residuals (from [S4] 5fc565b)
 
-Status: Committed, pushed. 384 tests, 20/20 doctor.
+- R1: os.environ reads in neo4j_store.py and embeddings.py → addressing (this plan)
 
-### Fix 1: Fragile gap heuristic → marker-based `_walk_upward(start, predicate, max_depth=20)`
-### Fix 2: Duplicate walk logic → shared `_walk_upward` helper (also fixes Fix 1)
-### Fix 3: Silent rule override → `overridden_rules()` + `[OVERRIDDEN]` markers in CLI
-### Fix 4: Unbounded read-up → `max_depth` param on `project_matches_scope()`
-### Fix 5: No TOML name validation → `validate_toml_name()` advisory check
-### Fix 6: Missing doctor checks → `toml_config` + `rules_inherit` (20/20 now)
+## Fix
 
-## Phase 2: Fixes 7-11 ✓ bd78354
+### `neo4j_store.py`
+Remove module-level `_DEFAULT_*` constants. In `Neo4jMemoryStore.__init__()`, when no `config` and no explicit params, import and use `MemoryConfig` defaults directly:
 
-### Fix 7: Dual env var reads
-**Files:** `src/memoryschema/inheritance.py`, `src/memoryschema/config.py`
+```python
+def __init__(self, uri=None, user=None, password=None, config=None):
+    if config is None and uri is None:
+        from memoryschema.config import MemoryConfig
+        config = MemoryConfig()
+    if config:
+        uri = uri or config.neo4j_uri
+        user = user or config.neo4j_user
+        password = password or config.neo4j_password
+    self._driver = GraphDatabase.driver(uri, auth=(user, password))
+```
 
-Remove env var reading from `inheritance.py`. Let `config.py` dataclass defaults handle env vars as before. `resolve_config_chain()` returns TOML+CLI values only — `MemoryConfig.__post_init__` already applies env var defaults via `field(default_factory)`. Fix docstring in config.py.
+Remove `import os` (no longer needed).
 
-### Fix 8: `_name_warning` side-channel in config dict
-**File:** `src/memoryschema/inheritance.py`
+### `embeddings.py`
+In `get_client()`, when no `api_key` and no `config`, import and use `MemoryConfig` defaults:
 
-Remove `_name_warning` from `resolve_config_chain()` return dict. Move the check to `MemoryConfig.from_toml()` which can log/store it on the instance without polluting the kwargs dict.
+```python
+if api_key is None and config is None:
+    from memoryschema.config import MemoryConfig
+    config = MemoryConfig()
+if api_key is None and config:
+    api_key = config.voyage_api_key
+```
 
-### Fix 9: Unscoped entities go silent
-**File:** `src/memoryschema/hierarchy.py`
-
-Modify `project_matches_scope()` and `project_matches_filter()`: treat `None`/empty `entry_project` as matching any scope (universal visibility). Pre-hierarchy entities remain visible.
-
-### Fix 10: Repeated lazy imports in store.py
-**File:** `src/memoryschema/store.py`
-
-Move `from memoryschema.hierarchy import project_matches_filter, project_matches_scope` to module-level. No circular dependency exists (hierarchy.py has zero internal imports).
-
-### Fix 11: Double filesystem walk for diagnostics
-**File:** `src/memoryschema/inheritance.py`
-
-Refactor `resolve_rules()` to also return overridden info. `overridden_rules()` becomes a thin wrapper that extracts the override data. Single walk serves both.
+Remove `os.environ.get('VOYAGE_API_KEY')` calls. Remove `import os`.
 
 ## Files to Modify
 
-| File | Phase 1 | Phase 2 |
-|------|---------|---------|
-| `src/memoryschema/inheritance.py` | Fixes 1,2,3,5 | Fixes 7,8,11 |
-| `src/memoryschema/hierarchy.py` | Fix 4 | Fix 9 |
-| `src/memoryschema/store.py` | — | Fix 10 |
-| `src/memoryschema/config.py` | — | Fixes 7,8 |
-| `src/memoryschema/cli/doctor_cmd.py` | Fix 6 | — |
-| `src/memoryschema/cli/rules_cmd.py` | Fix 3 | — |
-| `tests/test_inheritance.py` | +18 tests | +5 tests |
-| `tests/test_hierarchy.py` | +5 tests | +3 tests |
-| `tests/test_store.py` | — | +2 tests |
+| File | Change |
+|------|--------|
+| `src/memoryschema/neo4j_store.py` | Remove `_DEFAULT_*` constants, use `MemoryConfig()` fallback |
+| `src/memoryschema/embeddings.py` | Remove `os.environ` reads, use `MemoryConfig()` fallback |
+| `tests/test_neo4j_store.py` | Update mocks (no more module-level env reads) |
+| `tests/test_embeddings.py` | Update mocks |
 
 ## Verification
 
-1. `python -m pytest tests/ -v` — 384 tests passing ✓
-2. `memoryschema doctor` — 20/20 checks ✓
-3. Pre-hierarchy entities (no project field) visible in scoped recall after Fix 9 ✓
-4. No `os.environ` reads in `inheritance.py` after Fix 7 ✓
-
-## Status: COMPLETE
-
-All 11 fixes implemented, tested, audited. Session report: `docs/reports/2026-06-09-session-report-1.md`
+1. `python -m pytest tests/ -v` — all tests pass
+2. `grep -r "os\.environ" src/memoryschema/ --include="*.py"` — only `config.py`
+3. `memoryschema doctor` — 20/20
