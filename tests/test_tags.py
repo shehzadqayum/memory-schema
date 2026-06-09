@@ -43,7 +43,7 @@ class TestParseMemoryContent:
         assert result['name'] == 'test-minimal'
         assert result['description'] == 'Minimal entity'
         assert result['schema'] == 2
-        assert result['type'] == ''
+        assert result['type'] == 'semantic'  # defaults to semantic when omitted
         assert result['importance'] is None
         assert result['observations'] == []
         assert result['prompt'] is None

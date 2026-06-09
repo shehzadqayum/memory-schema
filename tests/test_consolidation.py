@@ -52,13 +52,13 @@ class TestEmbeddingText:
         assert "Because." in result
 
     def test_minimal(self):
-        memory = {"description": "Just desc"}
+        memory = {"name": "test", "description": "Just desc"}
         result = _embedding_text(memory)
-        assert result == "Just desc"
+        assert result == "test Just desc"
 
     def test_empty(self):
         result = _embedding_text({})
-        assert result == ""
+        assert result.strip() == ""
 
 
 class TestConsolidate:

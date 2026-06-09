@@ -259,6 +259,9 @@ from memoryschema.cli.doctor_cmd import doctor
 from memoryschema.cli.rules_cmd import rules
 from memoryschema.cli.config_cmd import config_cmd
 
+from memoryschema.cli.eval_cmd import eval_cmd
+
 cli.add_command(doctor)
 cli.add_command(rules)
 cli.add_command(config_cmd, name="config")
+cli.add_command(eval_cmd, name="eval")

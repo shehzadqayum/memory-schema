@@ -246,8 +246,9 @@ class TestResolveConfigChain:
     def test_cli_overrides_toml(self, tmp_path):
         _write_toml(tmp_path / 'memoryschema.toml',
                      '[project]\nname = "toml-name"')
-        result = resolve_config_chain(tmp_path, cli_overrides={'project_name': 'cli-name'})
-        assert result['project_name'] == 'cli-name'
+        from memoryschema.config import MemoryConfig
+        config = MemoryConfig.from_toml(tmp_path, cli_overrides={'project_name': 'cli-name'})
+        assert config.project_name == 'cli-name'
 
     def test_from_toml_classmethod(self, tmp_path):
         _write_toml(tmp_path / 'memoryschema.toml',
