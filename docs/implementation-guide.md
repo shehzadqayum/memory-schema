@@ -67,7 +67,9 @@ memoryschema voyage status
 memoryschema hook install
 ```
 
-This adds the PostToolUse Write hook to `~/.claude/settings.json`. The hook fires on every Write to `memory/*.md`, parsing, embedding, and indexing automatically.
+This adds the PostToolUse Write hook to `~/.claude/settings.json` (global). The hook fires on every Write to `memory/*.md`, parsing, embedding, and indexing automatically.
+
+**Note:** The hook installs globally, not per-project. On multi-project machines, the hook runs for all projects. This is safe — the hook derives the project root from the file path and only processes files under `memory/`.
 
 ## Step 6: Verify
 
@@ -142,7 +144,7 @@ pip install memory-schema[all,dev]
 pytest tests/ -v --cov=memoryschema
 ```
 
-262 tests, 15 files. External dependencies are mocked — no Docker or API keys needed to run tests.
+390 tests, 24 files. External dependencies are mocked — no Docker or API keys needed to run tests.
 
 ### Write tests for custom ingest scripts
 
