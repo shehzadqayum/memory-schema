@@ -71,8 +71,8 @@ def parse_memory_content(content, filepath=None):
         except ValueError:
             schema = 1
 
-    # Type
-    type_val = root.get('type', '')
+    # Type (defaults to 'semantic' per schema when omitted)
+    type_val = root.get('type') or 'semantic'
 
     # Importance
     importance = None
