@@ -142,8 +142,8 @@ from memoryschema import Neo4jMemoryStore, embed_text, embed_batch, rerank
 | `memoryschema.reembed` | Re-embed entries by prefix |
 | `memoryschema.discovery` | Find .md files under a path |
 | `memoryschema.config` | Centralized configuration + `from_toml()` factory |
-| `memoryschema.hierarchy` | Dot-notation project hierarchy: `parse_project_path`, `parent_project`, `ancestor_projects`, `is_ancestor_of`, `is_descendant_of`, `project_matches_scope`, `project_matches_filter`, `validate_project_name` |
-| `memoryschema.inheritance` | TOML config chain + rules resolution: `find_toml_config`, `load_toml_config`, `flatten_toml`, `walk_config_chain`, `resolve_config_chain`, `rules_ancestry`, `resolve_rules`, `overridden_rules`, `validate_toml_name` |
+| `memoryschema.hierarchy` | Dot-notation project hierarchy — see [hierarchy-and-inheritance.md](hierarchy-and-inheritance.md) for full API |
+| `memoryschema.inheritance` | TOML config chain + rules resolution — see [hierarchy-and-inheritance.md](hierarchy-and-inheritance.md) for full API |
 
 ---
 

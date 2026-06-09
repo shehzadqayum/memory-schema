@@ -309,6 +309,7 @@ memoryschema doctor --fix    # Auto-remediation suggestions
 ## Documentation
 
 - `docs/schema.md` — Memory schema specification (source of truth)
+- `docs/hierarchy-and-inheritance.md` — Agent hierarchy and config/rules inheritance reference
 - `docs/implementation-guide.md` — Step-by-step deployment guide
 - `docs/system-overview.md` — Conceptual overview
 - `docs/technical-reference.md` — Architecture, API, configuration

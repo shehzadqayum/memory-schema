@@ -202,3 +202,5 @@ Verify inheritance:
 memoryschema config --chain     # shows config sources
 memoryschema rules --conflicts  # shows overridden rules
 ```
+
+For detailed config resolution examples and troubleshooting, see [hierarchy-and-inheritance.md](hierarchy-and-inheritance.md).

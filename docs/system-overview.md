@@ -125,6 +125,8 @@ Rules are `.claude/rules/*.md` files. Inheritance follows the same parent-wins m
 
 Use `memoryschema rules --conflicts` to see overridden rules.
 
+For complete examples, API reference, and troubleshooting, see [docs/hierarchy-and-inheritance.md](hierarchy-and-inheritance.md).
+
 ## Full Specification
 
 - **Schema:** `docs/schema.md` — the authoritative structural reference
