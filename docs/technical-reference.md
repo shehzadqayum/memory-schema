@@ -188,7 +188,7 @@ from memoryschema import Neo4jMemoryStore, embed_text, embed_batch, rerank
 
 ### Diagnostics
 
-`memoryschema doctor` — 18 live checks:
+`memoryschema doctor` — 20 live checks:
 
 | Check | What | Fix on failure |
 |-------|------|----------------|
