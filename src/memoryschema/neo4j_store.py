@@ -18,6 +18,7 @@ from datetime import datetime, timezone
 from neo4j import GraphDatabase
 
 from memoryschema.config import ALL_RELATION_TYPES as _RELATION_TYPES, TRUST_LEVELS
+from memoryschema.hierarchy import project_matches_scope
 
 
 def _now_iso():
@@ -375,6 +376,7 @@ class Neo4jMemoryStore:
                 'description': seed.get('description'),
                 'observations': seed.get('observations', []),
                 'status': seed.get('status', 'active'),
+                'project': seed.get('project'),
             }
             if seed['name'] not in visited or result['score'] > visited[seed['name']]['score']:
                 visited[seed['name']] = result
@@ -409,6 +411,7 @@ class Neo4jMemoryStore:
                     'description': neighbor.get('description'),
                     'observations': neighbor.get('observations', []),
                     'status': neighbor.get('status', 'active'),
+                    'project': neighbor.get('project'),
                 }
                 if channel in ('relation', 'backlink'):
                     result['relation_type'] = neighbor_info.get('rel_type')
@@ -425,6 +428,15 @@ class Neo4jMemoryStore:
                 key=lambda x: x['score'], reverse=True)
         else:
             results = sorted(visited.values(), key=lambda x: x['score'], reverse=True)
+
+        # Post-filter: enforce max_inherit_depth (Cypher uses STARTS WITH
+        # which doesn't respect depth limits — apply Python-side)
+        if project is not None and max_inherit_depth is not None:
+            results = [r for r in results
+                       if project_matches_scope(
+                           r.get('project') or '', project,
+                           max_depth=max_inherit_depth)]
+
         return results[:limit]
 
     # --- Associations ---

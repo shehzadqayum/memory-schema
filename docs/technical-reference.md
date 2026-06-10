@@ -135,7 +135,7 @@ from memoryschema import Neo4jMemoryStore, embed_text, embed_batch, rerank
 | `memoryschema.store` | JSONL store + `get_store()` factory |
 | `memoryschema.neo4j_store` | Neo4j store (O(1) upsert, vector k-NN, graph) |
 | `memoryschema.embeddings` | Voyage AI: embed_text, embed_batch, rerank |
-| `memoryschema.validator` | Schema validation (V1-V10, R1-R5, F1, F3) |
+| `memoryschema.validator` | Schema validation (V1-V13, R1-R6, F1, F3) |
 | `memoryschema.schema` | Create Neo4j indexes and constraints |
 | `memoryschema.consolidation` | Batch index un-indexed files |
 | `memoryschema.migration` | JSONL ↔ Neo4j migration |
@@ -146,9 +146,48 @@ from memoryschema import Neo4jMemoryStore, embed_text, embed_batch, rerank
 | `memoryschema.inheritance` | TOML config chain + rules resolution — see [hierarchy-and-inheritance.md](hierarchy-and-inheritance.md) for full API |
 | `memoryschema.audit` | Append-only mutation log with field-level change tracking |
 | `memoryschema.l0_budget` | MEMORY.md token budget enforcement with score-based eviction |
-| `memoryschema.write_gate` | Pre-consolidation write gate with consistency probe |
+| `memoryschema.write_gate` | Two-verdict write gate: ACCEPT/REJECT/QUARANTINE pipeline |
 | `memoryschema.cli.eval_cmd` | Evaluation harness: recall@k, MRR, nDCG metrics |
 | `memoryschema.cli.reflect_cmd` | Episodic clustering and semantic summary synthesis |
+
+---
+
+## CLI Commands
+
+| Command | Category | Description |
+|---------|----------|-------------|
+| `init` | Setup | Initialize project (memory dir, TOML, rules, docker-compose) |
+| `neo4j` | Setup | Manage Neo4j container (deploy, up, down, status, reset, schema) |
+| `voyage` | Setup | Manage Voyage AI connectivity (status, test) |
+| `status` | Operations | Show store backend, node count, embedding coverage |
+| `recall` | Operations | Semantic search with cascade recall |
+| `get` | Operations | Retrieve single entity by name |
+| `list` | Operations | List entities with filters |
+| `write` | Operations | Parse, validate, gate, embed, and index a memory file |
+| `delete` | Operations | Remove entity from all stores + MEMORY.md |
+| `search` | Operations | Full-text keyword search |
+| `archive` | Lifecycle | Set status=archived (exclude from default recall) |
+| `unarchive` | Lifecycle | Restore archived → active |
+| `reactivate` | Lifecycle | Restore superseded → active |
+| `quarantine` | Lifecycle | Review quarantined entries (list, review, release, reject) |
+| `validate` | Quality | Validate memory files against schema |
+| `index` | Indexing | Batch index un-indexed files |
+| `embed` | Indexing | Re-embed entries by prefix or all |
+| `associations` | Indexing | Show or recompute k-NN associations |
+| `reflect` | Indexing | Cluster episodic entries → semantic summaries |
+| `eval` | Quality | Evaluation harness (recall@k, MRR, nDCG) |
+| `migrate` | Data | Migrate between JSONL and Neo4j |
+| `sync` | Data | Reconcile JSONL and Neo4j stores |
+| `backup` | Lifecycle | Full or selective backup |
+| `restore` | Lifecycle | Restore from backup archive |
+| `reset` | Lifecycle | Wipe data (full or selective) |
+| `clean` | Lifecycle | Complete removal of memory system |
+| `export` | Data | Portable archive for moving to another project |
+| `import` | Data | Import from portable archive |
+| `hook` | Hooks | Manage PostToolUse hook (install, uninstall, status, test) |
+| `doctor` | Diagnostics | 21-point health check |
+| `rules` | Diagnostics | Show effective rules with inheritance markers |
+| `config` | Diagnostics | Show effective config with inheritance chain |
 
 ---
 
@@ -159,7 +198,7 @@ from memoryschema import Neo4jMemoryStore, embed_text, embed_batch, rerank
 | Project name | `default` | `MEMORY_PROJECT` |
 | Neo4j URI | `bolt://localhost:7687` | `NEO4J_URI` |
 | Neo4j user | `neo4j` | `NEO4J_USER` |
-| Neo4j password | `changeme` | `NEO4J_PASSWORD` |
+| Neo4j password | (empty — set via env) | `NEO4J_PASSWORD` |
 | Voyage API key | (none) | `VOYAGE_API_KEY` |
 | Embed model | `voyage-4-lite` | — |
 | Embed dimensions | 1024 | — |

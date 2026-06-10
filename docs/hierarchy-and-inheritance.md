@@ -162,13 +162,13 @@ path = "memory/store.jsonl"
 [neo4j]
 uri = "bolt://localhost:7687"
 user = "neo4j"
-password = "changeme"
+# password via env: NEO4J_PASSWORD (never in TOML)
 container_name = "my-project-neo4j"
 http_port = 7474
 bolt_port = 7687
 
 [voyage]
-api_key = "..."
+# api_key via env: VOYAGE_API_KEY (never in TOML)
 embed_model = "voyage-4-lite"
 embed_dimensions = 1024
 rerank_model = "rerank-2"

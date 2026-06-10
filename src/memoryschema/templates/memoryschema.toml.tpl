@@ -10,7 +10,8 @@ name = "{project_name}"
 # [neo4j]
 # uri = "bolt://localhost:7687"
 # user = "neo4j"
-# password = "changeme"
+# NOTE: password and api_key must come from environment variables:
+#   NEO4J_PASSWORD, VOYAGE_API_KEY — never store secrets in TOML.
 
 # [voyage]
 # embed_model = "voyage-4-lite"

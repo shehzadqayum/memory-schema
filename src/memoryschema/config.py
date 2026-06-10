@@ -64,7 +64,7 @@ class MemoryConfig:
         default_factory=lambda: os.environ.get("NEO4J_USER", "neo4j")
     )
     neo4j_password: str = field(
-        default_factory=lambda: os.environ.get("NEO4J_PASSWORD", "changeme")
+        default_factory=lambda: os.environ.get("NEO4J_PASSWORD", "")
     )
     neo4j_container_name: str | None = None
     neo4j_http_port: int = 7474
