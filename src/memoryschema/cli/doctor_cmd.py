@@ -315,7 +315,7 @@ def run_checks(config):
 @click.option("--fix", "auto_fix", is_flag=True, help="Auto-fix fixable issues (init, deploy, hook install).")
 @click.pass_obj
 def doctor(config, as_json, auto_fix):
-    """Run 20-point diagnostic checks on the memory system.
+    """Run 21-point diagnostic checks on the memory system.
 
     Checks every component — Python, package, config, filesystem,
     TOML config validity, rules inheritance conflicts,

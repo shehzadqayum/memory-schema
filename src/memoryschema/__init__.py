@@ -13,11 +13,17 @@ Public API:
     parse_memory_content  Parse raw content string into dict
     discover_memory_files Find all .md files under a path
 
-    validate              Validate memory content against schema
+    validate              Validate memory content against schema (V1-V13, R1-R7)
     validate_file         Validate a file
     validate_directory    Validate all files in a directory
 
     consolidate           Batch index un-indexed files
+    reflect               Cluster episodic entries → semantic summaries
+
+    Hierarchy: parse_project_path, parent_project, ancestor_projects,
+               is_ancestor_of, is_descendant_of, project_matches_scope,
+               project_matches_filter, validate_project_name
+    Inheritance: resolve_config_chain, resolve_rules
 
 Optional (require extras):
     Neo4jMemoryStore      Neo4j-backed store (requires: pip install memory-schema[neo4j])

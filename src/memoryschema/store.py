@@ -5,6 +5,10 @@ Pure Python, zero external dependencies (stdlib only).
 One JSON object per line. Atomic writes via temp file + os.replace.
 Optional numpy for vectorized scoring (graceful fallback).
 
+v3 features: status filtering (active/superseded/archived/quarantined),
+SUPERSEDES trust guards (TRUST_LEVELS provenance hierarchy),
+cycle detection (R7), and include_inactive override for queries.
+
 Usage:
     from memoryschema import MemoryStore, get_store
     store = get_store()  # Neo4j if available, JSONL fallback

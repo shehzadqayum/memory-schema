@@ -186,7 +186,9 @@ Each external service is optional. The system degrades gracefully:
 | `memoryschema voyage status` | Check API key, test embed |
 | `memoryschema voyage test <text>` | Embed text, show vector stats |
 | `memoryschema hook install` | Register PostToolUse hook |
+| `memoryschema hook uninstall` | Remove PostToolUse hook |
 | `memoryschema hook status` | Show hook registration |
+| `memoryschema hook test` | Test hook execution |
 
 ### Operations
 | Command | Description |
@@ -199,6 +201,10 @@ Each external service is optional. The system degrades gracefully:
 | `memoryschema delete <name> --confirm` | Remove entity |
 | `memoryschema search <text> [--project]` | Keyword search (scoped to subtree) |
 | `memoryschema validate [path]` | Schema validation |
+| `memoryschema archive <name>` | Set status=archived (exclude from recall) |
+| `memoryschema unarchive <name>` | Restore archived → active |
+| `memoryschema reactivate <name>` | Restore superseded → active |
+| `memoryschema quarantine list\|review\|release\|reject` | Review quarantined entries |
 
 ### Indexing
 | Command | Description |
@@ -207,6 +213,8 @@ Each external service is optional. The system degrades gracefully:
 | `memoryschema embed --prefix/--all` | Re-embed entries |
 | `memoryschema embed --coverage` | Embedding coverage stats |
 | `memoryschema associations` | Show/recompute k-NN |
+| `memoryschema reflect` | Cluster episodic → semantic summaries |
+| `memoryschema eval` | Retrieval quality evaluation (recall@k, MRR, nDCG) |
 
 ### Data
 | Command | Description |

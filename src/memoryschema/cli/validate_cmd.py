@@ -7,11 +7,11 @@ import click
 
 @click.command("validate")
 @click.argument("path", required=False)
-@click.option("--strict", is_flag=True, help="Include content quality checks (Q1-Q7).")
+@click.option("--strict", is_flag=True, help="Include content quality checks (Q1-Q2, Q6-Q8).")
 @click.option("--json", "as_json", is_flag=True, help="Output as JSON for agent consumption.")
 @click.pass_obj
 def validate(config, path, strict, as_json):
-    """Validate memory files against schema (V1-V10, R1-R5, F1-F3).
+    """Validate memory files against schema (V1-V13, R1-R7, F1, F3).
 
     If PATH is a file, validates that file. If a directory, validates
     all .md files in it. If omitted, validates memory/ directory.

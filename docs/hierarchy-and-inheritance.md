@@ -7,7 +7,7 @@ Two independent but complementary features:
 - **Hierarchy** (`hierarchy.py`) — dot-notation project names encode parent/child relationships. Controls which memories an agent can see.
 - **Inheritance** (`inheritance.py`) — TOML config files and `.claude/rules/` directories cascade from parent to child. Parent always wins on conflict.
 
-Both are backward compatible. Flat project names and env-var-only config still work unchanged. Schema stays at v2 — dot-notation is a naming convention, not a structural change.
+Both are backward compatible. Flat project names and env-var-only config still work unchanged. Schema is v3 — dot-notation is a naming convention, not a structural schema change.
 
 ---
 
@@ -325,7 +325,7 @@ memoryschema rules --json        # machine-readable
 
 ### 5.5 Doctor Checks
 
-Two hierarchy/inheritance checks (out of 20 total):
+Two hierarchy/inheritance checks (out of 21 total):
 
 - `toml_config` — validates TOML syntax, checks project name against directory
 - `rules_inherit` — reports overridden rules count

@@ -24,6 +24,7 @@ Memory Operations:
 
 Validation & Quality:
     validate       Validate memory files against schema
+    eval           Run retrieval quality evaluation (recall@k, MRR, nDCG)
 
 Indexing & Embeddings:
     index          Batch index un-indexed files

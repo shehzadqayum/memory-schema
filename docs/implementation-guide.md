@@ -135,7 +135,7 @@ Run `memoryschema --help` for the complete command list.
 memoryschema doctor
 ```
 
-Checks 20 components: Python, package, config, filesystem, TOML, rules inheritance, Docker, Neo4j, Voyage, hook, tests. Each failure shows the cause and the exact fix command.
+Checks 21 components: Python, package, config, filesystem, TOML, rules inheritance, Docker, Neo4j, Voyage, hook, tests. Each failure shows the cause and the exact fix command.
 
 ### Run tests
 

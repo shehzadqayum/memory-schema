@@ -74,8 +74,8 @@ Each layer adds capability without being required. The system degrades gracefull
 score = recency(0.995^hours) × 0.2 + importance/10 × 0.3 + cosine_similarity × 0.5
 ```
 
-Hub bonus: +0.05 per backlink (capped at 5).
-Text match boost: +0.1 if query string found in name/description/observations/prompt/reasoning.
+Hub bonus: +0.05 * ln(1 + backlinks) (log-scale, diminishing returns).
+Text match boost: +0.1 substring (Neo4j) or BM25 up to +0.3 (JSONL).
 
 ### Three-Channel Cascade
 
@@ -135,7 +135,7 @@ from memoryschema import Neo4jMemoryStore, embed_text, embed_batch, rerank
 | `memoryschema.store` | JSONL store + `get_store()` factory |
 | `memoryschema.neo4j_store` | Neo4j store (O(1) upsert, vector k-NN, graph) |
 | `memoryschema.embeddings` | Voyage AI: embed_text, embed_batch, rerank |
-| `memoryschema.validator` | Schema validation (V1-V13, R1-R6, F1, F3) |
+| `memoryschema.validator` | Schema validation (V1-V13, R1-R7, F1, F3) |
 | `memoryschema.schema` | Create Neo4j indexes and constraints |
 | `memoryschema.consolidation` | Batch index un-indexed files |
 | `memoryschema.migration` | JSONL ↔ Neo4j migration |
@@ -193,17 +193,26 @@ from memoryschema import Neo4jMemoryStore, embed_text, embed_batch, rerank
 
 ## Configuration
 
-| Setting | Default | Env var |
-|---------|---------|---------|
-| Project name | `default` | `MEMORY_PROJECT` |
-| Neo4j URI | `bolt://localhost:7687` | `NEO4J_URI` |
-| Neo4j user | `neo4j` | `NEO4J_USER` |
-| Neo4j password | (empty — set via env) | `NEO4J_PASSWORD` |
-| Voyage API key | (none) | `VOYAGE_API_KEY` |
-| Embed model | `voyage-4-lite` | — |
-| Embed dimensions | 1024 | — |
-| Association k | 10 | — |
-| Recency decay | 0.995^hours | — |
+| Setting | Default | Env var | TOML key |
+|---------|---------|---------|----------|
+| Project name | `default` | `MEMORY_PROJECT` | `[project] name` |
+| Store path | `memory/store.jsonl` | — | `[store] path` |
+| Neo4j URI | `bolt://localhost:7687` | `NEO4J_URI` | `[neo4j] uri` |
+| Neo4j user | `neo4j` | `NEO4J_USER` | `[neo4j] user` |
+| Neo4j password | (empty — set via env) | `NEO4J_PASSWORD` | — (env only) |
+| Neo4j container name | `{project}-neo4j` | — | `[neo4j] container_name` |
+| Neo4j HTTP port | 7474 | — | `[neo4j] http_port` |
+| Neo4j Bolt port | 7687 | — | `[neo4j] bolt_port` |
+| Voyage API key | (none) | `VOYAGE_API_KEY` | — (env only) |
+| Embed model | `voyage-4-lite` | — | `[voyage] embed_model` |
+| Embed dimensions | 1024 | — | `[voyage] embed_dimensions` |
+| Rerank model | `rerank-2` | — | `[voyage] rerank_model` |
+| Recency decay | 0.995 | — | `[retrieval] recency_decay` |
+| Recall depth | 2 | — | `[retrieval] recall_depth` |
+| Recall decay | 0.8 | — | `[retrieval] recall_decay` |
+| Association k | 10 | — | `[retrieval] association_k` |
+| L0 token budget | 2000 | — | `[retrieval] l0_token_budget` |
+| Max inherit depth | 3 | — | `[retrieval] max_inherit_depth` |
 
 ---
 

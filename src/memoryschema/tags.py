@@ -3,6 +3,8 @@ Memory tag parser.
 
 Parses <memory:entity> tagged files into structured dicts.
 Pure Python, zero external dependencies (stdlib xml.etree only).
+Extracts v3 attributes: status (default: active) and provenance
+(default: first-party) alongside all standard fields.
 
 Reuses XML parsing primitives from validator.py (DRY).
 """

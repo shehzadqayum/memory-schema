@@ -236,6 +236,7 @@ Re-saving with an existing `name` performs a merge, not a replacement.
 | V10 | If present, `schema` attribute is a valid integer from 1 to current version |
 | V11 | If present, `status` is one of: active, superseded, archived, quarantined |
 | V12 | If present, `provenance` is one of: first-party, user, ingested, derived |
+| V13 | If `provenance="ingested"`, must have a `<memory:source>` element |
 
 ### Relations
 
@@ -247,6 +248,7 @@ Re-saving with an existing `name` performs a merge, not a replacement.
 | R4 | No self-references (target != own name) |
 | R5 | No duplicate relations (same target + type pair) |
 | R6 | Referential integrity — target entity should exist (warning in standard, error in strict) |
+| R7 | No SUPERSEDES cycles — adding A→B→...→A chains is rejected |
 
 ### File System
 
@@ -279,7 +281,7 @@ When embedding unavailable: relevance weight redistributed (40% to recency, 60% 
 | Bonus | Value | Condition |
 | --- | --- | --- |
 | Hub bonus | `+0.05 * ln(1 + backlinks)` | Entry has backlinks (log-scale, diminishing returns) |
-| Text match | `+0.1` | Query substring found in searchable text |
+| Text match | `+0.1` substring (Neo4j) or BM25 up to `+0.3` (JSONL) | Query text relevance boost |
 
 ### Type Factor
 

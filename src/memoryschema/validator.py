@@ -5,9 +5,9 @@ Validates <memory:> tagged files against the schema specification.
 
 Validation rules:
   V1-V13: Structure (entity element, attributes, children, provenance gates)
-  R1-R6:  Relations (attributes, types, self-reference, duplicates, referential integrity)
+  R1-R7:  Relations (attributes, types, self-reference, duplicates, referential integrity, cycles)
   F1, F3: Filesystem (filename match, safe characters)
-  Q1-Q7:  Content quality (strict mode only)
+  Q1-Q2, Q6-Q8: Content quality (strict mode only)
 """
 
 import os
@@ -60,7 +60,7 @@ def validate(content, filepath=None, strict=False, known_names=None):
     Args:
         content: File content as string.
         filepath: Optional filepath for filesystem rules (F1, F3).
-        strict: If True, include content quality checks (Q1, Q2, Q6, Q7).
+        strict: If True, include content quality checks (Q1, Q2, Q6, Q7, Q8).
         known_names: Optional set of existing memory names for R6
             (referential integrity). If provided, relation targets
             are checked against this set.
