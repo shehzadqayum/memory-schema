@@ -1,90 +1,123 @@
-# v3 Semantics + Precedence Fix + Docs Reconciliation
+# Full Documentation Alignment — Post-v3 Semantics
 
 ## Context
 
-Re-audit after v3 structural work found: (1) config precedence code is correct (CLI applied last) but docs contradict each other across 4 files and examples show env winning; (2) status/provenance have validation but zero retrieval semantics — no filtering, no trust multiplier, no SUPERSEDES propagation, no write-gate operational spec; (3) documentation drift recurred — counts, formulas, schema versions still forked; (4) new issues from v3 changes — backend-divergent max_depth, secrets in TOML, $project_prefix undefined in filter Cypher.
+After the v3 semantics implementation (session 10, 8 phases), three comprehensive file-by-file audits found implementation bugs, security issues, stale examples, and 24 documentation gaps. This plan fixes implementation first, audits the result, then aligns all documentation to the verified implementation.
 
-## Prior Residuals (from [S4] 24870f9)
+## Prior Residuals (from [S4] 1fb9276)
 
 None.
 
-## Phases
+## Phase 1: Implementation Fixes (code, security, examples, templates)
 
-### Phase 1: Precedence fix + test ✓ 26b0f7e
-- Add test: CLI > env > TOML (set all three, assert CLI wins)
-- Reconcile all 4 docs to CLI-first ordering
-- Fix hierarchy-and-inheritance.md Example 4 (env beats CLI → CLI beats env)
+Fix all code-level issues before touching documentation. Tests must pass after each fix.
 
-### Phase 2: Status lifecycle semantics ✓ a73ac09
-- Implement retrieval filtering: exclude non-active from recall/search/list (opt-in flags)
-- Superseded: traversable-not-returned in cascade BFS
-- SUPERSEDES propagation with trust + authority guards
-- Cycle detection (R7)
-- Archive/unarchive/reactivate commands
-- Quarantine review commands (list/release/reject)
-- MEMORY.md line removal on status transition
-- Document all transitions + consequences in schema.md
+### 1A. Neo4j hub bonus formula divergence — SCORING BUG
+`src/memoryschema/neo4j_store.py:681` — uses `0.05 * min(backlinks, 5)` (old linear, capped).
+`src/memoryschema/store.py:665` — uses `0.05 * math.log(1 + backlinks)` (correct logarithmic).
+**Fix:** Change neo4j to `0.05 * math.log(1 + backlinks)`, add `import math` if missing.
+**Impact:** Scoring parity between backends. Hub-heavy entries scored differently until fixed.
 
-### Phase 3: Provenance trust semantics ✓ 19fb8ec
-- Provenance immutability in upsert (join name/project in merge exclusion)
-- Trust multiplier on final score (configurable: user=1.0, first-party=1.0, derived=0.9, ingested=0.7)
-- L0 invariant: MEMORY.md excludes ingested (stated as rule, not append-path accident)
-- Ingested presentation: untrusted-data delimiters in recall output
-- Source-required-if-ingested gate rule
-- Document in schema.md
+### 1B. Docker-compose password — SECURITY
+`docker-compose.yml:9` — hardcoded `NEO4J_AUTH=neo4j/changeme`.
+`docker-compose.yml:18` — healthcheck uses `"-p", "changeme"`.
+**Fix:** Use env var reference: `NEO4J_AUTH=neo4j/${NEO4J_PASSWORD}` and `"-p", "${NEO4J_PASSWORD}"`.
+**Impact:** Known-bad password committed to repo.
 
-### Phase 4: Write gate operational spec ✓ e0de311
-- Reject (structural) vs quarantine (suspicion) — two-verdict pipeline
-- Gate pipeline: validation → provenance admission → guards → consistency probe → commit
-- Quarantine storage: markdown + JSONL, unembedded, reviewable
-- CLI: memoryschema quarantine list/review/release/reject
-- Audit log: machine-readable verdict + reason
-- Never silently drop
-- Document pipeline in schema.md Behavioral Specification
+### 1C. Validator R6 dead code — CODE CLEANUP
+`src/memoryschema/validator.py:224` — `level = 'R6' if strict else 'R6'` always produces 'R6'.
+**Fix:** Replace with `level = 'R6'`.
 
-### Phase 5: Type factor implementation ✓ 5d7811d
-- semantic: effective_recency = max(recency, 0.6)
-- episodic: effective_recency = recency (standard)
-- procedural: recency^(1/(1 + 0.3*min(access_count, 10)))
-- Wire into _score_entry() in both store.py and neo4j_store.py
-- Document in schema.md scoring section
+### 1D. Example scripts stale schema version — CODE
+`src/memoryschema/examples/ingest_tweets.py:133` — schema="2"
+`src/memoryschema/examples/ingest_forum.py:153` — schema="2"
+`src/memoryschema/examples/consolidate_working.py:121` — schema="2"
+**Fix:** All → schema="3".
 
-### Phase 6: Behavioral specification additions ✓ cc95b5c
-- On Supersede, On Archive, On Delete, On Quarantine, On Mutate entries
-- Delete: remove md + JSONL + Neo4j + MEMORY.md + inbound edges (audit-logged)
-- Upsert table: add status (server-managed), provenance (immutable)
+### 1E. Examples README stale API — CODE
+`src/memoryschema/examples/README.md:52` — `'schema': 2` → `'schema': 3`
 
-### Phase 7: Documentation reconciliation ✓ 4201b24
-- Fix all count forks (432 tests / 21 doctor / 28 files everywhere)
-- Fix all category table sums
-- Fix schema="3" in all examples
-- Fix R2 wording ("six active types, two deprecated")
-- Remove stale references (scripts/memory-server/, ict-neo4j)
-- tech-ref: update from v2 to v3, add status/provenance, fix scoring formula
-- impl-guide: remove contradictory "every response" sentence
-- system-overview: update optional field count (10 not 8)
-- Add v3 row to schema versioning table
+### 1F. TOML template missing retrieval config
+`src/memoryschema/templates/memoryschema.toml.tpl` — missing `l0_token_budget` and `max_inherit_depth`.
+**Fix:** Add commented `# l0_token_budget = 2000` and `# max_inherit_depth = 3` to [retrieval] section.
 
-### Phase 8: Small holes ✓ 211663d
-- Neo4j max_depth: post-filter on results (or reject with error)
-- $project_prefix dot-boundary: ensure + '.' in filter-mode Cypher
-- Secrets: remove api_key/password from TOML examples, document env-only
-- Randomised Neo4j password: reflect in config table (remove changeme default)
-- eval + reflect + archive in CLI reference tables
+## Phase 2: Implementation Audit
 
-## Status: COMPLETE
+Verify the implementation is clean before documenting it.
 
-All 8 phases delivered. 472 tests passing. 10/10 verification criteria PASS (1 deferred: live doctor).
+### 2A. Full test suite
+`python -m pytest tests/ -v` — expect 472 pass.
+
+### 2B. Backend scoring parity check
+Verify store.py and neo4j_store.py _score_entry produce same results for identical inputs:
+- Hub bonus: both logarithmic
+- Type factor: both have semantic/episodic/procedural modifiers
+- Trust multiplier: both have provenance-based multipliers
+- Weight redistribution: both handle missing embeddings
+
+### 2C. Stale reference sweep
+```
+grep -rn 'schema="2"' src/ docs/ .claude/ README.md   # only test fixtures
+grep -rn "changeme" .                                   # only memory/ historical
+grep -rn "20-point\|20 components\|out of 20" src/ docs/
+grep -rn "V1-V10\|R1-R5" src/ docs/ .claude/
+grep -rn "min(backlinks" src/                            # should be 0 after 1A
+```
+
+### 2D. Template sync
+`diff src/memoryschema/templates/memory-schema.rules.tpl .claude/rules/memory-schema.md` — must be identical before and after Phase 3.
+
+## Phase 3: Documentation Alignment (24 fixes across 14 files)
+
+All docs updated to match the verified implementation from Phase 2.
+
+### Group A: Doctor check count (20 → 21) — 3 fixes
+**3A.** `src/memoryschema/cli/doctor_cmd.py:318` — "Run 20-point" → "Run 21-point"
+**3B.** `docs/implementation-guide.md:138` — "Checks 20 components" → "Checks 21 components"
+**3C.** `docs/hierarchy-and-inheritance.md:328` — "out of 20 total" → "out of 21 total"
+
+### Group B: Validation rule coverage — 5 fixes
+**3D.** `.claude/rules/memory-schema.md:158` — "V1-V10 (structure), R1-R5 (relations)" → "V1-V13 (structure), R1-R7 (relations)"
+**3E.** `src/memoryschema/templates/memory-schema.rules.tpl:158` — same (keep in sync)
+**3F.** `src/memoryschema/cli/validate_cmd.py:14` — "V1-V10, R1-R5, F1-F3" → "V1-V13, R1-R7, F1, F3"
+**3G.** `src/memoryschema/validator.py:10` — "Q1-Q7" → "Q1-Q2, Q6-Q8"
+**3H.** `src/memoryschema/validator.py:63` — add Q8 to quality check list in function docstring
+
+### Group C: schema.md validation table — 2 fixes
+**3I.** `docs/schema.md:239` — Add V13: `| V13 | If provenance="ingested", must have <memory:source> element |`
+**3J.** `docs/schema.md:249` — Add R7: `| R7 | No SUPERSEDES cycles (A→B→...→A chains rejected) |`
+
+### Group D: Scoring formulas — 3 fixes
+**3K.** `.claude/rules/memory-schema.md:139` + template — hub: "min(backlinks, 5)" → "ln(1 + backlinks)"; text match: "+0.1" → "+0.1 substring (Neo4j) or BM25 up to +0.3 (JSONL)"
+**3L.** `docs/technical-reference.md:77-78` — same hub and text match formula fixes
+**3M.** `docs/schema.md:281-282` — same text match update
+
+### Group E: Rules file type factor + upsert — 4 fixes (rules + template)
+**3N.** `.claude/rules/memory-schema.md` Rule 7 + template — add type factor: "semantic floor 0.6, episodic standard, procedural `recency^(1/(1+0.3*min(accesses,10)))`"
+**3O.** `.claude/rules/memory-schema.md` Rule 6 + template — add: provenance (Immutable), status (Server-managed), project (Immutable)
+
+### Group F: Missing CLI commands — 3 fixes
+**3P.** `README.md` — add 6 commands: eval, reflect, archive, unarchive, reactivate, quarantine
+**3Q.** `README.md` — hook subcommands: add uninstall, test
+**3R.** `src/memoryschema/cli/main.py` docstring — add eval under "Validation & Quality"
+
+### Group G: Schema version + module docstrings — 4 fixes
+**3S.** `docs/hierarchy-and-inheritance.md:10` — "Schema stays at v2" → "Schema is v3."
+**3T.** `src/memoryschema/store.py:1-13` — add v3 capabilities to docstring
+**3U.** `src/memoryschema/tags.py:1-8` — add status/provenance parsing to docstring
+**3V.** `src/memoryschema/__init__.py:1-27` — update API listing (reflect, hierarchy, inheritance)
+
+### Group H: technical-reference.md completeness — 2 fixes
+**3W.** `docs/technical-reference.md:138` — validator module "R1-R6" → "R1-R7"
+**3X.** `docs/technical-reference.md` Configuration table — expand from 9 to ~16 fields (add: store_path, neo4j container/port fields, rerank_model, recall_depth, recall_decay, l0_token_budget, max_inherit_depth)
 
 ## Verification
 
-1. Test: CLI > env > TOML (all three set, CLI wins)
-2. Test: recall excludes superseded/archived by default, includes with opt-in
-3. Test: SUPERSEDES sets target status, trust guard blocks ingested→first-party
-4. Test: provenance immutable on upsert
-5. Test: type factor modifies recency correctly
-6. Test: quarantine stores unembedded, release embeds
-7. All counts consistent across docs (432/21/28)
-8. No schema="2" in any example
-9. python -m pytest tests/ -v — all pass
-10. memoryschema doctor — all pass
+1. `python -m pytest tests/ -v` — 472+ pass
+2. `diff src/memoryschema/templates/memory-schema.rules.tpl .claude/rules/memory-schema.md` — identical
+3. `grep -rn "20-point\|20 components\|out of 20\|V1-V10\|R1-R5\|Q1-Q7\|min(backlinks\|stays at v2" src/ docs/ .claude/ README.md` — zero matches
+4. `grep -rn 'schema="2"' src/ docs/ .claude/ README.md` — only test fixtures
+5. `grep -rn "changeme" docker-compose.yml` — zero matches
+6. `memoryschema --help` — eval listed
+7. `memoryschema doctor --help` — 21-point
+8. `memoryschema validate --help` — V1-V13, R1-R7
