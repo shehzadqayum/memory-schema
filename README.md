@@ -139,7 +139,7 @@ URI:     bolt://localhost:7687
 Write a memory file:
 
 ```xml
-<memory:entity schema="2" name="first-memory" type="semantic" importance="7">
+<memory:entity schema="3" name="first-memory" type="semantic" importance="7">
   <memory:description>My first memory entity</memory:description>
   <memory:reasoning>Testing the memory system</memory:reasoning>
 </memory:entity>
@@ -285,14 +285,15 @@ pytest tests/ --cov=memoryschema --cov-report=term-missing
 pytest tests/test_store.py -v
 ```
 
-**432 tests** across 28 test files covering all modules:
+**472 tests** across 27 test files covering all modules:
 
 | Category | Files | Tests | What's tested |
 |----------|------:|------:|---------------|
-| Core modules | 6 | 120 | config, discovery, validator, tags, store, consolidation |
-| Mocked deps | 5 | 46 | embeddings, neo4j_store, schema, migration, reembed |
+| Core modules | 7 | 236 | config, discovery, validator, tags, store, consolidation, hierarchy |
+| Mocked deps | 5 | 48 | embeddings, neo4j_store, schema, migration, reembed |
 | Lazy imports | 1 | 23 | __init__.py public API, __getattr__, __all__ |
-| CLI commands | 10 | 73 | All 10 CLI modules via Click CliRunner |
+| CLI commands | 12 | 89 | All CLI modules via Click CliRunner |
+| Integration | 2 | 76 | inheritance (config chain), write_gate, eval harness |
 
 **Mocking strategy:** External dependencies (voyageai, neo4j, Docker) are mocked with `unittest.mock.patch` — no real API calls, containers, or network required to run tests.
 

@@ -2,7 +2,7 @@
 
 ## Overview
 
-**Schema:** `docs/schema.md` (source of truth, v2)
+**Schema:** `docs/schema.md` (source of truth, v3)
 **Guidelines:** `.claude/rules/memory-*.md` (per-scope usage)
 **Embedding model:** Voyage AI `voyage-4-lite` (1024 dimensions)
 **Primary store:** Neo4j (L2b, optional)
@@ -34,10 +34,10 @@ Each layer adds capability without being required. The system degrades gracefull
 
 ---
 
-## Entity Structure (Schema v2)
+## Entity Structure (Schema v3)
 
 ```xml
-<memory:entity schema="2" name="unique-identifier" type="semantic" importance="7">
+<memory:entity schema="3" name="unique-identifier" type="semantic" importance="7">
   <memory:description>One-line summary</memory:description>
   <memory:observations>
     <memory:observation>Atomic fact</memory:observation>
@@ -172,14 +172,15 @@ from memoryschema import Neo4jMemoryStore, embed_text, embed_batch, rerank
 
 ### Coverage
 
-432 tests across 28 files. 21/21 doctor checks. Target: 100% module coverage.
+472 tests across 27 files. 21/21 doctor checks. Target: 100% module coverage.
 
 | Category | Test files | Tests |
 |----------|-----------|------:|
-| Core modules (config, discovery, validator, tags, store, consolidation) | 6 | 120 |
-| Mocked external deps (embeddings, neo4j_store, schema, migration, reembed) | 5 | 46 |
+| Core modules (config, discovery, validator, tags, store, consolidation, hierarchy) | 7 | 236 |
+| Mocked external deps (embeddings, neo4j_store, schema, migration, reembed) | 5 | 48 |
 | Lazy imports (__init__.py) | 1 | 23 |
-| CLI commands (all 10 modules) | 10 | 73 |
+| CLI commands (all CLI modules) | 12 | 89 |
+| Integration (inheritance, write_gate, eval) | 2 | 76 |
 
 ### Mocking Patterns
 

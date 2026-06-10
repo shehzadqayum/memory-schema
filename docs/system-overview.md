@@ -12,7 +12,7 @@ Everything else — the store, embeddings, hooks, scripts — is infrastructure 
 A memory is a single, atomic unit of storage. It has a name, a description, and optionally any combination of observations, reasoning, prompt, relations, and source. Every memory uses the same structure:
 
 ```xml
-<memory:entity schema="2" name="unique-name" type="semantic" importance="7">
+<memory:entity schema="3" name="unique-name" type="semantic" importance="7">
   <memory:description>One-line summary</memory:description>
   <memory:observations>
     <memory:observation>A specific fact</memory:observation>
@@ -71,7 +71,7 @@ The system degrades gracefully. If Neo4j is down, JSONL works. If JSONL is corru
 
 ## Schema + Guidelines = Core
 
-- **Schema** (structure): 3 required fields, 8 optional. Portable across projects.
+- **Schema** (structure): 3 required fields, 10 optional. Portable across projects.
 - **Guidelines** (usage): per-scope, per-project. Importance correlates with enforcement.
 
 The schema is stable (changes rarely). The guidelines are tunable (change per project, per session, per scope).

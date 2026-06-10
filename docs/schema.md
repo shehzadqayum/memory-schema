@@ -8,7 +8,7 @@ The guidelines determine how the entity IS used — which optional fields to fil
 
 **Principle:** Schema + guidelines = core. Schema is structure. Guidelines are usage.
 
-**Source of truth:** This document. CLAUDE.md carries a synced copy for prompt injection. Code in `scripts/memory-server/` implements the schema. On divergence, this document wins.
+**Source of truth:** This document. `.claude/rules/memory-schema.md` carries a derived copy. On divergence, this document wins.
 
 **Schema version:** `3`
 
@@ -21,7 +21,7 @@ The guidelines determine how the entity IS used — which optional fields to fil
 Minimal (required fields only):
 
 ```xml
-<memory:entity schema="2" name="unique-identifier">
+<memory:entity schema="3" name="unique-identifier">
   <memory:description>One-line summary</memory:description>
 </memory:entity>
 ```
@@ -29,7 +29,7 @@ Minimal (required fields only):
 Full (all optional fields included):
 
 ```xml
-<memory:entity schema="2" name="unique-identifier" type="semantic" importance="7">
+<memory:entity schema="3" name="unique-identifier" type="semantic" importance="7">
   <memory:description>One-line summary</memory:description>
   <memory:observations>
     <memory:observation>Atomic fact 1</memory:observation>
@@ -94,6 +94,7 @@ Optional body text follows after the closing tag.
 | --- | --- |
 | `1` | Initial tagged schema. |
 | `2` | Added `<memory:prompt>` and `<memory:reasoning>` as optional fields. Removed save/recall/result/consolidation MCP tags (unimplemented interfaces). Removed observation grammar (moved to project guidelines). Moved `<memory:observations>`, `type`, and `importance` from required to optional. Required fields reduced to: schema, name, description. All other fields optional. |
+| `3` | Added `status` and `provenance` attributes. Deprecated `PARENT_OF`, `CHILD_OF` relations (use `project` field). Added V11 (status), V12 (provenance), V13 (source-required-if-ingested), R6 (referential integrity). Full backward compatible with v1/v2. |
 
 ### Rules
 
@@ -241,7 +242,7 @@ Re-saving with an existing `name` performs a merge, not a replacement.
 | Rule | Description |
 | --- | --- |
 | R1 | Every `<memory:relation>` has both `target` and `type` attributes |
-| R2 | `type` is one of the six defined types |
+| R2 | `type` is one of the six active relation types (deprecated types warned) |
 | R3 | `target` is a valid memory name (kebab-case) |
 | R4 | No self-references (target != own name) |
 | R5 | No duplicate relations (same target + type pair) |
@@ -320,7 +321,7 @@ Each layer adds capability without being required. The system degrades gracefull
 | L1a | Markdown files | Persistence, git, human-readable | Never fails |
 | L1b | JSONL | Structured queries, backlinks, access tracking | Never fails |
 | L2a | Voyage embeddings | Semantic similarity, associations | Degrades to L1 |
-| L2b | Neo4j (`ict-neo4j`) | Primary store, vector k-NN, graph traversal | Degrades to L2a |
+| L2b | Neo4j | Primary store, vector k-NN, graph traversal | Degrades to L2a |
 
 ### Fallback Chain
 

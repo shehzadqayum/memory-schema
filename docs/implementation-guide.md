@@ -85,7 +85,7 @@ Open Claude Code in your project. The `.claude/rules/` files auto-load:
 - `memory-schema.md` — structural rules for valid entities
 - `memory-working.md` — selective write policy (write on decisions, corrections, novel facts)
 
-Every response writes a `<memory:entity>` to `memory/<name>.md`. The hook indexes it.
+Selected responses write a `<memory:entity>` to `memory/<name>.md` (per scope guidelines). The hook indexes it.
 
 ## Architecture
 
@@ -144,7 +144,7 @@ pip install memory-schema[all,dev]
 pytest tests/ -v --cov=memoryschema
 ```
 
-432 tests, 28 files. External dependencies are mocked — no Docker or API keys needed to run tests.
+472 tests, 27 files. External dependencies are mocked — no Docker or API keys needed to run tests.
 
 ### Write tests for custom ingest scripts
 
@@ -152,7 +152,7 @@ pytest tests/ -v --cov=memoryschema
 from memoryschema import MemoryStore, parse_memory_content, validate
 
 def test_my_entity():
-    content = '<memory:entity schema="2" name="test"><memory:description>Test</memory:description></memory:entity>'
+    content = '<memory:entity schema="3" name="test"><memory:description>Test</memory:description></memory:entity>'
     result = parse_memory_content(content)
     assert result['name'] == 'test'
     errors = validate(content)
