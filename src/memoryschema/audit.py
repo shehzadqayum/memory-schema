@@ -45,6 +45,32 @@ def _diff_fields(existing, new_dict):
     return changes
 
 
+def log_gate_decision(audit_path, name, verdict, reasons, provenance=None):
+    """Log a write gate decision to the audit trail.
+
+    Args:
+        audit_path: Path to audit.jsonl file.
+        name: Memory entity name.
+        verdict: 'accept', 'reject', or 'quarantine'.
+        reasons: List of reason strings for the verdict.
+        provenance: Optional provenance of the entry.
+    """
+    record = {
+        'timestamp': _now_iso(),
+        'operation': 'gate_decision',
+        'name': name,
+        'verdict': verdict,
+        'reasons': reasons,
+    }
+    if provenance:
+        record['provenance'] = provenance
+
+    os.makedirs(os.path.dirname(audit_path), exist_ok=True)
+
+    with open(audit_path, 'a', encoding='utf-8') as f:
+        f.write(json.dumps(record, ensure_ascii=False) + '\n')
+
+
 def log_mutation(audit_path, operation, name, changes=None, prior_entry=None):
     """Append a mutation record to the audit log.
 

@@ -335,7 +335,30 @@ Stays under 200 lines (auto-load limit). The PostToolUse hook automatically appe
 
 ## Behavioral Specification
 
-**On Create:** Write markdown → upsert Neo4j (or JSONL fallback) → embed → associations → append to MEMORY.md (working memory only).
+**On Create:** Write markdown → write gate → embed (if accepted) → upsert → associations → append to MEMORY.md (working memory only).
+
+### Write Gate Pipeline
+
+Every write passes through a four-stage gate before indexing. The gate never silently drops — every entry receives a logged verdict.
+
+```
+Parse → Validate → Gate Pipeline → Embed (if accepted) → Index
+                       │
+         ┌─────────────┼─────────────┐
+         │             │             │
+      ACCEPT      QUARANTINE      REJECT
+    (index + embed)  (save unembedded,  (not saved,
+                      status=quarantined)  exit with error)
+```
+
+| Stage | Check | Failure verdict |
+|-------|-------|-----------------|
+| 1. Validation | Name required, description expected | REJECT |
+| 2. Provenance admission | Valid provenance, source required for ingested | REJECT |
+| 3. Guards | Provenance mismatch on upsert (existing ≠ new) | QUARANTINE |
+| 4. Consistency probe | Near-duplicate (>0.95 cosine sim, different description) | QUARANTINE |
+
+Every gate decision is recorded in `memory/audit.jsonl` with machine-readable verdict and reasons.
 **On Access:** Increment access_count, update last_accessed.
 **On Query:** Score candidates → search → expand via backlinks+associations → return ranked. Non-active entries are excluded from results by default (`--include-inactive` to override). Superseded entries remain traversable in BFS graph walks (their relations are followed) but are not returned in results.
 **On Consolidate:** Sync un-indexed files → backlinks → (batch embed → associations → Neo4j if available).

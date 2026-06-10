@@ -164,7 +164,10 @@ def list_cmd(config, type_filter, project_filter, limit, include_inactive, as_js
 @click.argument("file_path", type=click.Path(exists=True))
 @click.pass_obj
 def write(config, file_path):
-    """Parse, validate, embed, and index a single memory file.
+    """Parse, validate, gate-check, embed, and index a single memory file.
+
+    Pipeline: parse → validate → write gate → embed (if accepted) → index.
+    Gate verdicts: ACCEPT (normal), REJECT (exit 1), QUARANTINE (saved unembedded).
 
     Example:
         memoryschema write memory/my-memory.md
@@ -188,7 +191,40 @@ def write(config, file_path):
             click.echo(f"  [{rule}] {msg}")
         sys.exit(1)
 
-    # Embed
+    # Write gate pipeline
+    from memoryschema.write_gate import gate_pipeline, GateVerdict
+    store = _get_store(config)
+    gate_result = gate_pipeline(memory, store=store)
+
+    # Audit log — every gate decision is recorded
+    try:
+        from memoryschema.audit import log_gate_decision
+        audit_path = str(config.memory_dir / 'audit.jsonl')
+        log_gate_decision(
+            audit_path, memory.get('name', '?'),
+            gate_result.verdict.value,
+            gate_result.reasons + gate_result.warnings,
+            provenance=memory.get('provenance'))
+    except Exception:
+        pass  # Audit failure must not block writes
+
+    for w in gate_result.warnings:
+        click.echo(f"Gate: {w}", err=True)
+
+    if gate_result.verdict == GateVerdict.REJECT:
+        for r in gate_result.reasons:
+            click.echo(f"REJECTED: {r}", err=True)
+        sys.exit(1)
+
+    if gate_result.verdict == GateVerdict.QUARANTINE:
+        for r in gate_result.reasons:
+            click.echo(f"QUARANTINED: {r}", err=True)
+        memory['status'] = 'quarantined'
+        store.upsert(memory)
+        click.echo(f"Quarantined: {memory['name']} (review with: memoryschema quarantine review {memory['name']})")
+        return
+
+    # ACCEPT path — embed and index
     if config.voyage_api_key:
         try:
             from memoryschema.embeddings import embed_text
@@ -203,8 +239,6 @@ def write(config, file_path):
         except Exception as e:
             click.echo(f"Warning: Embedding failed: {e}", err=True)
 
-    # Index
-    store = _get_store(config)
     store.upsert(memory)
     click.echo(f"Indexed: {memory['name']}")
 
@@ -374,6 +408,52 @@ def quarantine_list(config, as_json):
             click.echo(f"{len(quarantined)} quarantined:")
             for e in quarantined:
                 click.echo(f"  {e.get('name', '?'):40s} {e.get('description', '')[:60]}")
+
+
+@quarantine.command("review")
+@click.argument("name")
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON.")
+@click.pass_obj
+def quarantine_review(config, name, as_json):
+    """Show full details of a quarantined entry for review.
+
+    Displays all fields so you can decide whether to release or reject.
+
+    Example:
+        memoryschema quarantine review suspicious-entry
+    """
+    store = _get_store(config)
+    entry = store.get(name)
+    if not entry:
+        click.echo(f"Error: Entity '{name}' not found.", err=True)
+        sys.exit(1)
+    if entry.get('status') != 'quarantined':
+        click.echo(f"Note: '{name}' status is '{entry.get('status', 'active')}' (not quarantined).",
+                    err=True)
+
+    if as_json:
+        output = {k: v for k, v in entry.items() if k != 'embedding'}
+        click.echo(json.dumps(output, indent=2))
+    else:
+        click.echo(f"Name:        {entry.get('name')}")
+        click.echo(f"Status:      {entry.get('status', 'active')}")
+        click.echo(f"Provenance:  {entry.get('provenance', 'first-party')}")
+        click.echo(f"Type:        {entry.get('type', 'semantic')}")
+        click.echo(f"Importance:  {entry.get('importance', 5)}")
+        click.echo(f"Description: {entry.get('description')}")
+        if entry.get('source'):
+            click.echo(f"Source:      {entry['source']}")
+        if entry.get('observations'):
+            click.echo(f"Observations ({len(entry['observations'])}):")
+            for obs in entry['observations'][:10]:
+                click.echo(f"  - {obs[:120]}")
+        if entry.get('prompt'):
+            click.echo(f"Prompt:      {entry['prompt'][:200]}")
+        if entry.get('reasoning'):
+            click.echo(f"Reasoning:   {entry['reasoning'][:200]}")
+        click.echo(f"\nActions:")
+        click.echo(f"  memoryschema quarantine release {name}")
+        click.echo(f"  memoryschema quarantine reject {name} --confirm")
 
 
 @quarantine.command("release")
