@@ -85,7 +85,13 @@ def recall(config, query, limit, project, include_inactive, as_json):
             click.echo("No results found.")
             return
         for r in results:
-            click.echo(f"  {r['score']:.3f} [{r['channel']}] {r['name']}")
+            untrusted = r.get('untrusted') or r.get('provenance') == 'ingested'
+            prefix = "  "
+            if untrusted:
+                prefix = "! "
+            click.echo(f"{prefix}{r['score']:.3f} [{r['channel']}] {r['name']}")
+            if untrusted:
+                click.echo(f"         [UNTRUSTED — ingested, provenance unverified]")
             if r.get('description'):
                 click.echo(f"         {r['description'][:100]}")
 

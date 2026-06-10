@@ -83,6 +83,15 @@ EMPTY_OBSERVATIONS = """<memory:entity schema="2" name="empty-obs">
   </memory:observations>
 </memory:entity>"""
 
+INGESTED_NO_SOURCE = """<memory:entity schema="3" name="ingested-no-src" provenance="ingested">
+  <memory:description>Ingested without source</memory:description>
+</memory:entity>"""
+
+INGESTED_WITH_SOURCE = """<memory:entity schema="3" name="ingested-with-src" provenance="ingested">
+  <memory:description>Ingested with source</memory:description>
+  <memory:source>https://example.com/data.json</memory:source>
+</memory:entity>"""
+
 
 class TestValidEntities:
     def test_minimal(self):
@@ -131,6 +140,14 @@ class TestStructureRules:
     def test_v7_empty_observations(self):
         errors = validate(EMPTY_OBSERVATIONS)
         assert any(r == 'V7' for r, _ in errors)
+
+    def test_v13_ingested_requires_source(self):
+        errors = validate(INGESTED_NO_SOURCE)
+        assert any(r == 'V13' for r, _ in errors)
+
+    def test_v13_ingested_with_source_passes(self):
+        errors = validate(INGESTED_WITH_SOURCE)
+        assert not any(r == 'V13' for r, _ in errors)
 
 
 class TestRelationRules:

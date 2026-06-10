@@ -357,6 +357,30 @@ Stays under 200 lines (auto-load limit). The PostToolUse hook automatically appe
 - **Trust guard:** The source entry's provenance trust level must be ≥ the target's. Trust levels: `user`=3, `first-party`=3, `derived`=3, `ingested`=1. An ingested entry cannot supersede a first-party or derived entry.
 - **Cycle detection (R7):** Adding a SUPERSEDES relation that would create a circular chain (A→B→C→A) is rejected with a ValueError.
 
+### Provenance Semantics
+
+- **Immutability:** Provenance is set on creation and cannot be changed by subsequent upserts. This prevents trust escalation (e.g., ingested content being re-upserted as first-party).
+- **Trust multiplier:** Provenance affects retrieval scoring. Applied as a multiplier on the final score: `first-party`=1.0, `user`=1.0, `derived`=0.9, `ingested`=0.7.
+- **L0 invariant:** MEMORY.md (always-in-context index) never contains ingested entries. This is enforced by the PostToolUse hook at the L0 gating step, closing the injection channel for external content.
+- **Source required (V13):** Entries with `provenance="ingested"` must include a `<memory:source>` element identifying the origin URL or path.
+- **Untrusted presentation:** CLI recall output marks ingested entries with `[UNTRUSTED — ingested, provenance unverified]` delimiters. In JSON output, the `untrusted: true` flag is set.
+
+### Upsert Immutability
+
+| Field | On Create | On Merge |
+|-------|-----------|----------|
+| `name` | Set (merge key) | Immutable |
+| `schema` | Set | Immutable |
+| `provenance` | Set | Immutable |
+| `project` | Set | Immutable |
+| `filepath` | Set | Immutable |
+| `created_at` | Set (auto) | Immutable |
+| `description` | Set | Replaced |
+| `status` | Set | Replaced (or auto via SUPERSEDES) |
+| `observations` | Set | Appended (deduped) |
+| `relations` | Set | Appended (deduped by target+type) |
+| Other fields | Set | Replaced |
+
 ---
 
 ## Design Decisions

@@ -222,8 +222,8 @@ class MemoryStore:
         # Capture prior state for audit
         prior_snapshot = dict(existing)
 
-        # Merge (schema and filepath are immutable after creation)
-        for key in ('type', 'status', 'provenance', 'description', 'importance',
+        # Merge (schema, filepath, provenance, project are immutable after creation)
+        for key in ('type', 'status', 'description', 'importance',
                      'body', 'source', 'prompt', 'reasoning'):
             if key in memory_dict and memory_dict[key] is not None:
                 existing[key] = memory_dict[key]

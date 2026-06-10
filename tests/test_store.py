@@ -280,6 +280,33 @@ class TestComputeAssociations:
         assert len(entry_a.get('associations', [])) > 0
 
 
+class TestProvenanceSemantics:
+    """Tests for provenance immutability and trust semantics."""
+
+    def test_provenance_immutable_on_upsert(self, store):
+        """Provenance set on creation cannot be changed by merge."""
+        store.upsert({'name': 'prov-test', 'schema': 3, 'description': 'Test',
+                      'provenance': 'ingested', 'source': 'http://example.com'})
+        assert store.get('prov-test')['provenance'] == 'ingested'
+        # Re-upsert with different provenance — should NOT change
+        store.upsert({'name': 'prov-test', 'description': 'Updated',
+                      'provenance': 'first-party'})
+        assert store.get('prov-test')['provenance'] == 'ingested'
+
+    def test_provenance_default(self, store):
+        """Provenance defaults to first-party when not set."""
+        store.upsert({'name': 'default-prov', 'schema': 3, 'description': 'Test'})
+        entry = store.get('default-prov')
+        # No explicit provenance set — parser/store uses default
+        assert entry.get('provenance') is None or entry.get('provenance') == 'first-party'
+
+    def test_provenance_set_on_create(self, store):
+        """Provenance is correctly set when creating a new entry."""
+        store.upsert({'name': 'user-entry', 'schema': 3, 'description': 'Test',
+                      'provenance': 'user'})
+        assert store.get('user-entry')['provenance'] == 'user'
+
+
 class TestStatusLifecycle:
     """Tests for status-based filtering, trust guards, and lifecycle commands."""
 

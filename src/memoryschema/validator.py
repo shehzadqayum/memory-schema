@@ -4,7 +4,7 @@ Memory schema validator.
 Validates <memory:> tagged files against the schema specification.
 
 Validation rules:
-  V1-V12: Structure (entity element, attributes, children)
+  V1-V13: Structure (entity element, attributes, children, provenance gates)
   R1-R6:  Relations (attributes, types, self-reference, duplicates, referential integrity)
   F1, F3: Filesystem (filename match, safe characters)
   Q1-Q7:  Content quality (strict mode only)
@@ -138,6 +138,12 @@ def validate(content, filepath=None, strict=False, known_names=None):
     provenance_val = root.get('provenance')
     if provenance_val and provenance_val not in VALID_PROVENANCES:
         errors.append(('V12', f'Invalid provenance "{provenance_val}", must be one of: {", ".join(sorted(VALID_PROVENANCES))}'))
+
+    # V13: ingested provenance requires source element
+    if provenance_val == 'ingested':
+        source_elem = root.find('source')
+        if source_elem is None or not (source_elem.text and source_elem.text.strip()):
+            errors.append(('V13', 'Provenance "ingested" requires a <memory:source> element with origin URL or path'))
 
     # V6: exactly one <memory:description>
     descriptions = root.findall('description')

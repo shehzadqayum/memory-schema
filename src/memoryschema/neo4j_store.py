@@ -61,12 +61,16 @@ class Neo4jMemoryStore:
 
         now = _now_iso()
 
+        # Mutable props (applied on both CREATE and MATCH)
         props = {}
-        for key in ('schema', 'type', 'status', 'provenance', 'description',
+        for key in ('schema', 'type', 'status', 'description',
                      'importance', 'body', 'source', 'filepath', 'prompt',
                      'reasoning', 'project'):
             if key in memory_dict and memory_dict[key] is not None:
                 props[key] = memory_dict[key]
+
+        # Immutable props (applied on CREATE only — provenance cannot change)
+        provenance = memory_dict.get('provenance')
 
         observations = memory_dict.get('observations', [])
         embedding = memory_dict.get('embedding')
@@ -76,6 +80,7 @@ class Neo4jMemoryStore:
                 MERGE (m:Memory {name: $name})
                 ON CREATE SET
                     m += $props,
+                    m.provenance = $provenance,
                     m.observations = $observations,
                     m.observations_text = $observations_text,
                     m.created_at = $now,
@@ -90,7 +95,8 @@ class Neo4jMemoryStore:
                 SET m.observations = existing + new_obs,
                     m.observations_text = reduce(s = '', x IN (existing + new_obs) | s + ' ' + x)
                 RETURN m
-            """, name=name, props=props, observations=observations,
+            """, name=name, props=props, provenance=provenance,
+                observations=observations,
                 observations_text=' '.join(observations), now=now)
 
             if embedding:
