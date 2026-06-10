@@ -49,6 +49,22 @@
 - Store scoping uses module-level imports instead of repeated inline imports
 
 ### Fixed
+- Neo4j hub bonus: `min(backlinks, 5)` → `math.log(1 + backlinks)` — scoring parity with JSONL store
+- Docker-compose: hardcoded `changeme` password → `${NEO4J_PASSWORD}` env var reference
+- Validator R6: dead code cleanup (`level = 'R6' if strict else 'R6'` → `'R6'`)
+- Config docstring: "default: changeme" → "no default" (matches actual empty-string default)
+- env.example: removed `changeme` placeholder from NEO4J_PASSWORD
+- Example scripts: schema="2" → schema="3" in all 3 ingest/consolidation scripts + README
+- Doctor count: 20→21 in doctor_cmd, implementation-guide, hierarchy-and-inheritance docs
+- Validation coverage: V1-V10→V1-V13, R1-R5→R1-R7 in rules, template, validate_cmd, validator
+- schema.md: added V13 and R7 rows to validation rules tables
+- Hub bonus formula: `min(backlinks, 5)` → `ln(1 + backlinks)` in rules, template, tech-ref
+- Text match scoring: "+0.1" → "+0.1 (Neo4j) or BM25 up to +0.3 (JSONL)" in schema, rules, tech-ref
+- Rules file: added type factor to Rule 7, added provenance/status/project to Rule 6 upsert table
+- README: added 6 missing CLI commands + 2 hook subcommands
+- Schema version: "stays at v2" → "is v3" in hierarchy doc
+- Module docstrings: store.py, tags.py, __init__.py updated for v3 features
+- Config table: expanded from 9 to 18 fields in technical-reference
 - Config precedence: 3 docs said "env vars override everything" — corrected to CLI > env > TOML
 - hierarchy-and-inheritance.md Example 4: "env beats CLI" → "CLI beats env and TOML"
 - Documentation counts: 432→472 tests, 28→27 files across all docs

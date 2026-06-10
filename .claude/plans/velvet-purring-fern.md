@@ -8,7 +8,7 @@ After the v3 semantics implementation (session 10, 8 phases), three comprehensiv
 
 None.
 
-## Phase 1: Implementation Fixes (code, security, examples, templates)
+## Phase 1: Implementation Fixes (code, security, examples, templates) ✓ a17e60c
 
 Fix all code-level issues before touching documentation. Tests must pass after each fix.
 
@@ -41,7 +41,7 @@ Fix all code-level issues before touching documentation. Tests must pass after e
 `src/memoryschema/templates/memoryschema.toml.tpl` — missing `l0_token_budget` and `max_inherit_depth`.
 **Fix:** Add commented `# l0_token_budget = 2000` and `# max_inherit_depth = 3` to [retrieval] section.
 
-## Phase 2: Implementation Audit
+## Phase 2: Implementation Audit ✓ ec9bb72
 
 Verify the implementation is clean before documenting it.
 
@@ -67,7 +67,7 @@ grep -rn "min(backlinks" src/                            # should be 0 after 1A
 ### 2D. Template sync
 `diff src/memoryschema/templates/memory-schema.rules.tpl .claude/rules/memory-schema.md` — must be identical before and after Phase 3.
 
-## Phase 3: Documentation Alignment (24 fixes across 14 files)
+## Phase 3: Documentation Alignment (24 fixes across 14 files) ✓ a0e87cd
 
 All docs updated to match the verified implementation from Phase 2.
 
@@ -110,6 +110,10 @@ All docs updated to match the verified implementation from Phase 2.
 ### Group H: technical-reference.md completeness — 2 fixes
 **3W.** `docs/technical-reference.md:138` — validator module "R1-R6" → "R1-R7"
 **3X.** `docs/technical-reference.md` Configuration table — expand from 9 to ~16 fields (add: store_path, neo4j container/port fields, rerank_model, recall_depth, recall_decay, l0_token_budget, max_inherit_depth)
+
+## Status: COMPLETE
+
+All 3 phases delivered. 16/16 audit items PASS. Zero residuals. 472 tests passing.
 
 ## Verification
 
