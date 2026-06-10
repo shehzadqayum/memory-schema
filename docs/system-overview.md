@@ -78,7 +78,7 @@ The schema is stable (changes rarely). The guidelines are tunable (change per pr
 
 ## Diagnostics
 
-`memoryschema doctor` is the health check entry point. It runs 20 checks against the live system — Python, package, config, filesystem, Docker, Neo4j, Voyage AI, hook, tests — and reports status with self-documented remediation for any failures.
+`memoryschema doctor` is the health check entry point. It runs 21 checks against the live system — Python, package, config, filesystem, Docker, Neo4j, Voyage AI, hook, tests — and reports status with self-documented remediation for any failures.
 
 ```bash
 memoryschema doctor          # Human-readable report

@@ -43,7 +43,7 @@ Hook Management:
     hook           Manage PostToolUse hook (install, uninstall, status, test)
 
 Diagnostics & Inheritance:
-    doctor         20-point health check (TOML, rules inheritance, tests)
+    doctor         21-point health check (TOML, rules inheritance, tests)
     rules          Show effective rules with inheritance markers
     config         Show effective config with inheritance chain
 """

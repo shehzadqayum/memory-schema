@@ -10,7 +10,7 @@ The guidelines determine how the entity IS used — which optional fields to fil
 
 **Source of truth:** This document. CLAUDE.md carries a synced copy for prompt injection. Code in `scripts/memory-server/` implements the schema. On divergence, this document wins.
 
-**Schema version:** `2`
+**Schema version:** `3`
 
 **Parser:** `xml.etree.ElementTree` (Python stdlib, zero external dependencies).
 
@@ -55,7 +55,7 @@ Optional body text follows after the closing tag.
 
 | Field | Location | Constraints |
 | --- | --- | --- |
-| **schema** | attribute | Positive integer. Current version: `2`. |
+| **schema** | attribute | Positive integer. Current version: `3`. |
 | **name** | attribute | Kebab-case, unique within project, filesystem-safe. |
 | **description** | child element | One-line summary, under 120 characters. |
 
@@ -71,6 +71,8 @@ Optional body text follows after the closing tag.
 | **relations** | `<memory:relations>` | When the memory explicitly relates to other known memories. |
 | **source** | `<memory:source>` | To record provenance (session hash, commit, URL). |
 | **project** | `<memory:project>` | When the memory is project-scoped (omit for user-scope). |
+| **status** | attribute | `active` (default), `superseded`, `archived`, or `quarantined`. |
+| **provenance** | attribute | `first-party` (default), `user`, `ingested`, or `derived`. |
 
 ### Server-managed (never authored by Claude)
 
@@ -137,8 +139,8 @@ Eight relation types define explicit connections between memories.
 | `DEPENDS_ON` | A → B | A requires B to be true/valid |
 | `INFORMS` | A → B | A provides context for B |
 | `CONTRADICTS` | A ↔ B | A and B conflict |
-| `PARENT_OF` | A → B | A is the parent agent of B |
-| `CHILD_OF` | A → B | A is a child agent of B |
+| `PARENT_OF` | A → B | A is the parent agent of B *(deprecated — use project field)* |
+| `CHILD_OF` | A → B | A is a child agent of B *(deprecated — use project field)* |
 
 **Rules:** Target must be a valid memory name. No self-references. No invented types. Deduplicated on upsert.
 
@@ -231,6 +233,8 @@ Re-saving with an existing `name` performs a merge, not a replacement.
 | V8 | *(Retired — formerly required `<memory:observations>`, now optional)* |
 | V9 | All open tags have matching close tags |
 | V10 | If present, `schema` attribute is a valid integer from 1 to current version |
+| V11 | If present, `status` is one of: active, superseded, archived, quarantined |
+| V12 | If present, `provenance` is one of: first-party, user, ingested, derived |
 
 ### Relations
 
@@ -241,6 +245,7 @@ Re-saving with an existing `name` performs a merge, not a replacement.
 | R3 | `target` is a valid memory name (kebab-case) |
 | R4 | No self-references (target != own name) |
 | R5 | No duplicate relations (same target + type pair) |
+| R6 | Referential integrity — target entity should exist (warning in standard, error in strict) |
 
 ### File System
 
@@ -248,8 +253,6 @@ Re-saving with an existing `name` performs a merge, not a replacement.
 | --- | --- |
 | F1 | Filename matches the `name` attribute: `<name>.md` |
 | F3 | Filename is filesystem-safe (no spaces, special characters beyond hyphens) |
-
-F2 (directory scope validation) is not implemented — memory files are not restricted by directory. Project scoping is handled via the `<memory:project>` element or filepath-based derivation.
 
 ---
 
@@ -349,3 +352,4 @@ Stays under 200 lines (auto-load limit). The PostToolUse hook automatically appe
 | XML escaping required | No CDATA support — keeps parser simple |
 | Strict mode optional | Quality checks (kebab-case name, description length, atomic observations) in strict only — defined in `validator.py`, not in this document. Graceful handling of imperfect output |
 | v1 backward compatible | v2 adds optional fields only — all v1 files remain valid |
+| v3 (current) | Adds `status`, `provenance` attributes. Deprecates `PARENT_OF`, `CHILD_OF` relations. Adds V11, V12, R6 validation rules. |

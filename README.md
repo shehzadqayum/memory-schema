@@ -13,7 +13,7 @@ export VOYAGE_API_KEY=voy-xxxxx
 memoryschema status
 ```
 
-Done. Claude Code will now write a memory entity on every response.
+Done. Claude Code will now selectively write memory entities when decisions, corrections, or novel facts are established.
 
 ---
 
@@ -59,7 +59,7 @@ my-project/
 ├── .env.example                       # Environment variable reference
 └── .claude/rules/
     ├── memory-schema.md               # Schema rules (auto-loaded)
-    ├── memory-working.md              # Working memory guidelines (importance 10)
+    ├── memory-working.md              # Working memory guidelines (selective write)
     └── memory-corpus.md               # Corpus guidelines (importance 4-7)
 ```
 
@@ -224,7 +224,7 @@ Each external service is optional. The system degrades gracefully:
 ### Diagnostics & Inheritance
 | Command | Description |
 |---------|-------------|
-| `memoryschema doctor` | 20-point health check (includes TOML + rules inheritance) |
+| `memoryschema doctor` | 21-point health check (includes TOML + rules inheritance) |
 | `memoryschema rules` | Show effective rules with inheritance markers |
 | `memoryschema rules --conflicts` | Show child rules overridden by parent |
 | `memoryschema config` | Show effective config |
@@ -241,7 +241,7 @@ All query commands support `--json` for agent consumption. All destructive comma
 **Delivery:** Schema rules deploy to `.claude/rules/memory-schema.md` (auto-loaded, no CLAUDE.md conflict).
 
 **Enforcement:** Correlates with importance attribute (1-10):
-- **10** (working memory): strict — every response writes memory
+- **8-10** (working memory): selective — write on decisions, corrections, novel facts
 - **4-7** (corpus): standard — batch ingested
 - **1-3** (advisory): write when significant
 
@@ -285,7 +285,7 @@ pytest tests/ --cov=memoryschema --cov-report=term-missing
 pytest tests/test_store.py -v
 ```
 
-**390 tests** across 24 test files covering all modules:
+**432 tests** across 28 test files covering all modules:
 
 | Category | Files | Tests | What's tested |
 |----------|------:|------:|---------------|
@@ -296,7 +296,7 @@ pytest tests/test_store.py -v
 
 **Mocking strategy:** External dependencies (voyageai, neo4j, Docker) are mocked with `unittest.mock.patch` — no real API calls, containers, or network required to run tests.
 
-**Diagnostics:** `memoryschema doctor` runs 18 health checks against the live system. Use it to verify a real deployment:
+**Diagnostics:** `memoryschema doctor` runs 21 health checks against the live system. Use it to verify a real deployment:
 
 ```bash
 memoryschema doctor          # Human-readable status report

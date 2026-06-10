@@ -144,6 +144,11 @@ from memoryschema import Neo4jMemoryStore, embed_text, embed_batch, rerank
 | `memoryschema.config` | Centralized configuration + `from_toml()` factory |
 | `memoryschema.hierarchy` | Dot-notation project hierarchy — see [hierarchy-and-inheritance.md](hierarchy-and-inheritance.md) for full API |
 | `memoryschema.inheritance` | TOML config chain + rules resolution — see [hierarchy-and-inheritance.md](hierarchy-and-inheritance.md) for full API |
+| `memoryschema.audit` | Append-only mutation log with field-level change tracking |
+| `memoryschema.l0_budget` | MEMORY.md token budget enforcement with score-based eviction |
+| `memoryschema.write_gate` | Pre-consolidation write gate with consistency probe |
+| `memoryschema.cli.eval_cmd` | Evaluation harness: recall@k, MRR, nDCG metrics |
+| `memoryschema.cli.reflect_cmd` | Episodic clustering and semantic summary synthesis |
 
 ---
 
@@ -167,7 +172,7 @@ from memoryschema import Neo4jMemoryStore, embed_text, embed_batch, rerank
 
 ### Coverage
 
-390 tests across 24 files. 20/20 doctor checks. Target: 100% module coverage.
+432 tests across 28 files. 21/21 doctor checks. Target: 100% module coverage.
 
 | Category | Test files | Tests |
 |----------|-----------|------:|
@@ -188,7 +193,7 @@ from memoryschema import Neo4jMemoryStore, embed_text, embed_batch, rerank
 
 ### Diagnostics
 
-`memoryschema doctor` — 20 live checks:
+`memoryschema doctor` — 21 live checks:
 
 | Check | What | Fix on failure |
 |-------|------|----------------|

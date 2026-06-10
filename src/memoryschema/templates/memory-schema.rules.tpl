@@ -1,4 +1,4 @@
-# Memory Schema Rules (v2)
+# Memory Schema Rules (v3)
 
 These rules define what a valid memory entity looks like.
 They say nothing about when to write or what to capture — that is determined by the scope guidelines.
@@ -15,14 +15,14 @@ Every memory entity MUST be a `<memory:entity>` XML block in a `.md` file.
 
 | Field | Location | Constraints |
 |-------|----------|-------------|
-| `schema` | attribute | Positive integer. Current: `2`. |
+| `schema` | attribute | Positive integer. Current: `3`. |
 | `name` | attribute | Kebab-case, unique, filesystem-safe. |
 | `description` | child element | One-line summary, under 120 characters. |
 
 ### Minimal valid entity:
 
 ```xml
-<memory:entity schema="2" name="unique-identifier">
+<memory:entity schema="3" name="unique-identifier">
   <memory:description>One-line summary</memory:description>
 </memory:entity>
 ```
@@ -30,7 +30,7 @@ Every memory entity MUST be a `<memory:entity>` XML block in a `.md` file.
 ### Full entity (all optional fields):
 
 ```xml
-<memory:entity schema="2" name="unique-identifier" type="semantic" importance="7">
+<memory:entity schema="3" name="unique-identifier" type="semantic" importance="7">
   <memory:description>One-line summary</memory:description>
   <memory:observations>
     <memory:observation>Atomic fact 1</memory:observation>
@@ -63,6 +63,8 @@ Include when contextually appropriate. Omit if not relevant.
 | `relations` | `<memory:relations>` | Explicit links to other known memories. |
 | `source` | `<memory:source>` | Provenance (session hash, commit, URL). |
 | `project` | `<memory:project>` | Project scoping. |
+| `status` | attribute | `active` (default), `superseded`, `archived`, `quarantined`. |
+| `provenance` | attribute | `first-party` (default), `user`, `ingested`, `derived`. |
 
 ---
 
@@ -90,8 +92,8 @@ Eight typed links connect entities explicitly. All optional.
 | `DEPENDS_ON` | A requires B to be true/valid |
 | `INFORMS` | A provides context for B |
 | `CONTRADICTS` | A and B conflict |
-| `PARENT_OF` | A is the parent agent of B |
-| `CHILD_OF` | A is a child agent of B |
+| `PARENT_OF` | A is the parent agent of B *(deprecated — use project field)* |
+| `CHILD_OF` | A is a child agent of B *(deprecated — use project field)* |
 
 Rules: target must be a valid memory name. No self-references. No duplicate target+type pairs.
 

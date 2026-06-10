@@ -83,7 +83,7 @@ Should show: backend type, node count (0 for fresh install), store path.
 
 Open Claude Code in your project. The `.claude/rules/` files auto-load:
 - `memory-schema.md` — structural rules for valid entities
-- `memory-working.md` — "every response MUST write memory" (importance 10)
+- `memory-working.md` — selective write policy (write on decisions, corrections, novel facts)
 
 Every response writes a `<memory:entity>` to `memory/<name>.md`. The hook indexes it.
 
@@ -106,7 +106,7 @@ Every response writes a `<memory:entity>` to `memory/<name>.md`. The hook indexe
 ### Enforcement
 
 Correlates with importance:
-- **Importance 8-10** (working memory): strict — every response writes
+- **Importance 8-10** (working memory): selective — write on decisions, corrections, novel facts
 - **Importance 4-7** (corpus): standard — batch ingested, validated at ingest
 - **Importance 1-3** (advisory): write when significant
 
@@ -144,7 +144,7 @@ pip install memory-schema[all,dev]
 pytest tests/ -v --cov=memoryschema
 ```
 
-390 tests, 24 files. External dependencies are mocked — no Docker or API keys needed to run tests.
+432 tests, 28 files. External dependencies are mocked — no Docker or API keys needed to run tests.
 
 ### Write tests for custom ingest scripts
 
