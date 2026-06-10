@@ -267,6 +267,16 @@ class TestResolveConfigChain:
             config = MemoryConfig.from_toml(tmp_path)
         assert config.neo4j_uri == 'bolt://env:7687'  # env wins
 
+    def test_cli_beats_env_beats_toml(self, tmp_path):
+        """Full precedence: CLI > env > TOML (all three set, CLI wins)."""
+        _write_toml(tmp_path / 'memoryschema.toml',
+                     '[project]\nname = "toml-name"')
+        from memoryschema.config import MemoryConfig
+        with patch.dict(os.environ, {'MEMORY_PROJECT': 'env-name'}):
+            config = MemoryConfig.from_toml(
+                tmp_path, cli_overrides={'project_name': 'cli-name'})
+        assert config.project_name == 'cli-name'  # CLI wins over env and TOML
+
 
 # --- Rules Ancestry ---
 

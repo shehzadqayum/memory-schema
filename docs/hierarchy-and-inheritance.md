@@ -224,17 +224,17 @@ org/memoryschema.toml:
 Resolved: neo4j_uri="bolt://prod:7687" (env var wins)
 ```
 
-**Example 4: CLI override beats TOML**
+**Example 4: CLI override beats env and TOML**
 
 ```
 CLI: --project cli-name
 TOML: [project] name = "toml-name"
-Env: (not set)
+Env: MEMORY_PROJECT=env-name
 
-Resolved: project_name="cli-name" (CLI beats TOML)
+Resolved: project_name="cli-name" (CLI beats env and TOML)
 
-With MEMORY_PROJECT=env-name:
-Resolved: project_name="env-name" (env beats CLI)
+Without CLI flag:
+Resolved: project_name="env-name" (env beats TOML)
 ```
 
 ### 3.4 Chain Walking

@@ -185,7 +185,7 @@ uri = "bolt://localhost:7687"
 recall_depth = 2
 ```
 
-Config inherits upward — parent TOML values override child on conflict. Environment variables override everything.
+Config inherits upward — parent TOML values override child on conflict. CLI flags have highest priority, followed by environment variables, then TOML.
 
 ## Nested Agent Setup
 

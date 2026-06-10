@@ -250,7 +250,7 @@ All query commands support `--json` for agent consumption. All destructive comma
 L0: MEMORY.md → L1a: Markdown files → L1b: JSONL → L2a: Embeddings → L2b: Neo4j
 ```
 
-**Hierarchical Inheritance:** Projects nest as agents via dot-notation (`parent.child`). Parent's config and rules override child's on conflict. Config via `memoryschema.toml` files with upward chain walking. Env vars > CLI > parent TOML > child TOML > defaults. See `docs/system-overview.md` for details.
+**Hierarchical Inheritance:** Projects nest as agents via dot-notation (`parent.child`). Parent's config and rules override child's on conflict. Config via `memoryschema.toml` files with upward chain walking. CLI > env vars > parent TOML > child TOML > defaults. See `docs/system-overview.md` for details.
 
 ---
 
