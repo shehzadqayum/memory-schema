@@ -3,6 +3,24 @@
 ## [Unreleased]
 
 ### Added
+- Status lifecycle semantics — retrieval filtering with `--include-inactive`, traversable-not-returned for superseded entries in BFS recall
+- SUPERSEDES trust guard — ingested entries cannot supersede first-party/derived/user entries
+- SUPERSEDES cycle detection (R7) — prevents circular SUPERSEDES chains
+- `unarchive`, `reactivate`, `release_quarantine` store methods and CLI commands
+- `quarantine` CLI command group — list, review, release, reject subcommands
+- MEMORY.md line removal on archive status transition
+- Provenance immutability — provenance cannot be changed after entity creation
+- V13 validation rule — ingested provenance requires `<memory:source>` element
+- Untrusted presentation — CLI recall marks ingested entries with `[UNTRUSTED]` delimiter
+- Write gate two-verdict pipeline — REJECT (structural) vs QUARANTINE (suspicion) vs ACCEPT
+- `gate_pipeline()` function with GateVerdict/GateResult classes
+- `log_gate_decision()` audit function for machine-readable gate verdicts
+- `quarantine review` CLI command — inspect quarantined entry details
+- Type factor in scoring — semantic floor (0.6), episodic standard decay, procedural access-reinforced
+- Behavioral specification — On Supersede/Archive/Delete/Quarantine/Mutate lifecycle events
+- Upsert immutability table in schema.md
+- 32-command CLI reference table in technical-reference.md
+- `TRUST_LEVELS` config constant for SUPERSEDES authority guards
 - `hierarchy.py` — dot-notation project hierarchy utilities (parse, ancestor, scope/filter)
 - `inheritance.py` — TOML config loading, rules resolution with parent-wins authority
 - `PARENT_OF`, `CHILD_OF` relation types for agent hierarchy edges
@@ -17,11 +35,29 @@
 - `--project` option on `recall` and `search` CLI commands
 
 ### Changed
+- Semantic scoring: recency floor at 0.6 (was hard 1.0 — allows some recency signal)
+- Procedural scoring: `recency^(1/(1+0.3*access_count))` formula (was `recency^(1-access_count/20)`)
+- Neo4j _score_entry: added type factor and trust multiplier (was missing both)
+- Neo4j recall: added max_inherit_depth post-filter (was ignoring parameter)
+- Neo4j upsert: provenance set only on CREATE, not on MATCH (immutability)
+- Neo4j upsert: status and provenance now included in props
+- CLI write command: runs write gate pipeline before indexing
+- Config neo4j_password default: empty string (was "changeme")
+- TOML template: secrets removed, env-only documentation added
 - `resolve_rules()` now returns `(effective, overridden)` tuple (single walk)
 - Unscoped entities (None/empty project) are universally visible in scoped queries
 - Store scoping uses module-level imports instead of repeated inline imports
 
 ### Fixed
+- Config precedence: 3 docs said "env vars override everything" — corrected to CLI > env > TOML
+- hierarchy-and-inheritance.md Example 4: "env beats CLI" → "CLI beats env and TOML"
+- Documentation counts: 432→472 tests, 28→27 files across all docs
+- schema="2" → schema="3" in all examples (7 locations across 5 files)
+- Stale references: scripts/memory-server/ and ict-neo4j removed
+- "Every response" → "Selected responses" in implementation guide
+- Optional field count: 8→10 in system overview
+- R2 wording: "six defined types" → "six active relation types"
+- v3 row added to schema versioning table
 - Neo4j status Docker detection — split availability from container status
 - `init --with-neo4j` — duplicate config argument in `ctx.invoke`
 - Doctor test check — cwd resolution, timeout (30s→120s), output parsing
