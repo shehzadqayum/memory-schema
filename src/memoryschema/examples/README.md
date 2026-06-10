@@ -49,7 +49,7 @@ python consolidate_working.py \
    ```python
    memory = {
        'name': 'source-123',
-       'schema': 2,
+       'schema': 3,
        'type': 'semantic',
        'importance': 5,
        'description': 'One-line summary',

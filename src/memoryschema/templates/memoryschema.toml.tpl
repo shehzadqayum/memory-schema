@@ -20,3 +20,5 @@ name = "{project_name}"
 # recency_decay = 0.995
 # recall_depth = 2
 # recall_decay = 0.8
+# l0_token_budget = 2000
+# max_inherit_depth = 3

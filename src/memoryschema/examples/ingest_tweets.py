@@ -130,7 +130,7 @@ def main():
         filepath = os.path.join(memory_dir, f"{memory['name']}.md")
         obs_xml = '\n'.join(f'    <memory:observation>{xml_escape(o)}</memory:observation>'
                            for o in memory['observations'])
-        content = f"""<memory:entity schema="2" name="{memory['name']}" type="semantic" importance="{memory['importance']}">
+        content = f"""<memory:entity schema="3" name="{memory['name']}" type="semantic" importance="{memory['importance']}">
   <memory:description>{xml_escape(memory['description'])}</memory:description>
   <memory:observations>
 {obs_xml}

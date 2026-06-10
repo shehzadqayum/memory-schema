@@ -221,8 +221,7 @@ def validate(content, filepath=None, strict=False, known_names=None):
 
             # R6: referential integrity (warning in standard, error in strict)
             if target and known_names is not None and target not in known_names:
-                level = 'R6' if strict else 'R6'
-                errors.append((level, f'Relation target "{target}" does not exist in known memories'))
+                errors.append(('R6', f'Relation target "{target}" does not exist in known memories'))
 
     # Filesystem
     if filepath and name:

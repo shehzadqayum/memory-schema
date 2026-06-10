@@ -13,6 +13,7 @@ Usage:
     results = store.recall(query='hello')
 """
 
+import math
 from datetime import datetime, timezone
 
 from neo4j import GraphDatabase
@@ -676,9 +677,10 @@ class Neo4jMemoryStore:
 
         score = recency * w_r + importance * w_i + relevance * w_v
 
+        # Hub bonus: log-scale to prevent rich-get-richer compounding
         backlinks = len(entry.get('backlinks', []))
         if backlinks > 0:
-            score += 0.05 * min(backlinks, 5)
+            score += 0.05 * math.log(1 + backlinks)
 
         # Trust multiplier: ingested content ranks lower by default
         provenance = entry.get('provenance', 'first-party')
