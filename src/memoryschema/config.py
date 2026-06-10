@@ -45,7 +45,7 @@ class MemoryConfig:
     Environment variables:
         NEO4J_URI       Neo4j Bolt URI (default: bolt://localhost:7687)
         NEO4J_USER      Neo4j username (default: neo4j)
-        NEO4J_PASSWORD  Neo4j password (default: changeme)
+        NEO4J_PASSWORD  Neo4j password (no default — set via env or init)
         VOYAGE_API_KEY  Voyage AI API key (required for embeddings)
     """
 
