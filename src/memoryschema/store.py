@@ -19,6 +19,7 @@ import tempfile
 from contextlib import contextmanager
 from datetime import datetime, timezone
 
+from memoryschema.config import TRUST_LEVELS
 from memoryschema.hierarchy import project_matches_filter, project_matches_scope
 
 
@@ -155,12 +156,65 @@ class MemoryStore:
 
         now = _now_iso()
 
+        # Pre-validate SUPERSEDES relations (trust guard + cycle detection R7)
+        new_rels = memory_dict.get('relations', [])
+        if any(r.get('type') == 'SUPERSEDES' for r in new_rels):
+            pre_map = {e['name']: e for e in entries if 'name' in e}
+            source_prov = (memory_dict.get('provenance')
+                           or (existing.get('provenance', 'first-party')
+                               if existing else 'first-party'))
+            existing_pairs = set()
+            if existing:
+                existing_pairs = {(r.get('target'), r.get('type'))
+                                  for r in existing.get('relations', [])}
+            for rel in new_rels:
+                if rel.get('type') != 'SUPERSEDES':
+                    continue
+                target_name = rel.get('target')
+                if not target_name or (target_name, 'SUPERSEDES') in existing_pairs:
+                    continue
+                if target_name in pre_map:
+                    target_prov = pre_map[target_name].get('provenance', 'first-party')
+                    source_trust = TRUST_LEVELS.get(source_prov, 1)
+                    target_trust = TRUST_LEVELS.get(target_prov, 1)
+                    if source_trust < target_trust:
+                        raise ValueError(
+                            f"Trust guard: {source_prov!r} cannot supersede "
+                            f"{target_prov!r} (insufficient authority)")
+                    if self._detect_supersedes_cycle(entries, name, target_name):
+                        raise ValueError(
+                            f"SUPERSEDES cycle detected: {name} → {target_name} "
+                            f"would create a circular chain")
+
         if existing is None:
             new_entry = dict(memory_dict)
             new_entry['created_at'] = now
             new_entry['last_accessed'] = now
             new_entry['access_count'] = 0
             entries.append(new_entry)
+
+            # Side effects for new entries with relations
+            if new_entry.get('relations'):
+                entry_map = {e['name']: e for e in entries if 'name' in e}
+                for rel in new_entry.get('relations', []):
+                    target_name = rel.get('target')
+                    rel_type = rel.get('type')
+                    if not target_name or target_name not in entry_map:
+                        continue
+                    if rel_type == 'SUPERSEDES':
+                        target = entry_map[target_name]
+                        if target.get('status', 'active') == 'active':
+                            target['status'] = 'superseded'
+                    if rel_type == 'CONTRADICTS' and name:
+                        target = entry_map[target_name]
+                        target_rels = target.get('relations', [])
+                        reverse = (name, 'CONTRADICTS')
+                        tpairs = {(r.get('target'), r.get('type'))
+                                  for r in target_rels}
+                        if reverse not in tpairs:
+                            target_rels.append({'target': name, 'type': 'CONTRADICTS'})
+                            target['relations'] = target_rels
+
             self._save(entries)
             self._audit('create', name)
             return new_entry
@@ -332,9 +386,83 @@ class MemoryStore:
                 return True
         return False
 
-    def list_all(self, project=None):
-        """Return all entries, optionally filtered to a project subtree."""
+    @staticmethod
+    def _detect_supersedes_cycle(entries, source_name, target_name):
+        """Check if adding SUPERSEDES from source to target creates a cycle.
+
+        Follows existing SUPERSEDES chains from target — if source is
+        reachable, adding source→target would create a cycle (R7).
+        """
+        entry_map = {e['name']: e for e in entries if 'name' in e}
+        visited = set()
+        queue = [target_name]
+        while queue:
+            current = queue.pop(0)
+            if current == source_name:
+                return True
+            if current in visited:
+                continue
+            visited.add(current)
+            entry = entry_map.get(current)
+            if entry:
+                for rel in entry.get('relations', []):
+                    if rel.get('type') == 'SUPERSEDES':
+                        t = rel.get('target')
+                        if t and t not in visited:
+                            queue.append(t)
+        return False
+
+    def unarchive(self, name):
+        """Set an archived memory back to active. Returns True if found and was archived."""
+        with self._file_lock():
+            entries = self._load()
+            for entry in entries:
+                if entry.get('name') == name:
+                    if entry.get('status') != 'archived':
+                        return False
+                    entry['status'] = 'active'
+                    self._save(entries)
+                    self._audit('unarchive', name)
+                    return True
+            return False
+
+    def reactivate(self, name):
+        """Set a superseded memory back to active. Returns True if found and was superseded."""
+        with self._file_lock():
+            entries = self._load()
+            for entry in entries:
+                if entry.get('name') == name:
+                    if entry.get('status') != 'superseded':
+                        return False
+                    entry['status'] = 'active'
+                    self._save(entries)
+                    self._audit('reactivate', name)
+                    return True
+            return False
+
+    def release_quarantine(self, name):
+        """Set a quarantined memory back to active. Returns True if found and was quarantined."""
+        with self._file_lock():
+            entries = self._load()
+            for entry in entries:
+                if entry.get('name') == name:
+                    if entry.get('status') != 'quarantined':
+                        return False
+                    entry['status'] = 'active'
+                    self._save(entries)
+                    self._audit('release_quarantine', name)
+                    return True
+            return False
+
+    def list_all(self, project=None, include_inactive=False):
+        """Return all entries, optionally filtered to a project subtree.
+
+        Excludes non-active entries by default unless include_inactive=True.
+        """
         entries = self._load()
+        if not include_inactive:
+            entries = [e for e in entries
+                       if e.get('status', 'active') == 'active']
         if project is not None:
             entries = [e for e in entries
                        if project_matches_filter(e.get('project', ''), project)]
@@ -614,21 +742,25 @@ class MemoryStore:
         entries = self._load()
         entry_map = {e['name']: e for e in entries if 'name' in e}
 
-        # Filter by status (active only by default)
-        if not include_inactive:
-            entry_map = {k: v for k, v in entry_map.items()
-                         if v.get('status', 'active') == 'active'}
-            entries = [e for e in entries if e.get('name') in entry_map]
-
         if project is not None:
             entry_map = {k: v for k, v in entry_map.items()
                          if project_matches_scope(
                              v.get('project', ''), project,
                              max_depth=max_inherit_depth)}
-            entries = [e for e in entries if e.get('name') in entry_map]
 
         if not entry_map:
             return []
+
+        # Returnable set: active entries only (unless include_inactive).
+        # Non-active entries stay in entry_map for BFS traversal
+        # (traversable-not-returned: superseded entries bridge graph walks).
+        if not include_inactive:
+            returnable = {k for k, v in entry_map.items()
+                          if v.get('status', 'active') == 'active'}
+        else:
+            returnable = set(entry_map.keys())
+
+        scorable_entries = [entry_map[n] for n in returnable]
 
         query_embedding = None
         if query:
@@ -639,10 +771,10 @@ class MemoryStore:
                 pass
 
         seeds = []
-        if name and name in entry_map:
+        if name and name in entry_map and name in returnable:
             seeds = [entry_map[name]]
         elif query:
-            scored = self._score_all_entries(entries, query, query_embedding)
+            scored = self._score_all_entries(scorable_entries, query, query_embedding)
             scored.sort(key=lambda x: x[1], reverse=True)
             seeds = [e for e, _ in scored[:3]]
         else:
@@ -735,7 +867,10 @@ class MemoryStore:
                         visited[assoc_name] = result
                         queue.append((neighbor, neighbor_score, next_hop))
 
-        results = sorted(visited.values(), key=lambda x: x['score'], reverse=True)
+        # Filter to returnable entries (traversable-not-returned)
+        results = sorted(
+            [r for r in visited.values() if r['name'] in returnable],
+            key=lambda x: x['score'], reverse=True)
 
         # Rerank stage: use Voyage reranker if available and query provided
         if query and len(results) > limit:

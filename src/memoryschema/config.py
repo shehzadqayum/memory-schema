@@ -23,6 +23,17 @@ DEPRECATED_RELATION_TYPES = frozenset({'PARENT_OF', 'CHILD_OF'})
 ALL_RELATION_TYPES = VALID_RELATION_TYPES | DEPRECATED_RELATION_TYPES
 SCHEMA_VERSION = 3
 
+# Trust hierarchy for SUPERSEDES authority guards.
+# Higher level can supersede same or lower; lower cannot supersede higher.
+# derived=3 because consolidation (reflect) creates derived entries that
+# legitimately supersede first-party episodic entries.
+TRUST_LEVELS = {
+    'user': 3,
+    'first-party': 3,
+    'derived': 3,
+    'ingested': 1,
+}
+
 
 @dataclass
 class MemoryConfig:

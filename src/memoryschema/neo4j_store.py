@@ -17,7 +17,7 @@ from datetime import datetime, timezone
 
 from neo4j import GraphDatabase
 
-from memoryschema.config import ALL_RELATION_TYPES as _RELATION_TYPES
+from memoryschema.config import ALL_RELATION_TYPES as _RELATION_TYPES, TRUST_LEVELS
 
 
 def _now_iso():
@@ -62,8 +62,9 @@ class Neo4jMemoryStore:
         now = _now_iso()
 
         props = {}
-        for key in ('schema', 'type', 'description', 'importance',
-                     'body', 'source', 'filepath', 'prompt', 'reasoning', 'project'):
+        for key in ('schema', 'type', 'status', 'provenance', 'description',
+                     'importance', 'body', 'source', 'filepath', 'prompt',
+                     'reasoning', 'project'):
             if key in memory_dict and memory_dict[key] is not None:
                 props[key] = memory_dict[key]
 
@@ -118,8 +119,32 @@ class Neo4jMemoryStore:
                     MERGE (s)-[r:{rel_type}]->(t)
                 """, source=name, target=target)
 
-                # SUPERSEDES → mark target as superseded
+                # SUPERSEDES → trust guard, cycle detection, then mark target
                 if rel_type == 'SUPERSEDES':
+                    # Trust guard
+                    guard = session.run("""
+                        MATCH (s:Memory {name: $source})
+                        OPTIONAL MATCH (t:Memory {name: $target})
+                        RETURN COALESCE(s.provenance, 'first-party') AS sp,
+                               COALESCE(t.provenance, 'first-party') AS tp
+                    """, source=name, target=target).single()
+                    if guard:
+                        st = TRUST_LEVELS.get(guard['sp'], 1)
+                        tt = TRUST_LEVELS.get(guard['tp'], 1)
+                        if st < tt:
+                            raise ValueError(
+                                f"Trust guard: {guard['sp']!r} cannot supersede "
+                                f"{guard['tp']!r} (insufficient authority)")
+                    # Cycle detection (R7)
+                    cycle = session.run("""
+                        OPTIONAL MATCH path = (t:Memory {name: $target})
+                            -[:SUPERSEDES*]->(s:Memory {name: $source})
+                        RETURN path IS NOT NULL AS has_cycle
+                    """, source=name, target=target).single()
+                    if cycle and cycle['has_cycle']:
+                        raise ValueError(
+                            f"SUPERSEDES cycle detected: {name} → {target} "
+                            f"would create a circular chain")
                     session.run("""
                         MATCH (t:Memory {name: $target})
                         WHERE t.status IS NULL OR t.status = 'active'
@@ -185,34 +210,84 @@ class Neo4jMemoryStore:
                 name=name)
             return result.single()['deleted'] > 0
 
-    def list_all(self, project=None):
+    def archive(self, name):
+        """Set a memory's status to archived."""
         with self._driver.session() as session:
+            result = session.run("""
+                MATCH (m:Memory {name: $name})
+                SET m.status = 'archived'
+                RETURN count(m) AS n
+            """, name=name)
+            return result.single()['n'] > 0
+
+    def unarchive(self, name):
+        """Set an archived memory back to active."""
+        with self._driver.session() as session:
+            result = session.run("""
+                MATCH (m:Memory {name: $name})
+                WHERE m.status = 'archived'
+                SET m.status = 'active'
+                RETURN count(m) AS n
+            """, name=name)
+            return result.single()['n'] > 0
+
+    def reactivate(self, name):
+        """Set a superseded memory back to active."""
+        with self._driver.session() as session:
+            result = session.run("""
+                MATCH (m:Memory {name: $name})
+                WHERE m.status = 'superseded'
+                SET m.status = 'active'
+                RETURN count(m) AS n
+            """, name=name)
+            return result.single()['n'] > 0
+
+    def release_quarantine(self, name):
+        """Set a quarantined memory back to active."""
+        with self._driver.session() as session:
+            result = session.run("""
+                MATCH (m:Memory {name: $name})
+                WHERE m.status = 'quarantined'
+                SET m.status = 'active'
+                RETURN count(m) AS n
+            """, name=name)
+            return result.single()['n'] > 0
+
+    def list_all(self, project=None, include_inactive=False):
+        with self._driver.session() as session:
+            status_clause = "" if include_inactive else \
+                " AND (m.status IS NULL OR m.status = 'active')"
             if project is not None:
-                result = session.run("""
+                result = session.run(f"""
                     MATCH (m:Memory)
-                    WHERE m.project IS NULL
+                    WHERE (m.project IS NULL
                        OR m.project = $project
-                       OR m.project STARTS WITH $project_prefix
+                       OR m.project STARTS WITH $project_prefix){status_clause}
                     RETURN m
                 """, project=project, project_prefix=project + '.')
             else:
-                result = session.run("MATCH (m:Memory) RETURN m")
+                where = "WHERE m.status IS NULL OR m.status = 'active'" \
+                    if not include_inactive else ""
+                result = session.run(f"MATCH (m:Memory) {where} RETURN m")
             return [self._node_to_dict(r['m']) for r in result]
 
     # --- Search ---
 
-    def search(self, query=None, type=None, project=None, limit=10):
+    def search(self, query=None, type=None, project=None, limit=10,
+               include_inactive=False):
         """Text search across name, description, observations, prompt, reasoning."""
         with self._driver.session() as session:
+            active_filter = "" if include_inactive else \
+                " AND (node.status IS NULL OR node.status = 'active')"
             if query:
-                result = session.run("""
+                result = session.run(f"""
                     CALL db.index.fulltext.queryNodes('memory_fulltext', $search_query)
                     YIELD node, score
                     WHERE ($filter_type IS NULL OR node.type = $filter_type)
                       AND ($filter_project IS NULL
                            OR node.project IS NULL
                            OR node.project = $filter_project
-                           OR node.project STARTS WITH $filter_project_prefix)
+                           OR node.project STARTS WITH $filter_project_prefix){active_filter}
                     RETURN node
                     LIMIT $result_limit
                 """, search_query=query, filter_type=type,
@@ -222,6 +297,8 @@ class Neo4jMemoryStore:
             else:
                 clauses = ["MATCH (m:Memory)"]
                 wheres = []
+                if not include_inactive:
+                    wheres.append("(m.status IS NULL OR m.status = 'active')")
                 if type:
                     wheres.append("m.type = $filter_type")
                 if project:
@@ -237,11 +314,14 @@ class Neo4jMemoryStore:
 
     # --- Recall ---
 
-    def recall(self, query=None, name=None, depth=2, decay=0.8, limit=10, project=None):
+    def recall(self, query=None, name=None, depth=2, decay=0.8, limit=10,
+               project=None, include_inactive=False, max_inherit_depth=3):
         """Cascade recall with spreading activation via Neo4j.
 
         If project is set, scopes traversal to the project hierarchy
         (bidirectional: child sees parent, parent sees child).
+        Excludes non-active entries from results unless include_inactive=True.
+        Non-active entries remain traversable in BFS (traversable-not-returned).
         """
         query_embedding = None
         if query:
@@ -260,6 +340,11 @@ class Neo4jMemoryStore:
             seeds = self._vector_search(query_embedding, top_k=3, project=project)
         else:
             return []
+
+        # Filter seeds to active only (unless include_inactive)
+        if not include_inactive:
+            seeds = [s for s in seeds
+                     if s.get('status', 'active') == 'active']
 
         if not seeds:
             return []
@@ -283,6 +368,7 @@ class Neo4jMemoryStore:
                 'importance': seed.get('importance'),
                 'description': seed.get('description'),
                 'observations': seed.get('observations', []),
+                'status': seed.get('status', 'active'),
             }
             if seed['name'] not in visited or result['score'] > visited[seed['name']]['score']:
                 visited[seed['name']] = result
@@ -316,6 +402,7 @@ class Neo4jMemoryStore:
                     'importance': neighbor.get('importance'),
                     'description': neighbor.get('description'),
                     'observations': neighbor.get('observations', []),
+                    'status': neighbor.get('status', 'active'),
                 }
                 if channel in ('relation', 'backlink'):
                     result['relation_type'] = neighbor_info.get('rel_type')
@@ -324,7 +411,14 @@ class Neo4jMemoryStore:
                     visited[neighbor['name']] = result
                     queue.append((neighbor, n_score, next_hop))
 
-        results = sorted(visited.values(), key=lambda x: x['score'], reverse=True)
+        # Filter to active entries unless include_inactive (traversable-not-returned)
+        if not include_inactive:
+            results = sorted(
+                [r for r in visited.values()
+                 if r.get('status', 'active') == 'active'],
+                key=lambda x: x['score'], reverse=True)
+        else:
+            results = sorted(visited.values(), key=lambda x: x['score'], reverse=True)
         return results[:limit]
 
     # --- Associations ---
@@ -557,6 +651,16 @@ class Neo4jMemoryStore:
         backlinks = len(entry.get('backlinks', []))
         if backlinks > 0:
             score += 0.05 * min(backlinks, 5)
+
+        # Trust multiplier: ingested content ranks lower by default
+        provenance = entry.get('provenance', 'first-party')
+        trust_multipliers = {
+            'first-party': 1.0,
+            'user': 1.0,
+            'derived': 0.9,
+            'ingested': 0.7,
+        }
+        score *= trust_multipliers.get(provenance, 0.8)
 
         return round(min(score, 1.0), 4)
 

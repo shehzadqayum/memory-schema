@@ -17,6 +17,10 @@ Memory Operations:
     write          Parse, validate, embed, and index a memory file
     delete         Remove an entity from all stores
     search         Full-text keyword search
+    archive        Set status=archived (excludes from default recall/search)
+    unarchive      Restore archived memory to active
+    reactivate     Restore superseded memory to active
+    quarantine     Review quarantined memories (list, release, reject)
 
 Validation & Quality:
     validate       Validate memory files against schema
@@ -230,7 +234,10 @@ cli.add_command(sync)
 
 # --- Register individual commands ---
 
-from memoryschema.cli.memory_cmd import status, recall, get, list_cmd, write, delete, archive, search
+from memoryschema.cli.memory_cmd import (
+    status, recall, get, list_cmd, write, delete, archive, unarchive,
+    reactivate, search, quarantine,
+)
 from memoryschema.cli.validate_cmd import validate
 from memoryschema.cli.index_cmd import index, embed, associations
 from memoryschema.cli.lifecycle_cmd import (
@@ -244,7 +251,10 @@ cli.add_command(list_cmd, name="list")
 cli.add_command(write)
 cli.add_command(delete)
 cli.add_command(archive)
+cli.add_command(unarchive)
+cli.add_command(reactivate)
 cli.add_command(search)
+cli.add_command(quarantine)
 cli.add_command(validate)
 cli.add_command(index)
 cli.add_command(embed)

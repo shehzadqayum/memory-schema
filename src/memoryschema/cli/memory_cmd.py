@@ -12,6 +12,18 @@ def _get_store(config):
     return get_store(config=config)
 
 
+def _remove_from_memory_index(config, name):
+    """Remove an entry from the MEMORY.md index."""
+    index_path = config.memory_index_path
+    if index_path.exists():
+        lines = index_path.read_text().split('\n')
+        new_lines = [l for l in lines if f'[{name}]' not in l]
+        if len(new_lines) != len(lines):
+            index_path.write_text('\n'.join(new_lines))
+            return True
+    return False
+
+
 @click.command("status")
 @click.option("--json", "as_json", is_flag=True, help="Output as JSON for agent consumption.")
 @click.pass_obj
@@ -41,9 +53,11 @@ def status(config, as_json):
 @click.argument("query")
 @click.option("--limit", "-n", default=10, type=int, help="Maximum results. Default: 10.")
 @click.option("--project", "-p", default=None, help="Scope recall to this project hierarchy.")
+@click.option("--include-inactive", is_flag=True, default=False,
+              help="Include archived/superseded/quarantined entries.")
 @click.option("--json", "as_json", is_flag=True, help="Output as JSON for agent consumption.")
 @click.pass_obj
-def recall(config, query, limit, project, as_json):
+def recall(config, query, limit, project, include_inactive, as_json):
     """Semantic search across memories.
 
     Finds seed memories via vector similarity, then cascades through
@@ -60,6 +74,7 @@ def recall(config, query, limit, project, as_json):
     store = _get_store(config)
     results = store.recall(
         query=query, limit=limit, project=project,
+        include_inactive=include_inactive,
         max_inherit_depth=config.max_inherit_depth,
     )
 
@@ -115,9 +130,11 @@ def get(config, name, as_json):
 @click.option("--type", "type_filter", help="Filter by type: semantic, episodic, procedural.")
 @click.option("--project", "project_filter", help="Filter by project name.")
 @click.option("--limit", "-n", default=20, type=int, help="Maximum results. Default: 20.")
+@click.option("--include-inactive", is_flag=True, default=False,
+              help="Include archived/superseded/quarantined entries.")
 @click.option("--json", "as_json", is_flag=True, help="Output as JSON for agent consumption.")
 @click.pass_obj
-def list_cmd(config, type_filter, project_filter, limit, as_json):
+def list_cmd(config, type_filter, project_filter, limit, include_inactive, as_json):
     """List entities with optional filters.
 
     Example:
@@ -125,7 +142,8 @@ def list_cmd(config, type_filter, project_filter, limit, as_json):
         memoryschema list --project my-project
     """
     store = _get_store(config)
-    results = store.search(type=type_filter, project=project_filter, limit=limit)
+    results = store.search(type=type_filter, project=project_filter, limit=limit,
+                           include_inactive=include_inactive)
 
     if as_json:
         click.echo(json.dumps([{k: v for k, v in r.items() if k != 'embedding'} for r in results], indent=2))
@@ -235,6 +253,7 @@ def archive(config, name):
 
     Archived memories are excluded from default recall and search
     but remain in the store. Use --include-inactive to retrieve them.
+    Also removes the entry from MEMORY.md.
 
     Example:
         memoryschema archive my-memory
@@ -242,9 +261,51 @@ def archive(config, name):
     store = _get_store(config)
     archived = store.archive(name)
     if archived:
+        if _remove_from_memory_index(config, name):
+            click.echo(f"Removed from MEMORY.md")
         click.echo(f"Archived: {name}")
     else:
         click.echo(f"Error: Entity '{name}' not found.", err=True)
+        sys.exit(1)
+
+
+@click.command()
+@click.argument("name")
+@click.pass_obj
+def unarchive(config, name):
+    """Unarchive a memory (set status back to active).
+
+    Only works on archived entries.
+
+    Example:
+        memoryschema unarchive my-memory
+    """
+    store = _get_store(config)
+    result = store.unarchive(name)
+    if result:
+        click.echo(f"Unarchived: {name}")
+    else:
+        click.echo(f"Error: Entity '{name}' not found or not archived.", err=True)
+        sys.exit(1)
+
+
+@click.command()
+@click.argument("name")
+@click.pass_obj
+def reactivate(config, name):
+    """Reactivate a superseded memory (set status back to active).
+
+    Only works on superseded entries.
+
+    Example:
+        memoryschema reactivate my-memory
+    """
+    store = _get_store(config)
+    result = store.reactivate(name)
+    if result:
+        click.echo(f"Reactivated: {name}")
+    else:
+        click.echo(f"Error: Entity '{name}' not found or not superseded.", err=True)
         sys.exit(1)
 
 
@@ -253,9 +314,11 @@ def archive(config, name):
 @click.option("--type", "type_filter", help="Filter by type.")
 @click.option("--project", "-p", default=None, help="Filter to this project subtree.")
 @click.option("--limit", "-n", default=10, type=int, help="Maximum results. Default: 10.")
+@click.option("--include-inactive", is_flag=True, default=False,
+              help="Include archived/superseded/quarantined entries.")
 @click.option("--json", "as_json", is_flag=True, help="Output as JSON for agent consumption.")
 @click.pass_obj
-def search(config, text, type_filter, project, limit, as_json):
+def search(config, text, type_filter, project, limit, include_inactive, as_json):
     """Full-text keyword search (not semantic — substring match).
 
     Use --project to filter results to a project subtree.
@@ -266,7 +329,8 @@ def search(config, text, type_filter, project, limit, as_json):
         memoryschema search "auth" --project ict
     """
     store = _get_store(config)
-    results = store.search(query=text, type=type_filter, project=project, limit=limit)
+    results = store.search(query=text, type=type_filter, project=project, limit=limit,
+                           include_inactive=include_inactive)
 
     if as_json:
         click.echo(json.dumps([{k: v for k, v in r.items() if k != 'embedding'} for r in results], indent=2))
@@ -274,3 +338,69 @@ def search(config, text, type_filter, project, limit, as_json):
         click.echo(f"Found {len(results)} matches:")
         for r in results:
             click.echo(f"  {r.get('name', '?'):40s} {r.get('description', '')[:60]}")
+
+
+# --- Quarantine ---
+
+@click.group()
+def quarantine():
+    """Review quarantined memories (list, release, reject)."""
+    pass
+
+
+@quarantine.command("list")
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON.")
+@click.pass_obj
+def quarantine_list(config, as_json):
+    """List all quarantined entries."""
+    store = _get_store(config)
+    results = store.list_all(include_inactive=True)
+    quarantined = [e for e in results if e.get('status') == 'quarantined']
+
+    if as_json:
+        click.echo(json.dumps(
+            [{k: v for k, v in e.items() if k != 'embedding'} for e in quarantined],
+            indent=2))
+    else:
+        if not quarantined:
+            click.echo("No quarantined entries.")
+        else:
+            click.echo(f"{len(quarantined)} quarantined:")
+            for e in quarantined:
+                click.echo(f"  {e.get('name', '?'):40s} {e.get('description', '')[:60]}")
+
+
+@quarantine.command("release")
+@click.argument("name")
+@click.pass_obj
+def quarantine_release(config, name):
+    """Release a quarantined memory (set status back to active)."""
+    store = _get_store(config)
+    result = store.release_quarantine(name)
+    if result:
+        click.echo(f"Released: {name}")
+    else:
+        click.echo(f"Error: Entity '{name}' not found or not quarantined.", err=True)
+        sys.exit(1)
+
+
+@quarantine.command("reject")
+@click.argument("name")
+@click.option("--confirm", is_flag=True, help="Required. Confirms deletion.")
+@click.pass_obj
+def quarantine_reject(config, name, confirm):
+    """Reject and delete a quarantined memory."""
+    if not confirm:
+        click.echo(f"This will DELETE quarantined entity '{name}'. Use --confirm to proceed.")
+        sys.exit(1)
+    store = _get_store(config)
+    entry = store.get(name)
+    if not entry or entry.get('status') != 'quarantined':
+        click.echo(f"Error: Entity '{name}' not found or not quarantined.", err=True)
+        sys.exit(1)
+    store.delete(name)
+    _remove_from_memory_index(config, name)
+    md_path = config.memory_dir / f"{name}.md"
+    if md_path.exists():
+        md_path.unlink()
+    click.echo(f"Rejected and deleted: {name}")

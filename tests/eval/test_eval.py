@@ -55,7 +55,7 @@ class TestMetrics:
 
 class TestFixtureStore:
     def test_fixture_count(self, eval_store):
-        entries = eval_store.list_all()
+        entries = eval_store.list_all(include_inactive=True)
         assert len(entries) == 50  # 10+10+8+5+10+3+4
 
     def test_superseded_excluded(self, eval_store):
@@ -65,17 +65,17 @@ class TestFixtureStore:
             assert f'outdated-{i}' not in names
 
     def test_types_present(self, eval_store):
-        entries = eval_store.list_all()
+        entries = eval_store.list_all(include_inactive=True)
         types = {e.get('type') for e in entries}
         assert types == {'semantic', 'episodic', 'procedural'}
 
     def test_provenances_present(self, eval_store):
-        entries = eval_store.list_all()
+        entries = eval_store.list_all(include_inactive=True)
         provs = {e.get('provenance') for e in entries}
         assert provs == {'first-party', 'user', 'ingested', 'derived'}
 
     def test_hierarchy_levels(self, eval_store):
-        entries = eval_store.list_all()
+        entries = eval_store.list_all(include_inactive=True)
         projects = {e.get('project') for e in entries}
         assert 'org' in projects
         assert 'org.team' in projects
