@@ -108,7 +108,7 @@ Optional body text follows after the closing tag.
 
 Three memory types. Optional — defaults to `semantic` if omitted.
 
-**Note:** The retention descriptions below are design intent, not current implementation. The scoring formula applies uniform recency decay (0.995^hours) to all types. Type-differentiated retention (persistent semantic, decaying episodic, access-reinforced procedural) would require a type term in the scoring formula, which has not been implemented.
+**Type factor:** Each type modifies the base recency decay differently (see Retrieval Scoring).
 
 ### `semantic` — Facts and Concepts
 
@@ -279,6 +279,18 @@ When embedding unavailable: relevance weight redistributed (40% to recency, 60% 
 | --- | --- | --- |
 | Hub bonus | `+0.05 * ln(1 + backlinks)` | Entry has backlinks (log-scale, diminishing returns) |
 | Text match | `+0.1` | Query substring found in searchable text |
+
+### Type Factor
+
+The base recency `0.995^hours` is modified by the entry's type before being used in the score formula:
+
+| Type | Effective recency | Behavior |
+|------|-------------------|----------|
+| `semantic` | `max(recency, 0.6)` | Floor at 0.6 — facts never fully decay |
+| `episodic` | `recency` | Standard decay — events age naturally |
+| `procedural` | `recency^(1/(1 + 0.3*min(access_count, 10)))` | Access-reinforced — frequently used procedures resist decay |
+
+Procedural examples: 0 accesses → standard decay; 5 accesses → exponent 0.4 (slower); 10 accesses → exponent 0.25 (very slow).
 
 **Properties:** No explicit tiers. Frequently accessed memories score higher. Connected memories rank higher via hub bonus. Neglected memories decay (0.89 at 24h, 0.70 at 72h, 0.43 at 7d). Important memories resist decay.
 

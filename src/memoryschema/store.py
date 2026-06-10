@@ -623,12 +623,15 @@ class MemoryStore:
         # Type-dependent recency modifier
         entry_type = entry.get('type', 'semantic')
         if entry_type == 'semantic':
-            recency = 1.0  # no decay — persistent knowledge
+            recency = max(recency, 0.6)  # floor at 0.6 — persistent knowledge
         elif entry_type == 'procedural':
             # Access reinforcement: frequently accessed procedures decay slower
+            # exponent = 1/(1 + 0.3*min(access_count, 10))
+            # At 0 accesses: exponent=1.0 (standard decay)
+            # At 10 accesses: exponent=0.25 (very slow decay)
             access_count = min(entry.get('access_count') or 0, 10)
-            dampen = 1 - access_count / 20  # 1.0 at 0 access → 0.5 at 10
-            recency = recency ** dampen  # raise to fractional power = slower decay
+            exponent = 1.0 / (1.0 + 0.3 * access_count)
+            recency = recency ** exponent
         # episodic: standard decay (no modification)
 
         importance = entry.get('importance', 5)

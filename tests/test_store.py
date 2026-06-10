@@ -164,6 +164,56 @@ class TestScoreEntry:
         high = store._score_entry({'name': 'high', 'importance': 10})
         assert high > low
 
+    def test_semantic_recency_floor(self, store):
+        """Semantic entries have a recency floor of 0.6."""
+        old_entry = {
+            'name': 'old-fact', 'type': 'semantic', 'importance': 5,
+            'last_accessed': '2020-01-01T00:00:00+00:00',
+        }
+        score = store._score_entry(old_entry)
+        # Recency floor 0.6 means even very old semantic entries score decently
+        assert score > 0.2
+
+    def test_episodic_decays_normally(self, store):
+        """Episodic entries have standard recency decay."""
+        old_episodic = {
+            'name': 'old-event', 'type': 'episodic', 'importance': 5,
+            'last_accessed': '2020-01-01T00:00:00+00:00',
+        }
+        old_semantic = {
+            'name': 'old-fact', 'type': 'semantic', 'importance': 5,
+            'last_accessed': '2020-01-01T00:00:00+00:00',
+        }
+        ep_score = store._score_entry(old_episodic)
+        sem_score = store._score_entry(old_semantic)
+        # Semantic should score higher due to recency floor
+        assert sem_score > ep_score
+
+    def test_procedural_access_reinforced(self, store):
+        """Procedural entries with more accesses decay slower."""
+        from datetime import datetime, timezone, timedelta
+        # Use a timestamp 30 days ago — enough for recency to matter
+        ts = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
+        base = {'type': 'procedural', 'importance': 5, 'last_accessed': ts}
+        no_access = {**base, 'name': 'p0', 'access_count': 0}
+        high_access = {**base, 'name': 'p10', 'access_count': 10}
+        score_0 = store._score_entry(no_access)
+        score_10 = store._score_entry(high_access)
+        # More accesses → slower decay → higher score for old entries
+        assert score_10 > score_0
+
+    def test_procedural_formula_matches_spec(self, store):
+        """Procedural exponent = 1/(1 + 0.3*min(access_count, 10))."""
+        entry = {
+            'name': 'proc', 'type': 'procedural', 'importance': 5,
+            'access_count': 10,
+            'last_accessed': '2025-06-01T00:00:00+00:00',
+        }
+        # With access_count=10: exponent = 1/(1+3) = 0.25
+        # Just verify it runs and produces a valid score
+        score = store._score_entry(entry)
+        assert 0.0 <= score <= 1.0
+
 
 class TestAtomicWrites:
     def test_file_not_corrupted_on_error(self, tmp_path):

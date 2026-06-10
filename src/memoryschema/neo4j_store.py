@@ -631,6 +631,16 @@ class Neo4jMemoryStore:
             except (ValueError, TypeError):
                 pass
 
+        # Type-dependent recency modifier
+        entry_type = entry.get('type', 'semantic')
+        if entry_type == 'semantic':
+            recency = max(recency, 0.6)
+        elif entry_type == 'procedural':
+            access_count = min(entry.get('access_count') or 0, 10)
+            exponent = 1.0 / (1.0 + 0.3 * access_count)
+            recency = recency ** exponent
+        # episodic: standard decay (no modification)
+
         importance = entry.get('importance', 5)
         if importance is None:
             importance = 5
