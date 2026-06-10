@@ -375,6 +375,46 @@ Every gate decision is recorded in `memory/audit.jsonl` with machine-readable ve
 **On Query:** Score candidates → search → expand via backlinks+associations → return ranked. Non-active entries are excluded from results by default (`--include-inactive` to override). Superseded entries remain traversable in BFS graph walks (their relations are followed) but are not returned in results.
 **On Consolidate:** Sync un-indexed files → backlinks → (batch embed → associations → Neo4j if available).
 
+### Lifecycle Events
+
+**On Supersede:** When a SUPERSEDES relation is created:
+1. Trust guard checked (source trust ≥ target trust)
+2. Cycle detection checked (R7)
+3. Target entry status set to `superseded`
+4. Target removed from MEMORY.md (on explicit CLI write; hook manages L0)
+5. Target remains traversable in recall BFS but excluded from results
+6. Audit logged
+
+**On Archive:** When `memoryschema archive NAME` is invoked:
+1. Entry status set to `archived` in store
+2. Entry removed from MEMORY.md
+3. Entry excluded from default recall/search/list
+4. Audit logged
+
+**On Delete:** When `memoryschema delete NAME --confirm` is invoked:
+1. Entry removed from JSONL store (or Neo4j via DETACH DELETE)
+2. All inbound relations pointing to entry cleaned up
+3. All backlink references removed
+4. Markdown file (`memory/<name>.md`) deleted from disk
+5. Entry removed from MEMORY.md
+6. Audit logged — deletion is permanent and irreversible
+
+**On Quarantine:** When the write gate quarantines an entry:
+1. Entry saved with `status=quarantined`
+2. Embedding skipped (stored unembedded)
+3. Entry excluded from default recall/search/list
+4. Gate decision audit-logged with verdict + reasons
+5. Entry available for review via `memoryschema quarantine review`
+
+**On Mutate (Upsert):** When an existing entry is re-upserted:
+1. Write gate evaluates the mutation
+2. Immutable fields preserved (name, schema, provenance, project, filepath, created_at)
+3. Observations appended (exact duplicates skipped)
+4. Relations appended (same target+type deduplicated)
+5. SUPERSEDES/CONTRADICTS side effects processed
+6. Prior state captured for audit diff
+7. Audit logged with field-level change hashes
+
 ### Status Transitions
 
 | Transition | Trigger | Effect | CLI |
@@ -411,7 +451,7 @@ Every gate decision is recorded in `memory/audit.jsonl` with machine-readable ve
 | `filepath` | Set | Immutable |
 | `created_at` | Set (auto) | Immutable |
 | `description` | Set | Replaced |
-| `status` | Set | Replaced (or auto via SUPERSEDES) |
+| `status` | Set | Replaced (server-managed: auto-set by SUPERSEDES, archive, quarantine) |
 | `observations` | Set | Appended (deduped) |
 | `relations` | Set | Appended (deduped by target+type) |
 | Other fields | Set | Replaced |
