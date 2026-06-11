@@ -1,122 +1,219 @@
-# Full Documentation Alignment — Verification Audit + Gap Coverage
+# Verification Axis, Gate Hardening, Subject Instrumentation
 
 ## Context
 
-Post-session-11 verification audit plus deep gap analysis. Three agents audited every source file, doc surface, CLI flag, config field, and algorithm. Found: 1 remaining factual error, 41 undocumented features/behaviors, and weak coverage of critical features (trust guards in 1/10 surfaces, SUPERSEDES authority in 1/10). Plan fixes errors first, then expands existing docs for full coverage.
+Document version 6. Seven motivating defects (D1–D7). Schema v4: verification axis (basis), gate probes (numeric contradiction with burn-in, L0 echo), MITIGATES with criterion capture, typed force records, salience instrumentation, report sequencing. v6 documents two accepted residual risks: Observation(str) enforceability limit (basis loss findable not prevented, docstring requirement for future modules) and qualifier-key missed-contradiction limit (documented in numeric_probe docstring). No design changes from v5. Prior: A1/A2 split, basis-loss rule+test, world-change coverage caveat, decay enum clarification, Phase 7 patch-spec default.
 
-## Prior Residuals (from [S4] 4747602)
+## Prior Residuals (from [S4] 9440915)
 
 None.
 
-## Phase 1: Fix remaining factual error (1 fix) ✓ 9942b0f
+## Execution Units
 
-### 1A. hierarchy-and-inheritance.md:416 — "Schema stays v2" → "Schema stays v3"
-Second occurrence missed in session 11. Line 10 already fixed.
+| Unit | Content | Exit criteria |
+|------|---------|---------------|
+| A1 | Pre-work P1–P3, Phase 0, Phase 1 — schema v4 structural layer | VC 1–2, 13–15 |
+| A2 | Phase 2 — verification-aware scoring + guards + staleness | VC 3–4 |
+| B | Phases 3–5 — MITIGATES, force record, gate stages 5–6, reflect | VC 5–8 |
+| C | Phases 6–8 — decline, report sequencing, docs sweep | VC 9–12 |
 
-## Phase 2: Expand technical-reference.md (missing CLI flags, config, scoring, audit) ✓ 9a31320
+Do not combine A1+A2 unless A1 closed early.
 
-### 2A. CLI flags reference — add ALL undocumented options
-After each command in the CLI table, add flags column. Missing flags:
-- `recall/list/search --include-inactive`
-- `validate --strict`
-- `hook install --timeout, --per-project`
-- `index --base-path, --project`
-- `embed --batch-size, --coverage, --dry-run`
-- `associations --k, --recompute`
-- `backup --neo4j-only, --jsonl-only, --files-only`
-- `reset --neo4j-only, --store-only, --working-memory-only`
-- `clean --dry-run`
-- `export --format, --output`
-- `import --format`
-- `doctor --fix`
-- `init --neo4j-password`
-- `migrate jsonl-to-neo4j --batch-size, --skip-assoc`
+## Pre-Work P1–P3
 
-### 2B. Scoring algorithm detail section
-Expand the existing scoring section to document:
-- BM25 parameters (k1=1.2, b=0.75, avg_dl=50, normalized to 0-0.3)
-- Weight redistribution when no embedding (40% recency, 60% importance)
-- Neo4j vs JSONL text match divergence
-- Numpy vectorized path (graceful fallback to pure Python)
+### P1. schema.md v3 summary rows
+- Schema Versioning v3: append ", R7 (SUPERSEDES cycle detection)"
+- Design Decisions v3: "Adds V11, V12, V13, R6, R7 validation rules."
 
-### 2C. Audit trail format
-Add new section documenting audit.jsonl schema:
-- `gate_decision` records: timestamp, operation, name, verdict, reasons, provenance
-- `mutation` records: timestamp, operation, name, changes (field-level hashes), prior hashes
-- Append-only, never truncated
+### P2. schema.md overlapping upsert tables
+- Consolidate into one table in Upsert Semantics; cross-reference at second location
 
-### 2D. Graceful degradation detail
-Add section documenting:
-- Neo4j down: silent fallback to JSONL (get_store tries Neo4j, catches all exceptions)
-- Voyage AI missing: entries indexed without embeddings, warning logged
-- Embedding failure: non-blocking, entry saved unembedded
-- Concurrent writes: fcntl advisory locking (Unix), no-op fallback (Windows)
-- Audit failure: silently swallowed, never blocks mutations
+### P3. technical-reference.md doctor table missing 3 checks
+- Add: toml_config, rules_inherit, rules_hash (confirm against doctor_cmd.py)
 
-## Phase 3: Expand schema.md behavioral spec (trust, L0, reflect) ✓ fd258c3
+## Phase 0 — Reconnaissance (read-only)
 
-### 3A. Trust multiplier detail
-Expand §Provenance Semantics to include:
-- Trust level hierarchy table: user=3, first-party=3, derived=3, ingested=1
-- Why derived=3: consolidation (reflect) creates derived summaries that supersede episodic entries
-- Scoring impact example: ingested entry scores 30% lower than first-party
+| # | Confirm | Where |
+|---|---------|-------|
+| 0.1 | Observation storage shape | store.py, neo4j_store.py |
+| 0.2 | Embedding timing vs gate stage 4 | write_gate.py, hook |
+| 0.3 | SUPERSEDES trust guard site + Neo4j mirror | store.py, neo4j_store.py |
+| 0.4 | Hook env var inheritance | hook script |
+| 0.5 | Reflect cluster contents | consolidation.py |
+| 0.6 | Recall rendering site(s) | cli/ recall |
+| 0.7 | Neo4j text-match reads observations directly? → selects model | neo4j_store.py Cypher |
 
-### 3B. L0 budget enforcement detail
-Expand §MEMORY.md Index to document:
-- Token estimation: chars/4 approximation
-- Eviction: score-based (lowest-scoring first), FIFO fallback when no store
-- Progressive disclosure: categorize_index groups entries by type (Knowledge, Procedures, Session History)
-- Token budget default: 2000 tokens (configurable via l0_token_budget)
+Record in commit. Follow §A fallbacks if false.
 
-### 3C. Reflect/consolidation algorithm
-Expand §Behavioral Specification "On Consolidate" to document:
-- Clustering: adjacency graph from associations, BFS connected components, min/max cluster size filtering
-- Synthesis: tries LLM via Anthropic SDK, falls back to mechanical merge (concatenate descriptions, dedup observations)
-- Output: creates SUPERSEDES edges from summary to cluster members, importance = max of cluster
+## Phase 1 — Schema v4 structural layer (D1, D5)
 
-### 3D. Project auto-derivation
-Add to §Entity Structure or hierarchy doc:
-- tags.py derives project from filepath: looks for `projects/<name>/` segments
-- Supports nested: `projects/parent/projects/child/` → `parent.child`
-- Strict kebab-case validation for segments
+### 1.1 Schema document
+- Version 4; v4 rows in BOTH summary tables
+- basis on `<memory:observation>`: measured | inferred | reported (no default)
+- Definitions: measured=command output/mechanical record; inferred=derived by reasoning; reported=carried forward
+- Server-managed: verified_at, generator, embed_model
+- V14 validation rule
 
-## Phase 4: Expand README.md (operational completeness) ✓ 5f7c8b3
+### 1.2 Parser (tags.py) — Observation(str) subclass
+- `class Observation(str)` with basis — IS a string, zero consumer sweep
+- Construction discipline: __new__ only sanctioned constructor
+- In-memory basis-loss rule: transforms return plain str. Code for comparison/display calls observation_text(); code retaining basis rebuilds via __new__. Bare→str flowing to stored state = defect.
+- Accepted residual limit: convention not constraint; Python cannot prevent str(obs) bypassing tests. Basis loss is findable (unlabelled where labelled expected) not prevented. Future observation-handling modules MUST add own basis-preservation test — note in Observation docstring.
+- Serialization: serialize_observation / deserialize_observation in tags.py; grep all json.dump/dumps
+- CANARY TEST: no dict/JSON syntax leaks
+- BASIS-LOSS TEST: mutate through string ops, assert explicit drop or preservation
 
-### 4A. Hook behavior detail
-Expand the hook section (lines 99-105) to document the full pipeline:
-1. Fires on every Write to `memory/*.md`
-2. Parses `<memory:entity>` XML
-3. **Runs write gate pipeline** (REJECT/QUARANTINE/ACCEPT)
-4. Embeds via Voyage AI (if key set, non-blocking on failure)
-5. Indexes to Neo4j (primary) or JSONL (fallback)
-6. **L0 gating: ingested entries never enter MEMORY.md**
-7. Appends to MEMORY.md (compact resilience)
-8. **L0 budget enforcement** (evicts lowest-scoring if over token limit)
+### 1.3 Stores
+- JSONL: serialize_observation; legacy byte-identical; no migration
+- Neo4j: per 0.7 — preferred JSON-per-element or fallback parallel-lists (3 mitigations)
+- Basis immutability; duplicate-text upgrade (higher rank upgrades + verified_at + audit basis_upgrade; lower/equal skips)
+- verified_at: server-managed, on ≥1 measured (including upgrade)
 
-### 4B. Graceful degradation table
-Expand the troubleshooting/degradation section with a clear table:
-| Component | If missing | Behavior | Fix |
-|-----------|-----------|----------|-----|
-| Neo4j | JSONL fallback | Silent, automatic | Install Docker + deploy |
-| Voyage AI | No embeddings | Keyword search only | Set VOYAGE_API_KEY |
-| Docker | No Neo4j | JSONL only | Install Docker |
-| Claude Code | No auto-indexing | Manual `write` | Install hook |
-| Hook | No auto-indexing | Manual `write` command | `memoryschema hook install` |
+### 1.4 Generator stamping
+- config.py: generator_id, env MEMORY_GENERATOR, no TOML key
+- Hook: read env, pass to store; embeddings.py: return model id; reembed updates
 
-## Status: COMPLETE
+### 1.5 Validator
+- V14; Q9 strict warning (≥3 obs, none labelled)
 
-All 4 phases delivered. 11/11 audit items PASS. Zero residuals. 472 tests passing.
+### 1.6 Tests
+- basis parse, V14, legacy round-trip, serializer pair, canary, basis-loss
+- relabel ignored+audited, upgrade matrix, verified_at
+- Neo4j model tests, hook generator stamp
 
-## Verification
+## Phase 2 — Verification-aware scoring and guards (D1, D2)
 
-1. `python -m pytest tests/ -v` — 472 pass
-2. `grep -rn "stays v2" docs/hierarchy-and-inheritance.md` — zero matches
-3. `memoryschema --help` — all commands listed
-4. `diff src/memoryschema/templates/memory-schema.rules.tpl .claude/rules/memory-schema.md` — identical
-5. Coverage matrix: trust multiplier documented in ≥3 surfaces, SUPERSEDES guards in ≥2
+### 2.1 Scoring
+- Basis factor: measured=1.0, inferred=0.97, reported=0.93, neutral=1.0
+- Both backends; config basis_multipliers
 
-## Out of Scope (historical records)
+### 2.2 SUPERSEDES verification guard
+- Rank = max among labelled obs; unlabelled=2
+- Source ≥ target; same site as trust guard; both backends
+- reported cannot supersede measured; audit verification-guard
 
-- 21 memory files with schema="2" — historical working memories, backward compatible, not user-facing
-- Session reports 8-9 with stale counts — historical records, accurate at time of writing
-- PKG-INFO build artifact — regenerated on next `pip install -e .`
+### 2.3 Staleness presentation (no scoring effect)
+- [VERIFIED Nd ago] / [VERIFICATION STALE: Nd]; config verification_staleness_days=7
+- JSON: verified_at + verification_age_hours
+
+### 2.4 Tests
+- Parity: 3×2 matrix; guard: 9 combinations; rendering: 0d/6d/8d
+
+## Phase 3 — MITIGATES, closure discipline, typed force record (D3)
+
+### 3.1 Relation type
+- MITIGATES (7 active, 9 total); update "six" → "seven" everywhere
+- B remains active; no status change
+
+### 3.2 Criterion capture on SUPERSEDES
+- Copy target description into audit as criterion
+- Guideline: supersede when addressing criterion; MITIGATES otherwise
+
+### 3.3 Typed force record (ledger-capture)
+- operation="force": force_type (contradiction|supersession|world-change|decay), level, source, target
+- By-product: SUPERSEDES→supersession, CONTRADICTS→contradiction
+- decay: enum completeness only; NEVER eagerly emitted
+- CLI: memoryschema force --type world-change --target NAME
+- Coverage honesty: sparse records, no natural trigger; absence ≠ no change
+- No consumer; records accumulate
+
+### 3.4 Criterion satisfaction: principled limit
+- Similarity gate would PASS D3's false closure; achievable standard = capture + MITIGATES + audit
+
+### 3.5 On Mitigate lifecycle
+- Audit operation=mitigate; dampening mitigation_dampening (0.95)
+
+### 3.6 Tests
+- MITIGATES accepted; target active; dampening; criterion; force records
+
+## Phase 4 — Gate extensions (D4, D5)
+
+### 4.1 Pipeline precondition
+- Candidate embedding before stage 4; stages 5-6 skip when degraded
+
+### 4.2 Stage 5 — Numeric contradiction probe (numeric_probe.py)
+- extract_claims: quantity + unit + qualifier; key = (unit, qualifier)
+- Qualifier limit (docstring): captures ONE token after unit; "472 tests currently passing" keys as (test, currently) not (test, passing); conservative = under-fire not over-quarantine
+- compare: pure function, neighbours as argument
+- numeric_probe_mode: "log" (default) | "quarantine"; never REJECT
+- Escape: CONTRADICTS or SUPERSEDES bypass
+- Extension point: compare() accepts neighbour set
+
+### 4.3 Stage 6 — L0 echo probe
+- Jaccard overlap ≥ threshold + no measured + no new relations → QUARANTINE
+- memory:<name> source convention; source_is_memory audit flag
+
+### 4.4 Tests
+- ≥15 extractor cases incl qualifier; both modes; bypasses; echo 2×2; degradation
+
+## Phase 5 — Contradiction-aware reflect (D4)
+
+- Check clusters for CONTRADICTS + numeric contradictions pre-synthesis
+- Hit → skip; audit reflect_skip
+- --include-contradictory: min importance, CONTRADICTS edges, inferred basis
+- Uniform LLM + mechanical
+
+## Phase 6 — Salience instrumentation (D6)
+
+- log_decline(name_hint, reason, context_hash)
+- CLI: memoryschema decline --reason "..." [--name-hint X]
+- Guideline with limitation caveat
+- Eval: salience mode, ~20 fixtures, precision/recall
+
+## Phase 7 — Report sequencing (D7) — in scope, outside package
+
+- Default: patch spec (shared skills = shared risk)
+- Direct edit ONLY if confirmed project-local
+- Checkpoint: "as of checkpoint; close commit pending"
+- Session-close: amend with final count + close pointer
+- Backfill most recent; erratum convention
+- Memory entities: basis="reported" → append measured after close
+
+## Phase 8 — Documentation synchronization (single commit)
+
+- schema.md: all Phase 1/3/4 items; v4 rows; force record; memory:<name>
+- Rules + templates: sync
+- technical-reference.md: basis factor, configs, stages 5-6, force CLI, module table
+- README.md: hook pipeline, gate verdicts, decline + force, relation count
+- Doctor: generator_env + gate_probes (+ neo4j_observation_integrity if fallback); 21→23/24
+- CHANGELOG: all phases + v4 rationale
+
+## Verification Criteria
+
+| # | Criterion | Unit |
+|---|-----------|------|
+| 1 | v1/v2/v3 round-trip unchanged | A1 |
+| 2 | Basis immutable; relabel audited | A1 |
+| 3 | Score parity basis × provenance | A2 |
+| 4 | reported blocked from superseding measured | A2 |
+| 5 | MITIGATES active; criterion; force records | B |
+| 6 | Numeric probe modes + bypasses | B |
+| 7 | Echo quarantine/accept | B |
+| 8 | Reflect skip + flag path | B |
+| 9 | Decline audit + salience eval | C |
+| 10 | Phase 7 patch spec or marker+count | C |
+| 11 | No services: probes skip, writes succeed | C |
+| 12 | docs_sync; doctor count; P1-P3 | C |
+| 13 | Canary: no syntax leaks | A1 |
+| 14 | Basis upgrade + verified_at | A1 |
+| 15 | Neo4j model invariant | A1 |
+
+## §A Assumptions Register
+
+| # | Assumption | If false |
+|---|-----------|----------|
+| A1 | String lists in both stores | Serializer adapts; Observation(str) survives |
+| A2 | Embedding at gate time | Pre-gate refactor per 4.1 |
+| A3 | One trust guard site | Place at actual choke point |
+| A4 | Hook inherits env | Session-scoped dotfile fallback |
+| A5 | Clusters have entities | Fetch from store |
+| A6 | One rendering site | All sites + parity test |
+| A7 | Searchable-text property | Parallel-list + 3 mitigations |
+
+## Out of scope
+
+- **Embedder axis** — deferred; only compare() extension point
+- **Level axis + decay views** — reserved for future phases; derivable from plan's data; build none now
+- **Staleness-coupled scoring** — presentation only; coupling behind eval harness
+- **Mechanical criterion enforcement** — principled limit (Phase 3.4)
+- **Ledger-capture exception** — Phase 3.3 force record lands NOW (world-change unreconstructable)
