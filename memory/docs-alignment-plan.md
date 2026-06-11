@@ -1,17 +1,16 @@
 <memory:entity schema="3" name="docs-alignment-plan" type="semantic" importance="9">
-  <memory:description>Plan for full documentation alignment — 6 implementation fixes, audit, then 24 doc fixes across 18 files</memory:description>
+  <memory:description>Plan for full documentation alignment — verification audit + gap coverage, 4 phases</memory:description>
   <memory:observations>
-    <memory:observation>Neo4j hub bonus uses min(backlinks, 5) but store.py uses math.log(1 + backlinks) — scoring parity bug</memory:observation>
-    <memory:observation>docker-compose.yml has hardcoded changeme password — security issue</memory:observation>
-    <memory:observation>Example scripts and README use schema="2" — stale</memory:observation>
-    <memory:observation>validator.py R6 has dead code: level = 'R6' if strict else 'R6'</memory:observation>
-    <memory:observation>24 documentation fixes: doctor count (20→21), validation rules (V1-V10→V1-V13), hub bonus formula, type factor, upsert immutability, 6 missing CLI commands, schema version, module docstrings, config table completeness</memory:observation>
-    <memory:observation>Three-pass audit covered every source file, template, hook, example, config, and doc</memory:observation>
+    <memory:observation>Session 11 fixed 30 issues; verification audit found 1 remaining error (hierarchy doc line 416 "v2"→"v3")</memory:observation>
+    <memory:observation>Gap analysis found 41 undocumented features: CLI flags, BM25 details, L0 budget algorithm, audit trail format, reflect algorithm, degradation behavior</memory:observation>
+    <memory:observation>Coverage matrix: trust multiplier in 1/10 surfaces, SUPERSEDES guards in 1/10 — critical gaps</memory:observation>
+    <memory:observation>Phase 1: fix line 416. Phase 2: expand tech-ref (CLI flags, scoring, audit, degradation). Phase 3: expand schema.md (trust, L0, reflect). Phase 4: expand README (hook pipeline, degradation table)</memory:observation>
+    <memory:observation>Out of scope: 21 historical memory files with schema="2" (backward compatible), stale session reports (historical)</memory:observation>
   </memory:observations>
-  <memory:prompt>Full documentation alignment after v3 semantics implementation</memory:prompt>
-  <memory:reasoning>Implementation outpaced documentation across 10 sessions. Three exhaustive audits revealed scoring divergence between backends, stale examples, security issue, and 24 documentation gaps. Plan restructured: fix code first, audit, then align all docs.</memory:reasoning>
+  <memory:prompt>Verification audit + gap coverage after session 11 docs alignment</memory:prompt>
+  <memory:reasoning>Session 11 achieved factual accuracy but left coverage gaps — features exist in code but aren't documented in enough surfaces for users to discover them. This plan expands existing docs rather than creating new files.</memory:reasoning>
   <memory:relations>
-    <memory:relation target="session-10-close" type="DEPENDS_ON"/>
+    <memory:relation target="session-11-close" type="DEPENDS_ON"/>
   </memory:relations>
   <memory:project>memory-schema</memory:project>
 </memory:entity>

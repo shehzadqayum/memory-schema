@@ -220,3 +220,5 @@
 2026-06-10 22:45:45	session-open	START	—	—
 2026-06-10 22:47:11	session-open	END	completed	Session 12 briefing — new session after S4 4747602, zero residuals, no active initiative
 2026-06-10 22:58:43	plan-commit	START	—	—
+2026-06-10 22:59:44	plan-commit	END	completed	S1 359a24f: verification audit — 1 remaining fix (hierarchy doc v2→v3)
+2026-06-11 01:39:21	plan-commit	START	—	—
