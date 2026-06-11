@@ -99,9 +99,12 @@ memoryschema hook install
 Adds the PostToolUse Write hook to `~/.claude/settings.json`. The hook:
 1. Fires on every Write to `memory/*.md`
 2. Parses the `<memory:entity>` XML
-3. Embeds via Voyage AI (if key set)
-4. Indexes to Neo4j (primary) or JSONL (fallback)
-5. Appends to MEMORY.md (compact resilience)
+3. Runs write gate pipeline (REJECT / QUARANTINE / ACCEPT)
+4. Embeds via Voyage AI (if key set, non-blocking on failure)
+5. Indexes to Neo4j (primary) or JSONL (fallback)
+6. L0 gating: ingested entries (`provenance="ingested"`) never enter MEMORY.md
+7. Appends to MEMORY.md (compact resilience)
+8. L0 budget enforcement (evicts lowest-scoring entries if over token limit)
 
 ---
 
@@ -259,6 +262,17 @@ L0: MEMORY.md → L1a: Markdown files → L1b: JSONL → L2a: Embeddings → L2b
 ```
 
 **Hierarchical Inheritance:** Projects nest as agents via dot-notation (`parent.child`). Parent's config and rules override child's on conflict. Config via `memoryschema.toml` files with upward chain walking. CLI > env vars > parent TOML > child TOML > defaults. See `docs/system-overview.md` for details.
+
+---
+
+## Graceful Degradation
+
+| Component | If unavailable | Behavior | Fix |
+|-----------|---------------|----------|-----|
+| Neo4j | JSONL fallback | Silent, automatic — `get_store()` tries Neo4j first | `memoryschema neo4j deploy` |
+| Voyage AI | No embeddings | Keyword search only, entries indexed without vectors | `export VOYAGE_API_KEY=...` |
+| Docker | No Neo4j available | JSONL only — all features except graph traversal | Install Docker |
+| Hook | No auto-indexing | Manual indexing via `memoryschema write <file>` | `memoryschema hook install` |
 
 ---
 
