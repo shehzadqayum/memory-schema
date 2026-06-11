@@ -186,7 +186,7 @@ def _synthesise_summary(cluster):
 
     return {
         'name': summary_name,
-        'schema': 3,
+        'schema': 4,
         'type': 'semantic',
         'status': 'active',
         'importance': max(e.get('importance') or 5 for e in cluster),
@@ -201,14 +201,58 @@ def _synthesise_summary(cluster):
     }
 
 
-def reflect(store, project=None, min_cluster=2, max_cluster=10, dry_run=False):
+def _check_cluster_contradictions(cluster):
+    """Check a cluster for contradictions before synthesis.
+
+    Returns a list of reason strings if contradictions found, empty list otherwise.
+    Checks: (a) CONTRADICTS relations between members, (b) numeric contradictions.
+    """
+    reasons = []
+    member_names = {e['name'] for e in cluster}
+
+    # (a) CONTRADICTS relations between members
+    for entry in cluster:
+        for rel in entry.get('relations', []):
+            if rel.get('type') == 'CONTRADICTS' and rel.get('target') in member_names:
+                reasons.append(
+                    f"CONTRADICTS between {entry['name']} and {rel['target']}")
+        for bl in entry.get('backlinks', []):
+            if bl.get('type') == 'CONTRADICTS' and bl.get('source') in member_names:
+                reasons.append(
+                    f"CONTRADICTS between {bl['source']} and {entry['name']}")
+
+    # (b) Numeric contradictions via numeric_probe
+    try:
+        from memoryschema.numeric_probe import extract_entity_claims, compare
+        for i, entry in enumerate(cluster):
+            candidate_claims = extract_entity_claims(entry)
+            if candidate_claims:
+                others = cluster[:i] + cluster[i+1:]
+                hits = compare(candidate_claims, others)
+                for hit in hits:
+                    qual = f"/{hit['qualifier']}" if hit['qualifier'] else ''
+                    reasons.append(
+                        f"numeric-contradiction: {hit['unit']}{qual} "
+                        f"{hit['candidate_value']} vs {hit['neighbour_value']} "
+                        f"({entry['name']} vs {hit['neighbour_name']})")
+    except ImportError:
+        pass
+
+    # Deduplicate (symmetric CONTRADICTS can produce duplicates)
+    return list(dict.fromkeys(reasons))
+
+
+def reflect(store, project=None, min_cluster=2, max_cluster=10,
+            dry_run=False, include_contradictory=False):
     """Cluster episodic entries and synthesise semantic summaries.
 
     For each cluster of related episodic entries (grouped by
     association neighbourhood):
-    1. Synthesise a semantic summary entity
-    2. Create SUPERSEDES edges from summary to members
-    3. Archive the original episodic entries
+    1. Check for contradictions (CONTRADICTS relations + numeric probe)
+    2. Skip contradictory clusters (or synthesize with --include-contradictory)
+    3. Synthesise a semantic summary entity
+    4. Create SUPERSEDES edges from summary to members
+    5. Archive the original episodic entries
 
     Args:
         store: MemoryStore or Neo4jMemoryStore instance.
@@ -216,11 +260,13 @@ def reflect(store, project=None, min_cluster=2, max_cluster=10, dry_run=False):
         min_cluster: Minimum cluster size to process.
         max_cluster: Maximum cluster size to process.
         dry_run: If True, return clusters without creating summaries.
+        include_contradictory: If True, synthesize contradictory clusters
+            with min importance, CONTRADICTS edges, and inferred basis.
 
     Returns:
-        Dict with counts: {clusters, summaries, archived, dry_run}.
+        Dict with counts: {clusters, summaries, archived, skipped, dry_run}.
     """
-    entries = store.list_all(project=project)
+    entries = store.list_all(project=project, include_inactive=True)
     episodic = [e for e in entries
                 if e.get('type') == 'episodic'
                 and e.get('status', 'active') == 'active']
@@ -231,6 +277,7 @@ def reflect(store, project=None, min_cluster=2, max_cluster=10, dry_run=False):
         'clusters': len(clusters),
         'summaries': 0,
         'archived': 0,
+        'skipped': 0,
         'dry_run': dry_run,
     }
 
@@ -238,14 +285,65 @@ def reflect(store, project=None, min_cluster=2, max_cluster=10, dry_run=False):
         return stats
 
     for cluster in clusters:
-        summary = _synthesise_summary(cluster)
+        # Pre-synthesis contradiction check
+        contradiction_reasons = _check_cluster_contradictions(cluster)
+
+        if contradiction_reasons and not include_contradictory:
+            # Skip: no synthesis, no SUPERSEDES, members untouched
+            stats['skipped'] += 1
+            try:
+                store._audit('reflect_skip', cluster[0]['name'], {
+                    'members': [e['name'] for e in cluster],
+                    'reasons': contradiction_reasons,
+                })
+            except Exception:
+                pass
+            continue
+
+        if contradiction_reasons and include_contradictory:
+            # Synthesize with degraded authority
+            summary = _synthesise_contradictory_summary(cluster, contradiction_reasons)
+        else:
+            summary = _synthesise_summary(cluster)
+
         store.upsert(summary)
         stats['summaries'] += 1
 
-        # Archive cluster members (SUPERSEDES side-effect handles
-        # status change via Phase 1.2)
         for entry in cluster:
             store.archive(entry['name'])
             stats['archived'] += 1
 
     return stats
+
+
+def _synthesise_contradictory_summary(cluster, contradiction_reasons):
+    """Synthesize a summary for a contradictory cluster with degraded authority.
+
+    - importance = min of cluster (not max)
+    - CONTRADICTS relations to each conflicting member
+    - all observations labelled basis="inferred"
+    """
+    from memoryschema.tags import Observation
+
+    summary = _synthesise_summary(cluster)
+
+    # Force min importance
+    summary['importance'] = min(e.get('importance') or 5 for e in cluster)
+
+    # Add CONTRADICTS relations to conflicting members
+    conflicting_names = set()
+    for reason in contradiction_reasons:
+        for entry in cluster:
+            if entry['name'] in reason:
+                conflicting_names.add(entry['name'])
+    for cname in conflicting_names:
+        if not any(r.get('target') == cname and r.get('type') == 'CONTRADICTS'
+                   for r in summary['relations']):
+            summary['relations'].append({'target': cname, 'type': 'CONTRADICTS'})
+
+    # Label all observations as inferred
+    summary['observations'] = [
+        Observation(str(o), basis='inferred') for o in summary['observations']
+    ]
+
+    return summary
