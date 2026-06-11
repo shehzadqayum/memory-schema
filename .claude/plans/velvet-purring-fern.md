@@ -19,7 +19,9 @@ None.
 
 Do not combine A1+A2 unless A1 closed early.
 
-**Session 14 scope: Unit B (Phases 3–5).** Exit criteria: VC 5–8.
+**Session 14 scope: Unit B (Phases 3–5).** Exit criteria: VC 5–8. ✓ complete.
+
+**Session 15 scope: Unit C (Phases 6–8).** Exit criteria: VC 9–12. Resolves carried residuals R1 (hook stamp) + R2 (docs v4).
 
 ## Pre-Work P1–P3 ✓ 283b111
 

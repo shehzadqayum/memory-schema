@@ -271,3 +271,7 @@
 2026-06-11 22:07:12	checkpoint	START	—	—
 2026-06-11 22:09:19	checkpoint	END	completed	Session 14: Unit B complete, 9/9 PASS, 557 tests, 2 residuals carried to Unit C
 2026-06-11 22:13:39	session-close	START	—	—
+2026-06-11 22:15:46	session-close	END	completed	Session 14: f0b43ea, 5 commits, 557 tests, 2 residuals carried to Unit C
+2026-06-11 22:17:51	session-open	START	—	—
+2026-06-11 22:18:22	session-open	END	completed	Session 15 briefing — new session after S4 f0b43ea, 2 residuals, Unit C next
+2026-06-11 22:20:48	plan-commit	START	—	—
