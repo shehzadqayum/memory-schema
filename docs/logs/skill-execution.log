@@ -289,3 +289,9 @@
 2026-06-11 23:50:29	session-open	START	—	—
 2026-06-11 23:51:21	session-open	END	completed	Session 16 briefing — new session after S4 5bd2970, 1 residual (salience eval), v4 plan complete
 2026-06-11 23:54:47	plan-commit	START	—	—
+2026-06-11 23:58:23	plan-commit	END	completed	S1 4104ef2: salience eval residual, 1 addressing
+2026-06-11 23:59:15	implement	START	—	—
+2026-06-12 00:04:17	implement	END	completed	Salience eval: 20 fixtures, precision/recall metrics, CLI --mode salience — 569 tests, residual resolved
+2026-06-12 00:07:01	checkpoint	START	—	—
+2026-06-12 00:09:04	checkpoint	END	completed	Session 16: salience eval resolved, 4/4 PASS, 569 tests, zero residuals
+2026-06-12 00:11:20	session-close	START	—	—
