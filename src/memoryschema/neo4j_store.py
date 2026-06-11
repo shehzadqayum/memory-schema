@@ -770,6 +770,14 @@ class Neo4jMemoryStore:
             worst = min(labelled_bases, key=lambda b: VERIFICATION_RANKS.get(b, 2))
             score *= basis_multipliers.get(worst, 1.0)
 
+        # MITIGATES dampening
+        mitigates_count = sum(
+            1 for bl in entry.get('backlinks', [])
+            if bl.get('type') == 'MITIGATES'
+        )
+        if mitigates_count > 0:
+            score *= 0.95
+
         return round(min(score, 1.0), 4)
 
     def _searchable_text(self, entry):

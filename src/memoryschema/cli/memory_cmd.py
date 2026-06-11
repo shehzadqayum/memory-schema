@@ -514,3 +514,30 @@ def quarantine_reject(config, name, confirm):
     if md_path.exists():
         md_path.unlink()
     click.echo(f"Rejected and deleted: {name}")
+
+
+# --- Force record ---
+
+@click.command("force")
+@click.option("--type", "force_type", required=True,
+              type=click.Choice(['world-change', 'contradiction', 'supersession']),
+              help="Type of force event.")
+@click.option("--target", required=True, help="Target entity name.")
+@click.option("--level", default="entry",
+              type=click.Choice(['entry', 'cluster', 'project']),
+              help="Scope level. Default: entry.")
+@click.pass_obj
+def force_cmd(config, force_type, target, level):
+    """Record a typed force event in the audit trail.
+
+    Used to record world-change events that have no reconstructable trace.
+    Contradiction and supersession forces are normally emitted automatically;
+    this command is primarily for world-change.
+
+    Example:
+        memoryschema force --type world-change --target my-entity
+    """
+    from memoryschema.audit import log_force
+    audit_path = str(config.memory_dir / 'audit.jsonl')
+    log_force(audit_path, force_type, target, level=level)
+    click.echo(f"Force recorded: {force_type} → {target} (level: {level})")

@@ -15,6 +15,7 @@ VALID_STATUSES = frozenset({'active', 'superseded', 'archived', 'quarantined'})
 VALID_PROVENANCES = frozenset({'first-party', 'user', 'ingested', 'derived'})
 VALID_RELATION_TYPES = frozenset({
     'USES', 'MODIFIES', 'SUPERSEDES', 'DEPENDS_ON', 'INFORMS', 'CONTRADICTS',
+    'MITIGATES',
 })
 # Deprecated in v3: hierarchy is the project field, not relation edges.
 # Accepted on read for backward compatibility, warned on write.
@@ -110,6 +111,7 @@ class MemoryConfig:
     recall_decay: float = 0.8
     max_inherit_depth: int = 3  # max hierarchy levels for scope matching
     verification_staleness_days: int = 7  # staleness threshold for verified_at display
+    mitigation_dampening: float = 0.95  # score multiplier for entries with inbound MITIGATES
 
     def __post_init__(self):
         self.project_root = Path(self.project_root).resolve()

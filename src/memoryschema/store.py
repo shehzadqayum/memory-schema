@@ -80,10 +80,19 @@ class MemoryStore:
                 lock_fd.close()
 
     def _audit(self, operation, name, new_dict=None, prior_entry=None):
-        """Log a mutation to the audit trail. Non-blocking on failure."""
+        """Log a mutation to the audit trail. Non-blocking on failure.
+
+        When both prior_entry and new_dict are given, computes field diffs.
+        When only new_dict is given (no prior), passes it directly as changes.
+        """
         try:
             from memoryschema.audit import log_mutation, _diff_fields
-            changes = _diff_fields(prior_entry, new_dict) if prior_entry and new_dict else None
+            if prior_entry and new_dict:
+                changes = _diff_fields(prior_entry, new_dict)
+            elif new_dict:
+                changes = new_dict  # direct changes dict (e.g. criterion capture)
+            else:
+                changes = None
             log_mutation(self._audit_path, operation, name, changes, prior_entry)
         except Exception:
             pass  # Audit failure must not block mutations
@@ -258,6 +267,20 @@ class MemoryStore:
                         target = entry_map[target_name]
                         if target.get('status', 'active') == 'active':
                             target['status'] = 'superseded'
+                            self._audit('supersede', target_name, {
+                                'criterion': target.get('description', ''),
+                                'superseded_by': name,
+                            })
+                            try:
+                                from memoryschema.audit import log_force
+                                log_force(self._audit_path, 'supersession',
+                                          target_name, source=name)
+                            except Exception:
+                                pass
+                    if rel_type == 'MITIGATES':
+                        self._audit('mitigate', target_name, {
+                            'mitigated_by': name,
+                        })
                     if rel_type == 'CONTRADICTS' and name:
                         target = entry_map[target_name]
                         target_rels = target.get('relations', [])
@@ -267,6 +290,12 @@ class MemoryStore:
                         if reverse not in tpairs:
                             target_rels.append({'target': name, 'type': 'CONTRADICTS'})
                             target['relations'] = target_rels
+                            try:
+                                from memoryschema.audit import log_force
+                                log_force(self._audit_path, 'contradiction',
+                                          target_name, source=name)
+                            except Exception:
+                                pass
 
             self._save(entries)
             self._audit('create', name)
@@ -342,13 +371,30 @@ class MemoryStore:
             if not target_name or target_name not in entry_map:
                 continue
 
-            # SUPERSEDES → mark target as superseded
+            # SUPERSEDES → mark target as superseded + capture criterion + force record
             if rel_type == 'SUPERSEDES':
                 target = entry_map[target_name]
                 if target.get('status', 'active') == 'active':
                     target['status'] = 'superseded'
+                    self._audit('supersede', target_name, {
+                        'criterion': target.get('description', ''),
+                        'superseded_by': name,
+                    })
+                    # Force record: supersession
+                    try:
+                        from memoryschema.audit import log_force
+                        log_force(self._audit_path, 'supersession',
+                                  target_name, source=name)
+                    except Exception:
+                        pass
 
-            # CONTRADICTS → ensure symmetric edge on target
+            # MITIGATES → audit only, no status change, target stays active
+            if rel_type == 'MITIGATES':
+                self._audit('mitigate', target_name, {
+                    'mitigated_by': name,
+                })
+
+            # CONTRADICTS → ensure symmetric edge on target + force record
             if rel_type == 'CONTRADICTS' and name:
                 target = entry_map[target_name]
                 target_rels = target.get('relations', [])
@@ -358,6 +404,13 @@ class MemoryStore:
                 if reverse_pair not in target_pairs:
                     target_rels.append({'target': name, 'type': 'CONTRADICTS'})
                     target['relations'] = target_rels
+                    # Force record: contradiction
+                    try:
+                        from memoryschema.audit import log_force
+                        log_force(self._audit_path, 'contradiction',
+                                  target_name, source=name)
+                    except Exception:
+                        pass
 
         existing['last_accessed'] = now
 
@@ -769,6 +822,14 @@ class MemoryStore:
             worst = min(labelled_bases, key=lambda b: VERIFICATION_RANKS.get(b, 2))
             score *= basis_multipliers.get(worst, 1.0)
         # No labelled observations → neutral (1.0), no effect
+
+        # MITIGATES dampening: entries with inbound MITIGATES score slightly lower
+        mitigates_count = sum(
+            1 for bl in entry.get('backlinks', [])
+            if bl.get('type') == 'MITIGATES'
+        )
+        if mitigates_count > 0:
+            score *= 0.95  # mitigation_dampening default
 
         return round(min(score, 1.0), 4)
 

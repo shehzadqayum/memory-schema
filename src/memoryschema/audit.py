@@ -45,6 +45,42 @@ def _diff_fields(existing, new_dict):
     return changes
 
 
+VALID_FORCE_TYPES = frozenset({'contradiction', 'supersession', 'world-change', 'decay'})
+VALID_FORCE_LEVELS = frozenset({'entry', 'cluster', 'project'})
+
+
+def log_force(audit_path, force_type, target, level='entry', source=None):
+    """Log a typed force record to the audit trail.
+
+    Force types: contradiction, supersession, world-change, decay.
+    - contradiction/supersession: emitted as by-products of CONTRADICTS/SUPERSEDES.
+    - world-change: deliberate authoring path (CLI: memoryschema force).
+    - decay: enum completeness only; NEVER eagerly emitted (derivable from timestamps).
+
+    Coverage honesty: world-change has no natural trigger; records will be sparse.
+    Absence of a record does NOT mean the world did not change.
+    """
+    if force_type not in VALID_FORCE_TYPES:
+        raise ValueError(f"Invalid force_type {force_type!r}, must be one of: {', '.join(sorted(VALID_FORCE_TYPES))}")
+    if level not in VALID_FORCE_LEVELS:
+        raise ValueError(f"Invalid level {level!r}, must be one of: {', '.join(sorted(VALID_FORCE_LEVELS))}")
+
+    record = {
+        'timestamp': _now_iso(),
+        'operation': 'force',
+        'force_type': force_type,
+        'target': target,
+        'level': level,
+    }
+    if source:
+        record['source'] = source
+
+    os.makedirs(os.path.dirname(audit_path), exist_ok=True)
+
+    with open(audit_path, 'a', encoding='utf-8') as f:
+        f.write(json.dumps(record, ensure_ascii=False) + '\n')
+
+
 def log_gate_decision(audit_path, name, verdict, reasons, provenance=None):
     """Log a write gate decision to the audit trail.
 
