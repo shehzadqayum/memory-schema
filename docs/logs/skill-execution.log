@@ -238,3 +238,22 @@
 2026-06-11 08:22:52	session-open	START	—	—
 2026-06-11 08:25:20	session-open	END	completed	Session 13 briefing — new session after S4 9440915, zero residuals, no active initiative
 2026-06-11 09:01:42	plan-commit	START	—	—
+2026-06-11 09:13:24	plan-commit	END	completed	S1 188dc5b: v4 verification axis plan — 8 phases, 7 defects, 12 verification criteria
+2026-06-11 09:37:26	plan-commit	END	completed	S1 3e57a0a (amended): v4 plan v3 — Observation(str), Neo4j model selection, burn-in mode, 3 execution units
+2026-06-11 09:40:37	plan-commit	START	—	—
+2026-06-11 09:41:09	plan-commit	END	completed	S1 3e57a0a already committed+pushed+synced; verified clean
+2026-06-11 11:44:10	plan-commit	START	—	—
+2026-06-11 11:44:46	plan-commit	END	completed	S1 e9bc523 verified: v4 plan committed+pushed+synced, memory included
+2026-06-11 12:08:29	plan-commit	START	—	—
+2026-06-11 12:09:15	plan-commit	END	completed	S1 de87c3b v6 verified: committed+pushed+synced
+2026-06-11 12:11:31	implement	START	—	—
+2026-06-11 12:15:53	implement	END	completed	Pre-work P1-P3: v3 summary rows, upsert consolidation, doctor table — 472 tests
+2026-06-11 12:24:10	implement	START	—	—
+2026-06-11 12:28:31	implement	END	completed	Phase 0: all 7 assumptions confirmed — preferred Neo4j model viable, pre-gate embed needed, two recall paths
+2026-06-11 12:35:14	implement	START	—	—
+2026-06-11 12:44:27	implement	END	completed	Phase 1: schema v4 — Observation(str), serializers, basis upgrade, verified_at, V14, Q9, canary — 504 tests
+2026-06-11 12:52:52	implement	START	—	—
+2026-06-11 16:12:19	implement	END	completed	Phase 2: basis factor scoring, verification guard, staleness presentation — 514 tests
+2026-06-11 16:13:45	checkpoint	START	—	—
+2026-06-11 16:31:00	checkpoint	END	completed	Session 13: Unit A complete, 9/9 PASS, 514 tests, 2 residuals (hook stamp, docs v4)
+2026-06-11 17:11:28	session-close	START	—	—
