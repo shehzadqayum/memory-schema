@@ -257,3 +257,7 @@
 2026-06-11 16:13:45	checkpoint	START	—	—
 2026-06-11 16:31:00	checkpoint	END	completed	Session 13: Unit A complete, 9/9 PASS, 514 tests, 2 residuals (hook stamp, docs v4)
 2026-06-11 17:11:28	session-close	START	—	—
+2026-06-11 17:16:48	session-close	END	completed	Session 13: 540a118, 6 commits, 514 tests, 2 residuals (hook stamp, docs v4)
+2026-06-11 17:28:05	session-open	START	—	—
+2026-06-11 17:35:08	session-open	END	completed	Session 14 briefing — new session after S4 540a118, 2 residuals, Unit B next
+2026-06-11 17:41:09	plan-commit	START	—	—

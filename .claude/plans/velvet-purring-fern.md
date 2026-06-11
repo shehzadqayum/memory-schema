@@ -19,6 +19,8 @@ None.
 
 Do not combine A1+A2 unless A1 closed early.
 
+**Session 14 scope: Unit B (Phases 3–5).** Exit criteria: VC 5–8.
+
 ## Pre-Work P1–P3 ✓ 283b111
 
 ### P1. schema.md v3 summary rows
