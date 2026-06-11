@@ -8,12 +8,12 @@ Post-session-11 verification audit plus deep gap analysis. Three agents audited 
 
 None.
 
-## Phase 1: Fix remaining factual error (1 fix)
+## Phase 1: Fix remaining factual error (1 fix) ✓ 9942b0f
 
 ### 1A. hierarchy-and-inheritance.md:416 — "Schema stays v2" → "Schema stays v3"
 Second occurrence missed in session 11. Line 10 already fixed.
 
-## Phase 2: Expand technical-reference.md (missing CLI flags, config, scoring, audit)
+## Phase 2: Expand technical-reference.md (missing CLI flags, config, scoring, audit) ✓ 9a31320
 
 ### 2A. CLI flags reference — add ALL undocumented options
 After each command in the CLI table, add flags column. Missing flags:
@@ -53,7 +53,7 @@ Add section documenting:
 - Concurrent writes: fcntl advisory locking (Unix), no-op fallback (Windows)
 - Audit failure: silently swallowed, never blocks mutations
 
-## Phase 3: Expand schema.md behavioral spec (trust, L0, reflect)
+## Phase 3: Expand schema.md behavioral spec (trust, L0, reflect) ✓ fd258c3
 
 ### 3A. Trust multiplier detail
 Expand §Provenance Semantics to include:
@@ -80,7 +80,7 @@ Add to §Entity Structure or hierarchy doc:
 - Supports nested: `projects/parent/projects/child/` → `parent.child`
 - Strict kebab-case validation for segments
 
-## Phase 4: Expand README.md (operational completeness)
+## Phase 4: Expand README.md (operational completeness) ✓ 5f7c8b3
 
 ### 4A. Hook behavior detail
 Expand the hook section (lines 99-105) to document the full pipeline:
@@ -102,6 +102,10 @@ Expand the troubleshooting/degradation section with a clear table:
 | Docker | No Neo4j | JSONL only | Install Docker |
 | Claude Code | No auto-indexing | Manual `write` | Install hook |
 | Hook | No auto-indexing | Manual `write` command | `memoryschema hook install` |
+
+## Status: COMPLETE
+
+All 4 phases delivered. 11/11 audit items PASS. Zero residuals. 472 tests passing.
 
 ## Verification
 

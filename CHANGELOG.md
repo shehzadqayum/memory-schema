@@ -3,6 +3,16 @@
 ## [Unreleased]
 
 ### Added
+- technical-reference.md: CLI flags column for all 32 commands with key options
+- technical-reference.md: scoring detail — type factor, trust multiplier, BM25 params, weight redistribution, numpy
+- technical-reference.md: audit trail section with gate_decision and mutation record schemas
+- technical-reference.md: graceful degradation table (Neo4j/Voyage/embedding/concurrent/audit)
+- schema.md: trust level hierarchy table with "Can supersede" column
+- schema.md: L0 budget enforcement detail (token estimation, eviction, progressive disclosure)
+- schema.md: reflect algorithm (6-step clustering → synthesis → SUPERSEDES → archive)
+- hierarchy-and-inheritance.md: project auto-derivation from filepath
+- README.md: 8-step hook pipeline (write gate, L0 gating, budget enforcement)
+- README.md: graceful degradation table
 - Status lifecycle semantics — retrieval filtering with `--include-inactive`, traversable-not-returned for superseded entries in BFS recall
 - SUPERSEDES trust guard — ingested entries cannot supersede first-party/derived/user entries
 - SUPERSEDES cycle detection (R7) — prevents circular SUPERSEDES chains
