@@ -11,18 +11,25 @@ import click
 
 
 @click.command()
+@click.option("--mode", type=click.Choice(["retrieval", "salience"]),
+              default="retrieval", help="Evaluation mode: retrieval quality or write-decision salience.")
 @click.option("--json", "as_json", is_flag=True, help="Output results as JSON.")
 @click.pass_obj
-def eval_cmd(config, as_json):
-    """Run retrieval quality evaluation against fixture store.
+def eval_cmd(config, mode, as_json):
+    """Run evaluation against fixture store.
 
-    Creates a temporary store with synthetic entities, runs the
-    evaluation query set, and reports recall@k, MRR, and nDCG@10.
+    Modes:
+      retrieval (default) — recall@k, MRR, nDCG@10 against synthetic entities
+      salience — precision/recall of write-decision fixtures
 
     Example:
         memoryschema eval
+        memoryschema eval --mode salience
         memoryschema eval --json
     """
+    if mode == 'salience':
+        _run_salience_eval(as_json)
+        return
     from memoryschema.store import MemoryStore
     import tempfile
     import os
@@ -62,3 +69,45 @@ def eval_cmd(config, as_json):
                f"recall@10={avg['recall@10']:.3f}  "
                f"mrr={avg['mrr']:.3f}  "
                f"ndcg@10={avg['ndcg@10']:.3f}")
+
+
+def _run_salience_eval(as_json):
+    """Run salience evaluation — write-decision quality against fixtures."""
+    from tests.eval.fixtures import build_salience_fixtures
+    from tests.eval.metrics import evaluate_salience
+
+    fixtures = build_salience_fixtures()
+
+    # Baseline: all-write decisions (upper bound on recall, lower on precision)
+    all_write = [{'excerpt': f['excerpt'], 'decision': 'write'} for f in fixtures]
+    # Perfect decisions (for reference)
+    perfect = [{'excerpt': f['excerpt'], 'decision': f['decision']} for f in fixtures]
+
+    baseline_result = evaluate_salience(all_write, fixtures)
+    perfect_result = evaluate_salience(perfect, fixtures)
+
+    result = {
+        'mode': 'salience',
+        'fixture_count': len(fixtures),
+        'actual_writes': baseline_result['actual_writes'],
+        'actual_declines': baseline_result['actual_declines'],
+        'baseline_all_write': baseline_result,
+        'perfect': perfect_result,
+    }
+
+    if as_json:
+        click.echo(json.dumps(result, indent=2))
+        return
+
+    click.echo("Salience Evaluation — Write-Decision Fixtures")
+    click.echo("=" * 50)
+    click.echo(f"  Fixtures: {len(fixtures)} ({baseline_result['actual_writes']} write, {baseline_result['actual_declines']} decline)")
+    click.echo()
+    click.echo("Baseline (all-write):")
+    click.echo(f"  precision={baseline_result['precision']:.3f}  recall={baseline_result['recall']:.3f}  f1={baseline_result['f1']:.3f}")
+    click.echo()
+    click.echo("Perfect:")
+    click.echo(f"  precision={perfect_result['precision']:.3f}  recall={perfect_result['recall']:.3f}  f1={perfect_result['f1']:.3f}")
+    click.echo()
+    click.echo("To evaluate an actual decision source, use the evaluate_salience()")
+    click.echo("function from tests.eval.metrics with your decision list.")

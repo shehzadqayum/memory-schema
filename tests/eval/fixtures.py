@@ -237,3 +237,59 @@ def build_poisoning_entries():
             'access_count': 0,
         },
     ]
+
+
+def build_salience_fixtures():
+    """Build salience evaluation fixtures — session excerpts labelled write/decline.
+
+    Each fixture is a short session excerpt simulating a response moment,
+    labelled with the correct write decision per the selective-write policy:
+    - WRITE: decisions, corrections, novel facts, session boundaries
+    - DECLINE: mechanical output, duplicates, clarification questions, trivial
+
+    Returns list of dicts with: excerpt, decision, reason.
+    """
+    return [
+        # --- WRITE decisions (10) ---
+        {'excerpt': 'After reviewing the options, we decided to use PostgreSQL instead of SQLite for the production database. The key factor was concurrent write support.',
+         'decision': 'write', 'reason': 'architectural decision'},
+        {'excerpt': 'The user corrected me: the API endpoint is /v2/users not /v1/users. The v1 endpoint was deprecated last quarter.',
+         'decision': 'write', 'reason': 'user correction'},
+        {'excerpt': 'Discovered that the config loader silently swallows TOML parse errors and falls back to defaults. This means typos in config are never reported.',
+         'decision': 'write', 'reason': 'novel bug discovery'},
+        {'excerpt': 'Session opened. Branch: main. Last commit: abc123. Working tree clean. No residuals from prior session.',
+         'decision': 'write', 'reason': 'session boundary'},
+        {'excerpt': 'The team uses a monorepo structure with packages/frontend and packages/backend. Shared types are in packages/shared.',
+         'decision': 'write', 'reason': 'novel project structure fact'},
+        {'excerpt': 'User confirmed that the parent-wins authority model is correct for their use case. They explicitly rejected the child-autonomy alternative.',
+         'decision': 'write', 'reason': 'confirmed design decision'},
+        {'excerpt': 'Found that the Neo4j fulltext index searches observations_text, not the observations list directly. This means JSON-encoded observations will not pollute text search.',
+         'decision': 'write', 'reason': 'novel technical discovery'},
+        {'excerpt': 'The deployment requires Python 3.11+ because of tomllib. Earlier versions need the tomli backport.',
+         'decision': 'write', 'reason': 'novel deployment requirement'},
+        {'excerpt': 'Session checkpoint complete. 5 commits, 12 files changed. All tests passing. Plan phase 3 delivered.',
+         'decision': 'write', 'reason': 'session boundary'},
+        {'excerpt': 'The user wants the write gate to quarantine rather than reject suspicious entries, because false positives are expected and quarantine is reviewable.',
+         'decision': 'write', 'reason': 'design decision with rationale'},
+        # --- DECLINE decisions (10) ---
+        {'excerpt': 'Running pytest tests/test_store.py -v... 45 passed in 2.3s.',
+         'decision': 'decline', 'reason': 'mechanical test output'},
+        {'excerpt': 'Staged files: src/config.py, src/store.py. Committed with message "fix: precedence ordering".',
+         'decision': 'decline', 'reason': 'mechanical git operations'},
+        {'excerpt': 'The config file is at src/memoryschema/config.py, as we discussed earlier.',
+         'decision': 'decline', 'reason': 'already captured information'},
+        {'excerpt': 'Sure, I can help with that. Let me read the file first.',
+         'decision': 'decline', 'reason': 'trivial acknowledgement'},
+        {'excerpt': 'Do you want me to fix the typo in the variable name, or rename the entire function?',
+         'decision': 'decline', 'reason': 'clarification question, no new facts'},
+        {'excerpt': 'Pushed to origin/main. No errors.',
+         'decision': 'decline', 'reason': 'mechanical push confirmation'},
+        {'excerpt': 'The file has 250 lines. Let me read the relevant section.',
+         'decision': 'decline', 'reason': 'transient navigation'},
+        {'excerpt': 'I will use the Edit tool to make that change now.',
+         'decision': 'decline', 'reason': 'action announcement, no fact'},
+        {'excerpt': 'Yes, that looks correct to me.',
+         'decision': 'decline', 'reason': 'agreement without new information'},
+        {'excerpt': 'Looking at the error message: ImportError No module named memoryschema.cli.new_cmd. This is because the module has not been created yet.',
+         'decision': 'decline', 'reason': 'transient debugging, obvious from error'},
+    ]

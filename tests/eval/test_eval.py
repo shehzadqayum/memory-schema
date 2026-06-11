@@ -129,3 +129,60 @@ class TestEvaluateAll:
         results = eval_store.recall(query='outdated fact')
         outdated = [r for r in results if r['name'].startswith('outdated-')]
         assert len(outdated) == 0
+
+
+# --- Salience evaluation ---
+
+class TestSalienceFixtures:
+    def test_fixtures_exist(self):
+        from tests.eval.fixtures import build_salience_fixtures
+        fixtures = build_salience_fixtures()
+        assert len(fixtures) >= 20
+
+    def test_fixtures_balanced(self):
+        from tests.eval.fixtures import build_salience_fixtures
+        fixtures = build_salience_fixtures()
+        writes = sum(1 for f in fixtures if f['decision'] == 'write')
+        declines = sum(1 for f in fixtures if f['decision'] == 'decline')
+        assert writes >= 8
+        assert declines >= 8
+
+    def test_fixture_structure(self):
+        from tests.eval.fixtures import build_salience_fixtures
+        for f in build_salience_fixtures():
+            assert 'excerpt' in f
+            assert 'decision' in f
+            assert f['decision'] in ('write', 'decline')
+            assert 'reason' in f
+
+
+class TestSalienceMetrics:
+    def test_perfect_score(self):
+        from tests.eval.fixtures import build_salience_fixtures
+        from tests.eval.metrics import evaluate_salience
+        fixtures = build_salience_fixtures()
+        perfect = [{'excerpt': f['excerpt'], 'decision': f['decision']} for f in fixtures]
+        result = evaluate_salience(perfect, fixtures)
+        assert result['precision'] == 1.0
+        assert result['recall'] == 1.0
+        assert result['f1'] == 1.0
+        assert result['correct'] == result['total']
+
+    def test_all_write_baseline(self):
+        from tests.eval.fixtures import build_salience_fixtures
+        from tests.eval.metrics import evaluate_salience
+        fixtures = build_salience_fixtures()
+        all_write = [{'excerpt': f['excerpt'], 'decision': 'write'} for f in fixtures]
+        result = evaluate_salience(all_write, fixtures)
+        assert result['recall'] == 1.0  # catches all writes
+        assert result['precision'] < 1.0  # but also catches declines
+        assert result['total'] == len(fixtures)
+
+    def test_all_decline_baseline(self):
+        from tests.eval.fixtures import build_salience_fixtures
+        from tests.eval.metrics import evaluate_salience
+        fixtures = build_salience_fixtures()
+        all_decline = [{'excerpt': f['excerpt'], 'decision': 'decline'} for f in fixtures]
+        result = evaluate_salience(all_decline, fixtures)
+        assert result['recall'] == 0.0  # catches no writes
+        assert result['precision'] == 0.0  # no predicted writes

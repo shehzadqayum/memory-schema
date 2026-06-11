@@ -115,3 +115,65 @@ def evaluate_all(store, query_set):
         'queries': per_query,
         'averages': averages,
     }
+
+
+def evaluate_salience(decisions, fixtures):
+    """Evaluate write-decision quality against gold-labelled fixtures.
+
+    Args:
+        decisions: list of {"excerpt": str, "decision": "write"|"decline"}
+            from the system under test.
+        fixtures: list of {"excerpt": str, "decision": str, "reason": str}
+            gold labels from build_salience_fixtures().
+
+    Returns:
+        Dict with precision, recall, f1, total, correct, and baseline scores.
+    """
+    # Build lookup from excerpt → gold decision
+    gold = {f['excerpt']: f['decision'] for f in fixtures}
+
+    # Count
+    total = 0
+    correct = 0
+    true_positives = 0   # predicted write AND gold write
+    false_positives = 0  # predicted write AND gold decline
+    false_negatives = 0  # predicted decline AND gold write
+
+    for d in decisions:
+        excerpt = d['excerpt']
+        predicted = d['decision']
+        actual = gold.get(excerpt)
+        if actual is None:
+            continue  # skip unmatched excerpts
+        total += 1
+        if predicted == actual:
+            correct += 1
+        if predicted == 'write' and actual == 'write':
+            true_positives += 1
+        elif predicted == 'write' and actual == 'decline':
+            false_positives += 1
+        elif predicted == 'decline' and actual == 'write':
+            false_negatives += 1
+
+    precision = true_positives / (true_positives + false_positives) if (true_positives + false_positives) > 0 else 0.0
+    recall = true_positives / (true_positives + false_negatives) if (true_positives + false_negatives) > 0 else 0.0
+    f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0.0
+
+    # Baselines
+    actual_writes = sum(1 for f in fixtures if f['decision'] == 'write')
+    actual_declines = len(fixtures) - actual_writes
+    all_write_precision = actual_writes / len(fixtures) if fixtures else 0.0
+    all_decline_recall = 0.0  # declining everything catches zero writes
+
+    return {
+        'total': total,
+        'correct': correct,
+        'accuracy': correct / total if total > 0 else 0.0,
+        'precision': round(precision, 4),
+        'recall': round(recall, 4),
+        'f1': round(f1, 4),
+        'baseline_all_write_precision': round(all_write_precision, 4),
+        'fixture_count': len(fixtures),
+        'actual_writes': actual_writes,
+        'actual_declines': actual_declines,
+    }
