@@ -74,8 +74,22 @@ Each layer adds capability without being required. The system degrades gracefull
 score = recency(0.995^hours) × 0.2 + importance/10 × 0.3 + cosine_similarity × 0.5
 ```
 
-Hub bonus: +0.05 * ln(1 + backlinks) (log-scale, diminishing returns).
-Text match boost: +0.1 substring (Neo4j) or BM25 up to +0.3 (JSONL).
+**Type factor** (applied to base recency before weighting):
+- `semantic`: `max(recency, 0.6)` — facts never fully decay
+- `episodic`: standard `0.995^hours` — events age naturally
+- `procedural`: `recency^(1/(1 + 0.3*min(access_count, 10)))` — access-reinforced
+
+**Trust multiplier** (applied after weighted sum): `first-party`=1.0, `user`=1.0, `derived`=0.9, `ingested`=0.7.
+
+**Bonuses** (added after weighted sum, before clamping to 1.0):
+- Hub bonus: `+0.05 * ln(1 + backlinks)` — log-scale, diminishing returns
+- Text match: `+0.1` substring (Neo4j) or BM25 up to `+0.3` (JSONL)
+
+**BM25 parameters** (JSONL store only): k1=1.2, b=0.75, avg_dl=50, whitespace tokenization, normalized to [0, 0.3] boost range.
+
+**When no embedding available:** relevance weight redistributed — 40% to recency, 60% to importance.
+
+**Numpy acceleration:** vectorized cosine similarity via numpy when installed, pure-Python fallback otherwise.
 
 ### Three-Channel Cascade
 
@@ -91,8 +105,10 @@ Vector k-NN seeds → explicit relations → backlinks → ASSOCIATED_WITH assoc
 
 ```
 Response → memory entity (.md) → PostToolUse hook
-  → parse (tags.py) → embed (Voyage AI) → Neo4j upsert (or JSONL fallback)
-  → single-node associations → append to MEMORY.md (compact resilience)
+  → parse (tags.py) → write gate (REJECT/QUARANTINE/ACCEPT)
+  → embed (Voyage AI, non-blocking) → Neo4j upsert (or JSONL fallback)
+  → single-node associations → L0 gating (ingested excluded)
+  → append to MEMORY.md → L0 budget enforcement (evict if over limit)
 ```
 
 ### Recall Path
@@ -101,6 +117,36 @@ Response → memory entity (.md) → PostToolUse hook
 Query → embed query → vector k-NN seeds → cascade BFS
   → relations + backlinks + associations → ranked results
 ```
+
+---
+
+## Audit Trail
+
+All mutations and gate decisions are logged to `memory/audit.jsonl` (append-only, never truncated).
+
+**Gate decision record:**
+```json
+{"timestamp": "2026-06-10T...", "operation": "gate_decision", "name": "entity-name", "verdict": "accept", "reasons": ["..."], "provenance": "first-party"}
+```
+
+**Mutation record:**
+```json
+{"timestamp": "2026-06-10T...", "operation": "upsert", "name": "entity-name", "changes": {"description": {"prior_hash": "a1b2c3...", "new_hash": "d4e5f6..."}}}
+```
+
+Tracked fields: description, type, status, provenance, importance, body, prompt, reasoning, source, project. Audit failure is silently swallowed — never blocks mutations.
+
+---
+
+## Graceful Degradation
+
+| Component | If unavailable | Behavior |
+|-----------|---------------|----------|
+| Neo4j | JSONL fallback | `get_store()` tries Neo4j, catches all exceptions, falls back silently |
+| Voyage AI key | No embeddings | Entries indexed without vectors; keyword search only |
+| Embedding failure | Non-blocking | Warning logged, entry saved unembedded |
+| Concurrent writes | Advisory locking | `fcntl` on Unix (raises IOError on contention); no-op on Windows |
+| Audit logging | Silently swallowed | Mutations proceed even if audit.jsonl write fails |
 
 ---
 
@@ -154,40 +200,40 @@ from memoryschema import Neo4jMemoryStore, embed_text, embed_batch, rerank
 
 ## CLI Commands
 
-| Command | Category | Description |
-|---------|----------|-------------|
-| `init` | Setup | Initialize project (memory dir, TOML, rules, docker-compose) |
-| `neo4j` | Setup | Manage Neo4j container (deploy, up, down, status, reset, schema) |
-| `voyage` | Setup | Manage Voyage AI connectivity (status, test) |
-| `status` | Operations | Show store backend, node count, embedding coverage |
-| `recall` | Operations | Semantic search with cascade recall |
-| `get` | Operations | Retrieve single entity by name |
-| `list` | Operations | List entities with filters |
-| `write` | Operations | Parse, validate, gate, embed, and index a memory file |
-| `delete` | Operations | Remove entity from all stores + MEMORY.md |
-| `search` | Operations | Full-text keyword search |
-| `archive` | Lifecycle | Set status=archived (exclude from default recall) |
-| `unarchive` | Lifecycle | Restore archived → active |
-| `reactivate` | Lifecycle | Restore superseded → active |
-| `quarantine` | Lifecycle | Review quarantined entries (list, review, release, reject) |
-| `validate` | Quality | Validate memory files against schema |
-| `index` | Indexing | Batch index un-indexed files |
-| `embed` | Indexing | Re-embed entries by prefix or all |
-| `associations` | Indexing | Show or recompute k-NN associations |
-| `reflect` | Indexing | Cluster episodic entries → semantic summaries |
-| `eval` | Quality | Evaluation harness (recall@k, MRR, nDCG) |
-| `migrate` | Data | Migrate between JSONL and Neo4j |
-| `sync` | Data | Reconcile JSONL and Neo4j stores |
-| `backup` | Lifecycle | Full or selective backup |
-| `restore` | Lifecycle | Restore from backup archive |
-| `reset` | Lifecycle | Wipe data (full or selective) |
-| `clean` | Lifecycle | Complete removal of memory system |
-| `export` | Data | Portable archive for moving to another project |
-| `import` | Data | Import from portable archive |
-| `hook` | Hooks | Manage PostToolUse hook (install, uninstall, status, test) |
-| `doctor` | Diagnostics | 21-point health check |
-| `rules` | Diagnostics | Show effective rules with inheritance markers |
-| `config` | Diagnostics | Show effective config with inheritance chain |
+| Command | Category | Key flags | Description |
+|---------|----------|-----------|-------------|
+| `init` | Setup | `--with-neo4j`, `--scopes`, `--neo4j-password` | Initialize project (memory dir, TOML, rules, docker-compose) |
+| `neo4j` | Setup | deploy, up, down, status, logs, schema, reset, shell | Manage Neo4j container |
+| `voyage` | Setup | status, test | Manage Voyage AI connectivity |
+| `status` | Operations | `--json` | Show store backend, node count, embedding coverage |
+| `recall` | Operations | `--project`, `--include-inactive`, `--json`, `-n` | Semantic search with cascade recall |
+| `get` | Operations | `--json` | Retrieve single entity by name |
+| `list` | Operations | `--type`, `--project`, `--include-inactive`, `--json`, `-n` | List entities with filters |
+| `write` | Operations | | Parse, validate, gate, embed, and index a memory file |
+| `delete` | Operations | `--confirm` | Remove entity from all stores + MEMORY.md |
+| `search` | Operations | `--type`, `--project`, `--include-inactive`, `--json`, `-n` | Full-text keyword search |
+| `archive` | Lifecycle | | Set status=archived (exclude from default recall) |
+| `unarchive` | Lifecycle | | Restore archived → active |
+| `reactivate` | Lifecycle | | Restore superseded → active |
+| `quarantine` | Lifecycle | list, review, release, reject `--confirm` | Review quarantined entries |
+| `validate` | Quality | `--strict` (Q1-Q2, Q6-Q8), `--json` | Validate memory files against schema |
+| `index` | Indexing | `--base-path`, `--project` | Batch index un-indexed files |
+| `embed` | Indexing | `--prefix`, `--all`, `--batch-size`, `--coverage`, `--dry-run` | Re-embed entries |
+| `associations` | Indexing | `--k`, `--recompute` | Show or recompute k-NN associations |
+| `reflect` | Indexing | `--project`, `--min-cluster`, `--max-cluster`, `--dry-run`, `--json` | Cluster episodic → semantic summaries |
+| `eval` | Quality | | Evaluation harness (recall@k, MRR, nDCG) |
+| `migrate` | Data | `jsonl-to-neo4j --batch-size --skip-assoc`, `neo4j-to-jsonl --output` | Migrate between JSONL and Neo4j |
+| `sync` | Data | | Reconcile JSONL and Neo4j stores |
+| `backup` | Lifecycle | `--neo4j-only`, `--jsonl-only`, `--files-only` | Full or selective backup |
+| `restore` | Lifecycle | | Restore from backup archive |
+| `reset` | Lifecycle | `--confirm`, `--neo4j-only`, `--store-only`, `--working-memory-only` | Wipe data (full or selective) |
+| `clean` | Lifecycle | `--confirm`, `--dry-run` | Complete removal of memory system |
+| `export` | Data | `--format` (tar/jsonl/md), `--output` | Portable archive for moving to another project |
+| `import` | Data | `--format` | Import from portable archive |
+| `hook` | Hooks | install `--timeout --per-project`, uninstall, status, test | Manage PostToolUse hook |
+| `doctor` | Diagnostics | `--fix`, `--json` | 21-point health check |
+| `rules` | Diagnostics | `--conflicts` | Show effective rules with inheritance markers |
+| `config` | Diagnostics | `--chain` | Show effective config with inheritance chain |
 
 ---
 
