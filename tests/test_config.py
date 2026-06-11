@@ -14,7 +14,7 @@ def test_defaults():
     assert config.neo4j_user == "neo4j"
     assert config.embed_model == "voyage-4-lite"
     assert config.embed_dimensions == 1024
-    assert config.schema_version == 3
+    assert config.schema_version == 4
     assert config.association_k == 10
     assert config.recency_decay == 0.995
 

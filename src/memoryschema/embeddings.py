@@ -43,23 +43,28 @@ def get_client(api_key=None, config=None):
     return client
 
 
-def embed_text(text, client=None, config=None):
+def embed_text(text, client=None, config=None, return_model=False):
     """Embed a single text string.
 
     Args:
         text: Text to embed.
         client: Optional voyageai.Client.
         config: Optional MemoryConfig for model selection.
+        return_model: If True, return (vector, model_name) tuple.
 
     Returns:
-        List of floats (1024-dim embedding vector).
+        List of floats (1024-dim embedding vector), or (vector, model_name)
+        tuple if return_model=True.
     """
     if client is None:
         client = get_client(config=config)
 
     model = config.embed_model if config else 'voyage-4-lite'
     result = client.embed(texts=[text], model=model)
-    return result.embeddings[0]
+    vector = result.embeddings[0]
+    if return_model:
+        return vector, model
+    return vector
 
 
 def embed_batch(texts, client=None, config=None):

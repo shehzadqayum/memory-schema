@@ -23,8 +23,9 @@ import tempfile
 from contextlib import contextmanager
 from datetime import datetime, timezone
 
-from memoryschema.config import TRUST_LEVELS
+from memoryschema.config import TRUST_LEVELS, VERIFICATION_RANKS
 from memoryschema.hierarchy import project_matches_filter, project_matches_scope
+from memoryschema.tags import Observation, serialize_observation, deserialize_observation, observation_text
 
 
 def _now_iso():
@@ -107,12 +108,37 @@ class MemoryStore:
                 if not line:
                     continue
                 try:
-                    entries.append(json.loads(line))
+                    entry = json.loads(line)
+                    self._deserialize_observations(entry)
+                    entries.append(entry)
                 except json.JSONDecodeError:
                     continue
         self._cache = entries
         self._cache_mtime = mtime
         return entries
+
+    @staticmethod
+    def _serialize_entry(entry):
+        """Prepare an entry dict for JSON serialization.
+
+        Observations with basis must be serialized through the
+        serialize_observation function — json.dumps on an Observation(str)
+        would silently drop basis.
+        """
+        out = dict(entry)
+        if 'observations' in out:
+            out['observations'] = [serialize_observation(o) for o in out['observations']]
+        return out
+
+    @staticmethod
+    def _deserialize_observations(entry):
+        """Reconstruct Observation instances from loaded JSONL data.
+
+        Handles both legacy plain strings and v4 {"text","basis"} dicts.
+        """
+        if 'observations' in entry:
+            entry['observations'] = [deserialize_observation(o) for o in entry['observations']]
+        return entry
 
     def _save(self, entries):
         """Write entries atomically to the JSONL file.
@@ -128,7 +154,7 @@ class MemoryStore:
         try:
             with os.fdopen(fd, 'w', encoding='utf-8') as f:
                 for entry in entries:
-                    f.write(json.dumps(entry, ensure_ascii=False) + '\n')
+                    f.write(json.dumps(self._serialize_entry(entry), ensure_ascii=False) + '\n')
             os.replace(tmp_path, self._path)
             self._cache = None
         except BaseException:
@@ -195,6 +221,10 @@ class MemoryStore:
             new_entry['created_at'] = now
             new_entry['last_accessed'] = now
             new_entry['access_count'] = 0
+            # Set verified_at if any measured observation present
+            if any(isinstance(o, Observation) and o.basis == 'measured'
+                   for o in new_entry.get('observations', [])):
+                new_entry['verified_at'] = now
             entries.append(new_entry)
 
             # Side effects for new entries with relations
@@ -232,14 +262,45 @@ class MemoryStore:
             if key in memory_dict and memory_dict[key] is not None:
                 existing[key] = memory_dict[key]
 
+        # Observation merge with basis upgrade (v4)
         existing_obs = existing.get('observations', [])
         new_obs = memory_dict.get('observations', [])
-        existing_set = set(existing_obs)
+        # Build text→index map for existing observations
+        existing_text_map = {}
+        for i, o in enumerate(existing_obs):
+            existing_text_map.setdefault(observation_text(o), i)
+        has_measured = False
         for obs in new_obs:
-            if obs not in existing_set:
-                existing_obs.append(obs)
-                existing_set.add(obs)
+            text = observation_text(obs)
+            obs_basis = obs.basis if isinstance(obs, Observation) else None
+            if text in existing_text_map:
+                # Duplicate text — check for basis upgrade
+                idx = existing_text_map[text]
+                stored = existing_obs[idx]
+                stored_basis = stored.basis if isinstance(stored, Observation) else None
+                new_rank = VERIFICATION_RANKS.get(obs_basis, 2)
+                stored_rank = VERIFICATION_RANKS.get(stored_basis, 2)
+                if obs_basis is not None and new_rank > stored_rank:
+                    # Higher rank → upgrade
+                    existing_obs[idx] = Observation(text, basis=obs_basis)
+                    self._audit('basis_upgrade', existing.get('name'),
+                                {'observation': text, 'from': stored_basis, 'to': obs_basis})
+                    if obs_basis == 'measured':
+                        has_measured = True
+                # Lower/equal → skip (ordinary duplicate)
+            else:
+                existing_obs.append(obs if isinstance(obs, Observation) else Observation(text, basis=obs_basis))
+                existing_text_map[text] = len(existing_obs) - 1
+                if obs_basis == 'measured':
+                    has_measured = True
         existing['observations'] = existing_obs
+
+        # Advance verified_at if any measured observation was added or upgraded
+        if has_measured or any(
+            (isinstance(o, Observation) and o.basis == 'measured')
+            for o in memory_dict.get('observations', [])
+        ):
+            existing['verified_at'] = now
 
         existing_rels = existing.get('relations', [])
         new_rels = memory_dict.get('relations', [])

@@ -21,7 +21,19 @@ VALID_RELATION_TYPES = frozenset({
 DEPRECATED_RELATION_TYPES = frozenset({'PARENT_OF', 'CHILD_OF'})
 # Combined set for validation (accepts both active and deprecated)
 ALL_RELATION_TYPES = VALID_RELATION_TYPES | DEPRECATED_RELATION_TYPES
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
+
+# v4: basis attribute on observations — classifies how claims were obtained.
+VALID_BASES = frozenset({'measured', 'inferred', 'reported'})
+
+# Verification rank ordering for SUPERSEDES guards.
+# Higher rank can supersede same or lower; lower cannot supersede higher.
+VERIFICATION_RANKS = {
+    'measured': 3,
+    'inferred': 2,
+    'reported': 1,
+    None: 2,  # unlabelled = neutral rank
+}
 
 # Trust hierarchy for SUPERSEDES authority guards.
 # Higher level can supersede same or lower; lower cannot supersede higher.
@@ -77,6 +89,11 @@ class MemoryConfig:
     embed_model: str = "voyage-4-lite"
     embed_dimensions: int = 1024
     rerank_model: str = "rerank-2"
+
+    # Generator identity (v4, session-scoped — no TOML key)
+    generator_id: str | None = field(
+        default_factory=lambda: os.environ.get("MEMORY_GENERATOR")
+    )
 
     # Schema
     schema_version: int = SCHEMA_VERSION

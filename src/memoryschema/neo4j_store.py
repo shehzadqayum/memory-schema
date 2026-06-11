@@ -18,12 +18,39 @@ from datetime import datetime, timezone
 
 from neo4j import GraphDatabase
 
-from memoryschema.config import ALL_RELATION_TYPES as _RELATION_TYPES, TRUST_LEVELS
+import json as _json
+
+from memoryschema.config import ALL_RELATION_TYPES as _RELATION_TYPES, TRUST_LEVELS, VERIFICATION_RANKS
+from memoryschema.tags import Observation, observation_text
 from memoryschema.hierarchy import project_matches_scope
 
 
 def _now_iso():
     return datetime.now(timezone.utc).isoformat()
+
+
+def _neo4j_serialize_obs(obs):
+    """Serialize observation for Neo4j list property (preferred JSON-per-element model).
+
+    Unlabelled → plain string; labelled → compact JSON: {"t":"text","b":"basis"}.
+    """
+    if isinstance(obs, Observation) and obs.basis is not None:
+        return _json.dumps({'t': str(obs), 'b': obs.basis}, ensure_ascii=False)
+    return str(obs)
+
+
+def _neo4j_deserialize_obs(raw):
+    """Deserialize observation from Neo4j list property.
+
+    Plain strings → Observation(text); JSON strings → Observation(text, basis).
+    """
+    if isinstance(raw, str) and raw.startswith('{"t":'):
+        try:
+            d = _json.loads(raw)
+            return Observation(d['t'], basis=d.get('b'))
+        except (ValueError, KeyError):
+            pass
+    return Observation(str(raw))
 
 
 class Neo4jMemoryStore:
@@ -74,8 +101,18 @@ class Neo4jMemoryStore:
         # Immutable props (applied on CREATE only — provenance cannot change)
         provenance = memory_dict.get('provenance')
 
-        observations = memory_dict.get('observations', [])
+        raw_observations = memory_dict.get('observations', [])
+        # Serialize for Neo4j: labelled → JSON string, unlabelled → plain
+        neo4j_obs = [_neo4j_serialize_obs(o) for o in raw_observations]
+        # observations_text stays plain text for fulltext search
+        obs_text = ' '.join(observation_text(o) for o in raw_observations)
         embedding = memory_dict.get('embedding')
+
+        # Set verified_at if any measured observation present
+        has_measured = any(
+            isinstance(o, Observation) and o.basis == 'measured'
+            for o in raw_observations
+        )
 
         with self._driver.session() as session:
             session.run("""
@@ -95,11 +132,19 @@ class Neo4jMemoryStore:
                 WITH m, m.observations AS existing
                 WITH m, existing, [x IN $observations WHERE NOT x IN existing] AS new_obs
                 SET m.observations = existing + new_obs,
-                    m.observations_text = reduce(s = '', x IN (existing + new_obs) | s + ' ' + x)
+                    m.observations_text = reduce(s = '', x IN (existing + new_obs) |
+                        CASE WHEN x STARTS WITH '{"t":' THEN s
+                        ELSE s + ' ' + x END)
                 RETURN m
             """, name=name, props=props, provenance=provenance,
-                observations=observations,
-                observations_text=' '.join(observations), now=now)
+                observations=neo4j_obs,
+                observations_text=obs_text, now=now)
+
+            if has_measured:
+                session.run("""
+                    MATCH (m:Memory {name: $name})
+                    SET m.verified_at = $now
+                """, name=name, now=_now_iso())
 
             if embedding:
                 session.run("""
@@ -708,7 +753,7 @@ class Neo4jMemoryStore:
         if 'observations' not in d or d['observations'] is None:
             d['observations'] = []
         else:
-            d['observations'] = list(d['observations'])
+            d['observations'] = [_neo4j_deserialize_obs(o) for o in d['observations']]
         d.pop('observations_text', None)
         d.setdefault('relations', [])
         d.setdefault('backlinks', [])

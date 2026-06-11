@@ -4,10 +4,10 @@ Memory schema validator.
 Validates <memory:> tagged files against the schema specification.
 
 Validation rules:
-  V1-V13: Structure (entity element, attributes, children, provenance gates)
+  V1-V14: Structure (entity element, attributes, children, provenance gates, basis)
   R1-R7:  Relations (attributes, types, self-reference, duplicates, referential integrity, cycles)
   F1, F3: Filesystem (filename match, safe characters)
-  Q1-Q2, Q6-Q8: Content quality (strict mode only)
+  Q1-Q2, Q6-Q9: Content quality (strict mode only)
 """
 
 import os
@@ -16,7 +16,7 @@ import xml.etree.ElementTree as ET
 
 
 from memoryschema.config import (
-    VALID_TYPES, VALID_STATUSES, VALID_PROVENANCES,
+    VALID_TYPES, VALID_STATUSES, VALID_PROVENANCES, VALID_BASES,
     VALID_RELATION_TYPES, DEPRECATED_RELATION_TYPES, ALL_RELATION_TYPES,
     SCHEMA_VERSION,
 )
@@ -60,7 +60,7 @@ def validate(content, filepath=None, strict=False, known_names=None):
     Args:
         content: File content as string.
         filepath: Optional filepath for filesystem rules (F1, F3).
-        strict: If True, include content quality checks (Q1, Q2, Q6, Q7, Q8).
+        strict: If True, include content quality checks (Q1, Q2, Q6, Q7, Q8, Q9).
         known_names: Optional set of existing memory names for R6
             (referential integrity). If provided, relation targets
             are checked against this set.
@@ -145,6 +145,14 @@ def validate(content, filepath=None, strict=False, known_names=None):
         if source_elem is None or not (source_elem.text and source_elem.text.strip()):
             errors.append(('V13', 'Provenance "ingested" requires a <memory:source> element with origin URL or path'))
 
+    # V14: basis on observations is valid (v4)
+    observations_elems_early = root.findall('observations')
+    if observations_elems_early:
+        for obs in observations_elems_early[0].findall('observation'):
+            basis_val = obs.get('basis')
+            if basis_val is not None and basis_val not in VALID_BASES:
+                errors.append(('V14', f'Invalid basis "{basis_val}" on observation, must be one of: {", ".join(sorted(VALID_BASES))}'))
+
     # V6: exactly one <memory:description>
     descriptions = root.findall('description')
     if len(descriptions) == 0:
@@ -187,6 +195,14 @@ def validate(content, filepath=None, strict=False, known_names=None):
             reasoning_words = len(reasoning_elem.text.split())
             if reasoning_words > 500:
                 errors.append(('Q8', f'Reasoning has {reasoning_words} words, recommended max 500'))
+
+        # Q9: unlabelled observations (v4 basis adoption nudge)
+        if observations_elems_early:
+            obs_list = observations_elems_early[0].findall('observation')
+            if len(obs_list) >= 3:
+                has_any_basis = any(o.get('basis') is not None for o in obs_list)
+                if not has_any_basis:
+                    errors.append(('Q9', f'{len(obs_list)} observations, none carries a basis label'))
 
     # Relations
     relations_elems = root.findall('relations')
