@@ -8,7 +8,7 @@ Deferred residual from v4 Phase 6 (session 15). The decline instrumentation (log
 
 - Salience eval mode → addressing (this session)
 
-## Phase 1 — Salience eval mode (single commit)
+## Phase 1 — Salience eval mode (single commit) ✓ 7cf7867
 
 ### 1.1 Fixtures (tests/eval/fixtures.py)
 Add `build_salience_fixtures() -> list[dict]`:
