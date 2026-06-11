@@ -19,7 +19,7 @@ None.
 
 Do not combine A1+A2 unless A1 closed early.
 
-## Pre-Work P1–P3
+## Pre-Work P1–P3 ✓ 283b111
 
 ### P1. schema.md v3 summary rows
 - Schema Versioning v3: append ", R7 (SUPERSEDES cycle detection)"
@@ -31,7 +31,7 @@ Do not combine A1+A2 unless A1 closed early.
 ### P3. technical-reference.md doctor table missing 3 checks
 - Add: toml_config, rules_inherit, rules_hash (confirm against doctor_cmd.py)
 
-## Phase 0 — Reconnaissance (read-only)
+## Phase 0 — Reconnaissance (read-only) ✓ 03f966a
 
 | # | Confirm | Where |
 |---|---------|-------|
@@ -45,7 +45,7 @@ Do not combine A1+A2 unless A1 closed early.
 
 Record in commit. Follow §A fallbacks if false.
 
-## Phase 1 — Schema v4 structural layer (D1, D5)
+## Phase 1 — Schema v4 structural layer (D1, D5) ✓ 0e0b9f9
 
 ### 1.1 Schema document
 - Version 4; v4 rows in BOTH summary tables
@@ -81,7 +81,7 @@ Record in commit. Follow §A fallbacks if false.
 - relabel ignored+audited, upgrade matrix, verified_at
 - Neo4j model tests, hook generator stamp
 
-## Phase 2 — Verification-aware scoring and guards (D1, D2)
+## Phase 2 — Verification-aware scoring and guards (D1, D2) ✓ f2032bd
 
 ### 2.1 Scoring
 - Basis factor: measured=1.0, inferred=0.97, reported=0.93, neutral=1.0

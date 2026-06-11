@@ -2,8 +2,29 @@
 
 ## [Unreleased]
 
-### Added
-- technical-reference.md: CLI flags column for all 32 commands with key options
+### Added (v4 — Unit A)
+- Schema v4: `basis` attribute on `<memory:observation>` (measured | inferred | reported)
+- `Observation(str)` subclass with basis attribute — zero consumer sweep design
+- `serialize_observation` / `deserialize_observation` serializer pair in tags.py
+- Neo4j preferred JSON-per-element model for labelled observations
+- Basis immutability on upsert; duplicate-text basis upgrade (higher rank upgrades)
+- `verified_at` server-managed field — set on measured observations
+- `generator_id` config field (env MEMORY_GENERATOR, session-scoped)
+- `embed_text` return_model parameter for embed model identification
+- V14 validation rule (basis values); Q9 strict warning (unlabelled observations)
+- VERIFICATION_RANKS + VALID_BASES constants in config.py
+- Basis factor in scoring: measured=1.0, inferred=0.97, reported=0.93 (both backends)
+- SUPERSEDES verification guard: source rank ≥ target rank (both backends)
+- Staleness presentation: [VERIFIED Nd ago] / [VERIFICATION STALE: Nd] in CLI recall
+- `verification_staleness_days` config (default 7)
+- `verification_age_hours` in JSON recall output
+
+### Fixed (v4 — Unit A)
+- schema.md v3 summary rows: appended R7 to both Schema Versioning and Design Decisions tables
+- schema.md: consolidated two overlapping upsert tables into one 16-field table
+- technical-reference.md: doctor table completed (added toml_config, rules_inherit, rules_hash)
+
+### Added CLI flags column for all 32 commands with key options
 - technical-reference.md: scoring detail — type factor, trust multiplier, BM25 params, weight redistribution, numpy
 - technical-reference.md: audit trail section with gate_decision and mutation record schemas
 - technical-reference.md: graceful degradation table (Neo4j/Voyage/embedding/concurrent/audit)
