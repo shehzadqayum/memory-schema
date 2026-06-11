@@ -35,6 +35,8 @@ Each segment must be kebab-case (`[a-z0-9]+(-[a-z0-9]+)*`). Invalid names:
 
 Use `validate_project_name()` to check — returns a list of error strings (empty = valid).
 
+**Auto-derivation:** When `<memory:project>` is absent, `tags.py` derives the project from the filepath by looking for `projects/<name>/` segments. Nested projects (`projects/parent/projects/child/`) produce `parent.child`. Segments must pass kebab-case validation.
+
 ### 1.2 When to Use
 
 - **Multi-team organization** — Parent defines shared rules, children scope memory to their domain. Example: `ict` parent with `ict.auth`, `ict.signals`, `ict.execution` children.

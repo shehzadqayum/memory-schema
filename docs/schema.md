@@ -346,6 +346,12 @@ Layer 0 — always in context. One line per entry:
 
 Stays under 200 lines (auto-load limit). The PostToolUse hook automatically appends working memory entries to MEMORY.md on write, ensuring they remain visible after `/compact` events (compact resilience).
 
+**L0 budget enforcement:** When MEMORY.md exceeds the token budget (default: 2000 tokens, configurable via `l0_token_budget`), the lowest-scoring entries are evicted. Token estimation uses chars/4 approximation. If no store is available for scoring, eviction falls back to FIFO (oldest first).
+
+**Progressive disclosure:** After budget enforcement, `categorize_index()` reorganizes MEMORY.md entries into type-based sections (Knowledge, Procedures, Session History) for faster scanning.
+
+**L0 gating:** Ingested entries (`provenance="ingested"`) are never appended to MEMORY.md, preventing external content from entering the always-in-context index.
+
 ---
 
 ## Behavioral Specification
@@ -377,6 +383,13 @@ Every gate decision is recorded in `memory/audit.jsonl` with machine-readable ve
 **On Access:** Increment access_count, update last_accessed.
 **On Query:** Score candidates → search → expand via backlinks+associations → return ranked. Non-active entries are excluded from results by default (`--include-inactive` to override). Superseded entries remain traversable in BFS graph walks (their relations are followed) but are not returned in results.
 **On Consolidate:** Sync un-indexed files → backlinks → (batch embed → associations → Neo4j if available).
+**On Reflect:** Cluster episodic entries → synthesize semantic summaries:
+1. Build adjacency graph from mutual k-NN associations
+2. Find connected components via BFS (min/max cluster size filtering)
+3. Synthesize summary: tries LLM via Anthropic SDK, falls back to mechanical merge (concatenate descriptions, dedup observations)
+4. Create SUPERSEDES edges from summary to cluster members
+5. Set summary importance to max of cluster, provenance to `derived`
+6. Archive original episodic entries (status → superseded)
 
 ### Lifecycle Events
 
@@ -438,7 +451,16 @@ Every gate decision is recorded in `memory/audit.jsonl` with machine-readable ve
 ### Provenance Semantics
 
 - **Immutability:** Provenance is set on creation and cannot be changed by subsequent upserts. This prevents trust escalation (e.g., ingested content being re-upserted as first-party).
-- **Trust multiplier:** Provenance affects retrieval scoring. Applied as a multiplier on the final score: `first-party`=1.0, `user`=1.0, `derived`=0.9, `ingested`=0.7.
+- **Trust multiplier:** Provenance affects retrieval scoring. Applied as a multiplier on the final score: `first-party`=1.0, `user`=1.0, `derived`=0.9, `ingested`=0.7. An ingested entry scores 30% lower than an identical first-party entry.
+- **Trust level hierarchy** (for SUPERSEDES authority guards):
+
+  | Provenance | Trust level | Can supersede |
+  |------------|:-----------:|---------------|
+  | `user` | 3 | All |
+  | `first-party` | 3 | All |
+  | `derived` | 3 | All (consolidation creates derived summaries that supersede episodic entries) |
+  | `ingested` | 1 | Only other ingested entries |
+
 - **L0 invariant:** MEMORY.md (always-in-context index) never contains ingested entries. This is enforced by the PostToolUse hook at the L0 gating step, closing the injection channel for external content.
 - **Source required (V13):** Entries with `provenance="ingested"` must include a `<memory:source>` element identifying the origin URL or path.
 - **Untrusted presentation:** CLI recall output marks ingested entries with `[UNTRUSTED — ingested, provenance unverified]` delimiters. In JSON output, the `untrusted: true` flag is set.
