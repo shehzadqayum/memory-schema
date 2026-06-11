@@ -211,6 +211,25 @@ class MemoryStore:
                         raise ValueError(
                             f"Trust guard: {source_prov!r} cannot supersede "
                             f"{target_prov!r} (insufficient authority)")
+                    # Verification guard (v4): source rank ≥ target rank
+                    source_obs = memory_dict.get('observations', [])
+                    if existing:
+                        source_obs = source_obs or existing.get('observations', [])
+                    source_rank = max(
+                        (VERIFICATION_RANKS.get(
+                            o.basis if isinstance(o, Observation) else None, 2)
+                         for o in source_obs),
+                        default=2)
+                    target_entry = pre_map[target_name]
+                    target_rank = max(
+                        (VERIFICATION_RANKS.get(
+                            o.basis if isinstance(o, Observation) else None, 2)
+                         for o in target_entry.get('observations', [])),
+                        default=2)
+                    if source_rank < target_rank:
+                        raise ValueError(
+                            f"Verification guard: source rank {source_rank} cannot "
+                            f"supersede target rank {target_rank}")
                     if self._detect_supersedes_cycle(entries, name, target_name):
                         raise ValueError(
                             f"SUPERSEDES cycle detected: {name} → {target_name} "
@@ -739,6 +758,17 @@ class MemoryStore:
             'ingested': 0.7,
         }
         score *= trust_multipliers.get(provenance, 0.8)
+
+        # Basis factor (v4): lowest-reliability labelled observation biases ranking
+        basis_multipliers = {'measured': 1.0, 'inferred': 0.97, 'reported': 0.93}
+        labelled_bases = [
+            o.basis for o in entry.get('observations', [])
+            if isinstance(o, Observation) and o.basis is not None
+        ]
+        if labelled_bases:
+            worst = min(labelled_bases, key=lambda b: VERIFICATION_RANKS.get(b, 2))
+            score *= basis_multipliers.get(worst, 1.0)
+        # No labelled observations → neutral (1.0), no effect
 
         return round(min(score, 1.0), 4)
 

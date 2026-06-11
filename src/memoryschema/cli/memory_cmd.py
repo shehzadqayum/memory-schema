@@ -78,6 +78,22 @@ def recall(config, query, limit, project, include_inactive, as_json):
         max_inherit_depth=config.max_inherit_depth,
     )
 
+    # Annotate staleness for entries with verified_at
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc)
+    staleness_days = getattr(config, 'verification_staleness_days', 7)
+    for r in results:
+        va = r.get('verified_at')
+        if va:
+            try:
+                vt = datetime.fromisoformat(va)
+                if vt.tzinfo is None:
+                    vt = vt.replace(tzinfo=timezone.utc)
+                age_hours = max(0, (now - vt).total_seconds() / 3600)
+                r['verification_age_hours'] = round(age_hours, 1)
+            except (ValueError, TypeError):
+                pass
+
     if as_json:
         click.echo(json.dumps(results, indent=2))
     else:
@@ -92,6 +108,14 @@ def recall(config, query, limit, project, include_inactive, as_json):
             click.echo(f"{prefix}{r['score']:.3f} [{r['channel']}] {r['name']}")
             if untrusted:
                 click.echo(f"         [UNTRUSTED — ingested, provenance unverified]")
+            # Staleness annotation (v4)
+            age_hours = r.get('verification_age_hours')
+            if age_hours is not None:
+                age_days = age_hours / 24
+                if age_days > staleness_days:
+                    click.echo(f"         [VERIFICATION STALE: {int(age_days)}d]")
+                else:
+                    click.echo(f"         [VERIFIED {int(age_days)}d ago]")
             if r.get('description'):
                 click.echo(f"         {r['description'][:100]}")
 

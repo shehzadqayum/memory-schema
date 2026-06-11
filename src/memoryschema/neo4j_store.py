@@ -188,6 +188,29 @@ class Neo4jMemoryStore:
                             raise ValueError(
                                 f"Trust guard: {guard['sp']!r} cannot supersede "
                                 f"{guard['tp']!r} (insufficient authority)")
+                    # Verification guard (v4): source rank ≥ target rank
+                    source_rank = max(
+                        (VERIFICATION_RANKS.get(
+                            o.basis if isinstance(o, Observation) else None, 2)
+                         for o in raw_observations),
+                        default=2)
+                    target_obs_result = session.run("""
+                        MATCH (t:Memory {name: $target})
+                        RETURN t.observations AS obs
+                    """, target=target).single()
+                    target_rank = 2  # default neutral
+                    if target_obs_result and target_obs_result['obs']:
+                        target_obs = [_neo4j_deserialize_obs(o)
+                                      for o in target_obs_result['obs']]
+                        target_rank = max(
+                            (VERIFICATION_RANKS.get(
+                                o.basis if isinstance(o, Observation) else None, 2)
+                             for o in target_obs),
+                            default=2)
+                    if source_rank < target_rank:
+                        raise ValueError(
+                            f"Verification guard: source rank {source_rank} cannot "
+                            f"supersede target rank {target_rank}")
                     # Cycle detection (R7)
                     cycle = session.run("""
                         OPTIONAL MATCH path = (t:Memory {name: $target})
@@ -736,6 +759,16 @@ class Neo4jMemoryStore:
             'ingested': 0.7,
         }
         score *= trust_multipliers.get(provenance, 0.8)
+
+        # Basis factor (v4): lowest-reliability labelled observation biases ranking
+        basis_multipliers = {'measured': 1.0, 'inferred': 0.97, 'reported': 0.93}
+        labelled_bases = [
+            o.basis for o in entry.get('observations', [])
+            if isinstance(o, Observation) and o.basis is not None
+        ]
+        if labelled_bases:
+            worst = min(labelled_bases, key=lambda b: VERIFICATION_RANKS.get(b, 2))
+            score *= basis_multipliers.get(worst, 1.0)
 
         return round(min(score, 1.0), 4)
 
