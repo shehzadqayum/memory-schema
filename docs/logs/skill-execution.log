@@ -275,3 +275,13 @@
 2026-06-11 22:17:51	session-open	START	—	—
 2026-06-11 22:18:22	session-open	END	completed	Session 15 briefing — new session after S4 f0b43ea, 2 residuals, Unit C next
 2026-06-11 22:20:48	plan-commit	START	—	—
+2026-06-11 22:22:08	plan-commit	END	completed	S1 47d4331: Unit C Phases 6-8, 2 residuals addressing in Phase 8
+2026-06-11 22:23:39	implement	START	—	—
+2026-06-11 23:30:27	implement	END	completed	Phase 6: decline instrumentation — log_decline, CLI, guideline — 563 tests
+2026-06-11 23:31:18	implement	START	—	—
+2026-06-11 23:33:16	implement	END	completed	Phase 7: report sequencing patch spec delivered — VC 10 satisfied as specification
+2026-06-11 23:36:19	implement	START	—	—
+2026-06-11 23:44:14	implement	END	completed	Phase 8: docs sync — v4 in schema.md, V14, MITIGATES, rules synced, all phases complete
+2026-06-11 23:45:09	checkpoint	START	—	—
+2026-06-11 23:47:22	checkpoint	END	completed	Session 15: all 8 phases complete, R1+R2 resolved, 563 tests, 1 deferred residual
+2026-06-11 23:47:53	session-close	START	—	—
