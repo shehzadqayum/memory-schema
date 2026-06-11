@@ -113,6 +113,12 @@ class MemoryConfig:
     verification_staleness_days: int = 7  # staleness threshold for verified_at display
     mitigation_dampening: float = 0.95  # score multiplier for entries with inbound MITIGATES
 
+    # Gate probes (v4)
+    numeric_probe_enabled: bool = True
+    numeric_probe_mode: str = 'log'  # 'log' (default burn-in) or 'quarantine'
+    numeric_probe_sim_threshold: float = 0.80
+    l0_echo_threshold: float = 0.6
+
     def __post_init__(self):
         self.project_root = Path(self.project_root).resolve()
         if self.store_path is None:
