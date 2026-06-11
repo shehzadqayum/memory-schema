@@ -157,14 +157,14 @@ Record in commit. Follow §A fallbacks if false.
 - --include-contradictory: min importance, CONTRADICTS edges, inferred basis
 - Uniform LLM + mechanical
 
-## Phase 6 — Salience instrumentation (D6)
+## Phase 6 — Salience instrumentation (D6) ✓ 5e5aba3
 
 - log_decline(name_hint, reason, context_hash)
 - CLI: memoryschema decline --reason "..." [--name-hint X]
 - Guideline with limitation caveat
 - Eval: salience mode, ~20 fixtures, precision/recall
 
-## Phase 7 — Report sequencing (D7) — in scope, outside package
+## Phase 7 — Report sequencing (D7) — in scope, outside package ✓ a3ade4e
 
 - Default: patch spec (shared skills = shared risk)
 - Direct edit ONLY if confirmed project-local
@@ -173,7 +173,7 @@ Record in commit. Follow §A fallbacks if false.
 - Backfill most recent; erratum convention
 - Memory entities: basis="reported" → append measured after close
 
-## Phase 8 — Documentation synchronization (single commit)
+## Phase 8 — Documentation synchronization (single commit) ✓ ef6b2a6
 
 - schema.md: all Phase 1/3/4 items; v4 rows; force record; memory:<name>
 - Rules + templates: sync

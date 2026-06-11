@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Added (v4 — Unit C)
+- `log_decline()` in audit.py — write decline records for salience instrumentation
+- CLI: `memoryschema decline --reason "..." [--name-hint X]` — frictionless decline recording
+- CLI: `memoryschema force --type world-change --target NAME` — typed force events
+- Guideline amendment: write decline instrumentation section in memory-working.md
+- Report sequencing patch spec: docs/plans/phase-7-skill-amendments.md
+
 ### Added (v4 — Unit B)
 - MITIGATES relation type (7 active, 9 total) — target stays active, no status change
 - Mitigation dampening: 0.95 score multiplier for entries with inbound MITIGATES (both backends)
