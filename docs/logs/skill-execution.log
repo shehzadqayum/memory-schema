@@ -261,3 +261,13 @@
 2026-06-11 17:28:05	session-open	START	—	—
 2026-06-11 17:35:08	session-open	END	completed	Session 14 briefing — new session after S4 540a118, 2 residuals, Unit B next
 2026-06-11 17:41:09	plan-commit	START	—	—
+2026-06-11 17:43:30	plan-commit	END	completed	S1 34e217a: Unit B Phases 3-5, 2 residuals deferred to Unit C
+2026-06-11 17:44:12	implement	START	—	—
+2026-06-11 17:55:50	implement	END	completed	Phase 3: MITIGATES + criterion capture + force records + dampening — 523 tests
+2026-06-11 17:57:49	implement	START	—	—
+2026-06-11 18:07:50	implement	END	completed	Phase 4: numeric probe + L0 echo — 550 tests, VC 6+7 addressable
+2026-06-11 20:32:16	implement	START	—	—
+2026-06-11 22:06:48	implement	END	completed	Phase 5: contradiction-aware reflect — skip/degrade, 557 tests, Unit B complete
+2026-06-11 22:07:12	checkpoint	START	—	—
+2026-06-11 22:09:19	checkpoint	END	completed	Session 14: Unit B complete, 9/9 PASS, 557 tests, 2 residuals carried to Unit C
+2026-06-11 22:13:39	session-close	START	—	—
