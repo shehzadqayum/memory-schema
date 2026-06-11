@@ -10,7 +10,7 @@ The guidelines determine how the entity IS used — which optional fields to fil
 
 **Source of truth:** This document. `.claude/rules/memory-schema.md` carries a derived copy. On divergence, this document wins.
 
-**Schema version:** `3`
+**Schema version:** `4`
 
 **Parser:** `xml.etree.ElementTree` (Python stdlib, zero external dependencies).
 
@@ -95,6 +95,7 @@ Optional body text follows after the closing tag.
 | `1` | Initial tagged schema. |
 | `2` | Added `<memory:prompt>` and `<memory:reasoning>` as optional fields. Removed save/recall/result/consolidation MCP tags (unimplemented interfaces). Removed observation grammar (moved to project guidelines). Moved `<memory:observations>`, `type`, and `importance` from required to optional. Required fields reduced to: schema, name, description. All other fields optional. |
 | `3` | Added `status` and `provenance` attributes. Deprecated `PARENT_OF`, `CHILD_OF` relations (use `project` field). Added V11 (status), V12 (provenance), V13 (source-required-if-ingested), R6 (referential integrity), R7 (SUPERSEDES cycle detection). Full backward compatible with v1/v2. |
+| `4` | Added `basis` attribute on `<memory:observation>` (measured / inferred / reported). Added server-managed `verified_at`, `generator`, `embed_model`. Added `MITIGATES` relation type (7 active, 9 total). Added V14 (basis validation). Typed force records in audit trail. Numeric contradiction probe and L0 echo probe in write gate. Backward compatible with v1–v3. |
 
 ### Rules
 
@@ -140,6 +141,7 @@ Eight relation types define explicit connections between memories.
 | `DEPENDS_ON` | A → B | A requires B to be true/valid |
 | `INFORMS` | A → B | A provides context for B |
 | `CONTRADICTS` | A ↔ B | A and B conflict |
+| `MITIGATES` | A → B | A reduces the impact of B without satisfying B's criterion. B remains active. |
 | `PARENT_OF` | A → B | A is the parent agent of B *(deprecated — use project field)* |
 | `CHILD_OF` | A → B | A is a child agent of B *(deprecated — use project field)* |
 
@@ -242,13 +244,14 @@ Re-saving with an existing `name` performs a merge, not a replacement.
 | V11 | If present, `status` is one of: active, superseded, archived, quarantined |
 | V12 | If present, `provenance` is one of: first-party, user, ingested, derived |
 | V13 | If `provenance="ingested"`, must have a `<memory:source>` element |
+| V14 | If present, `basis` on `<memory:observation>` is one of: measured, inferred, reported |
 
 ### Relations
 
 | Rule | Description |
 | --- | --- |
 | R1 | Every `<memory:relation>` has both `target` and `type` attributes |
-| R2 | `type` is one of the six active relation types (deprecated types warned) |
+| R2 | `type` is one of the seven active relation types (deprecated types warned) |
 | R3 | `target` is a valid memory name (kebab-case) |
 | R4 | No self-references (target != own name) |
 | R5 | No duplicate relations (same target + type pair) |
@@ -486,4 +489,5 @@ See the consolidated upsert table in §Upsert Semantics above.
 | XML escaping required | No CDATA support — keeps parser simple |
 | Strict mode optional | Quality checks (kebab-case name, description length, atomic observations) in strict only — defined in `validator.py`, not in this document. Graceful handling of imperfect output |
 | v1 backward compatible | v2 adds optional fields only — all v1 files remain valid |
-| v3 (current) | Adds `status`, `provenance` attributes. Deprecates `PARENT_OF`, `CHILD_OF` relations. Adds V11, V12, V13, R6, R7 validation rules. |
+| v3 | Adds `status`, `provenance` attributes. Deprecates `PARENT_OF`, `CHILD_OF` relations. Adds V11, V12, V13, R6, R7 validation rules. |
+| v4 (current) | Adds `basis` on observations, `MITIGATES` relation, V14, server-managed `verified_at`/`generator`/`embed_model`, typed force records, numeric probe + L0 echo gate stages. |

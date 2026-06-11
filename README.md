@@ -208,6 +208,8 @@ Each external service is optional. The system degrades gracefully:
 | `memoryschema unarchive <name>` | Restore archived → active |
 | `memoryschema reactivate <name>` | Restore superseded → active |
 | `memoryschema quarantine list\|review\|release\|reject` | Review quarantined entries |
+| `memoryschema force --type world-change --target NAME` | Record typed force event |
+| `memoryschema decline --reason "..."` | Record write decline (salience instrumentation) |
 
 ### Indexing
 | Command | Description |

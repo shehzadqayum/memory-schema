@@ -181,7 +181,7 @@ from memoryschema import Neo4jMemoryStore, embed_text, embed_batch, rerank
 | `memoryschema.store` | JSONL store + `get_store()` factory |
 | `memoryschema.neo4j_store` | Neo4j store (O(1) upsert, vector k-NN, graph) |
 | `memoryschema.embeddings` | Voyage AI: embed_text, embed_batch, rerank |
-| `memoryschema.validator` | Schema validation (V1-V13, R1-R7, F1, F3) |
+| `memoryschema.validator` | Schema validation (V1-V14, R1-R7, F1, F3) |
 | `memoryschema.schema` | Create Neo4j indexes and constraints |
 | `memoryschema.consolidation` | Batch index un-indexed files |
 | `memoryschema.migration` | JSONL ↔ Neo4j migration |
@@ -193,6 +193,7 @@ from memoryschema import Neo4jMemoryStore, embed_text, embed_batch, rerank
 | `memoryschema.audit` | Append-only mutation log with field-level change tracking |
 | `memoryschema.l0_budget` | MEMORY.md token budget enforcement with score-based eviction |
 | `memoryschema.write_gate` | Two-verdict write gate: ACCEPT/REJECT/QUARANTINE pipeline |
+| `memoryschema.numeric_probe` | Numeric contradiction detection: extract_claims, compare |
 | `memoryschema.cli.eval_cmd` | Evaluation harness: recall@k, MRR, nDCG metrics |
 | `memoryschema.cli.reflect_cmd` | Episodic clustering and semantic summary synthesis |
 
@@ -231,6 +232,8 @@ from memoryschema import Neo4jMemoryStore, embed_text, embed_batch, rerank
 | `export` | Data | `--format` (tar/jsonl/md), `--output` | Portable archive for moving to another project |
 | `import` | Data | `--format` | Import from portable archive |
 | `hook` | Hooks | install `--timeout --per-project`, uninstall, status, test | Manage PostToolUse hook |
+| `force` | Audit | `--type`, `--target`, `--level` | Record typed force event (world-change) |
+| `decline` | Audit | `--reason`, `--name-hint` | Record write decline (salience instrumentation) |
 | `doctor` | Diagnostics | `--fix`, `--json` | 21-point health check |
 | `rules` | Diagnostics | `--conflicts` | Show effective rules with inheritance markers |
 | `config` | Diagnostics | `--chain` | Show effective config with inheritance chain |

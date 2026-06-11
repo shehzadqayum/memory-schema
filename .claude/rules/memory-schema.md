@@ -82,7 +82,7 @@ Three types. Optional — defaults to `semantic` if omitted.
 
 ## Rule 4: Relations
 
-Eight typed links connect entities explicitly. All optional.
+Nine typed links connect entities explicitly (seven active, two deprecated). All optional.
 
 | Type | Meaning |
 |------|---------|
@@ -92,6 +92,7 @@ Eight typed links connect entities explicitly. All optional.
 | `DEPENDS_ON` | A requires B to be true/valid |
 | `INFORMS` | A provides context for B |
 | `CONTRADICTS` | A and B conflict |
+| `MITIGATES` | A reduces B's impact without satisfying B's criterion (B stays active) |
 | `PARENT_OF` | A is the parent agent of B *(deprecated — use project field)* |
 | `CHILD_OF` | A is a child agent of B *(deprecated — use project field)* |
 
@@ -160,7 +161,7 @@ Bonuses: hub `+0.05 * ln(1 + backlinks)`, text match `+0.1` substring (Neo4j) or
 ## Enforcement
 
 These rules are enforced by:
-- **Validator:** V1-V13 (structure), R1-R7 (relations), F1, F3 (filesystem)
+- **Validator:** V1-V14 (structure), R1-R7 (relations), F1, F3 (filesystem)
 - **PostToolUse hook:** Parses, embeds, indexes on every Write to `memory/*.md`
 - **Compact resilience:** Working memory entries auto-appended to MEMORY.md by the hook
 
