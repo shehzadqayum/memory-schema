@@ -2,6 +2,22 @@
 
 ## [Unreleased]
 
+### Added (v4 — Unit B)
+- MITIGATES relation type (7 active, 9 total) — target stays active, no status change
+- Mitigation dampening: 0.95 score multiplier for entries with inbound MITIGATES (both backends)
+- Criterion capture: target description stored in audit record on SUPERSEDES
+- Typed force records: operation="force" with force_type/level/source/target in audit.jsonl
+- CLI: `memoryschema force --type world-change --target NAME` for unreconstructable events
+- Force by-products: SUPERSEDES→supersession, CONTRADICTS→contradiction auto-emitted
+- numeric_probe.py: extract_claims with qualifier-keyed (unit,qualifier) matching
+- Gate stage 5: numeric contradiction probe (log mode default, quarantine mode optional)
+- Gate stage 6: L0 echo probe (Jaccard overlap + measured conjunction)
+- CONTRADICTS/SUPERSEDES escape valves for numeric probe
+- memory:<name> source convention flagged in gate warnings
+- Contradiction-aware reflect: pre-synthesis check for CONTRADICTS + numeric contradictions
+- Reflect --include-contradictory: min importance, CONTRADICTS edges, inferred basis
+- Reflect skip audit: operation=reflect_skip with member names and reasons
+
 ### Added (v4 — Unit A)
 - Schema v4: `basis` attribute on `<memory:observation>` (measured | inferred | reported)
 - `Observation(str)` subclass with basis attribute — zero consumer sweep design

@@ -101,7 +101,7 @@ Record in commit. Follow §A fallbacks if false.
 ### 2.4 Tests
 - Parity: 3×2 matrix; guard: 9 combinations; rendering: 0d/6d/8d
 
-## Phase 3 — MITIGATES, closure discipline, typed force record (D3)
+## Phase 3 — MITIGATES, closure discipline, typed force record (D3) ✓ 14eeedb
 
 ### 3.1 Relation type
 - MITIGATES (7 active, 9 total); update "six" → "seven" everywhere
@@ -128,7 +128,7 @@ Record in commit. Follow §A fallbacks if false.
 ### 3.6 Tests
 - MITIGATES accepted; target active; dampening; criterion; force records
 
-## Phase 4 — Gate extensions (D4, D5)
+## Phase 4 — Gate extensions (D4, D5) ✓ c75dc50
 
 ### 4.1 Pipeline precondition
 - Candidate embedding before stage 4; stages 5-6 skip when degraded
@@ -148,7 +148,7 @@ Record in commit. Follow §A fallbacks if false.
 ### 4.4 Tests
 - ≥15 extractor cases incl qualifier; both modes; bypasses; echo 2×2; degradation
 
-## Phase 5 — Contradiction-aware reflect (D4)
+## Phase 5 — Contradiction-aware reflect (D4) ✓ e2460bc
 
 - Check clusters for CONTRADICTS + numeric contradictions pre-synthesis
 - Hit → skip; audit reflect_skip
