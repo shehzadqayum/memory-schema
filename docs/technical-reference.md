@@ -299,6 +299,9 @@ from memoryschema import Neo4jMemoryStore, embed_text, embed_batch, rerank
 | memory_index | MEMORY.md exists | `memoryschema init` |
 | rules | .claude/rules/memory-schema.md | `memoryschema init` |
 | guidelines | scope guideline installed | `memoryschema init --scopes working` |
+| toml_config | TOML syntax valid, project-name/directory match | Correct `memoryschema.toml` |
+| rules_inherit | overridden rules count reported | `memoryschema rules --conflicts` |
+| rules_hash | rules-file hash attestation | Re-run `memoryschema init` or restore rules |
 | store_jsonl | store.jsonl accessible | `memoryschema init` |
 | docker | Docker installed | Install Docker |
 | neo4j_container | container running | `memoryschema neo4j deploy` |

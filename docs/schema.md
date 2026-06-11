@@ -94,7 +94,7 @@ Optional body text follows after the closing tag.
 | --- | --- |
 | `1` | Initial tagged schema. |
 | `2` | Added `<memory:prompt>` and `<memory:reasoning>` as optional fields. Removed save/recall/result/consolidation MCP tags (unimplemented interfaces). Removed observation grammar (moved to project guidelines). Moved `<memory:observations>`, `type`, and `importance` from required to optional. Required fields reduced to: schema, name, description. All other fields optional. |
-| `3` | Added `status` and `provenance` attributes. Deprecated `PARENT_OF`, `CHILD_OF` relations (use `project` field). Added V11 (status), V12 (provenance), V13 (source-required-if-ingested), R6 (referential integrity). Full backward compatible with v1/v2. |
+| `3` | Added `status` and `provenance` attributes. Deprecated `PARENT_OF`, `CHILD_OF` relations (use `project` field). Added V11 (status), V12 (provenance), V13 (source-required-if-ingested), R6 (referential integrity), R7 (SUPERSEDES cycle detection). Full backward compatible with v1/v2. |
 
 ### Rules
 
@@ -202,19 +202,24 @@ Memories connected to other memories rank higher in retrieval.
 
 Re-saving with an existing `name` performs a merge, not a replacement.
 
-| Field | Behavior |
-| --- | --- |
-| **name** | Immutable |
-| **type** | Updated if provided |
-| **description** | Updated if provided |
-| **importance** | Updated if provided |
-| **observations** | Appended (exact duplicates skipped) |
-| **reasoning** | Replaced if provided |
-| **prompt** | Replaced if provided |
-| **relations** | Deduplicated merge (same target+type not duplicated) |
-| **body** | Replaced if provided |
-| **source** | Updated if provided |
-| **project** | Immutable |
+| Field | On Create | On Merge |
+|-------|-----------|----------|
+| `name` | Set (merge key) | Immutable |
+| `schema` | Set | Immutable |
+| `provenance` | Set | Immutable (prevents trust escalation) |
+| `project` | Set | Immutable |
+| `filepath` | Set | Immutable |
+| `created_at` | Set (auto) | Immutable |
+| `type` | Set | Replaced if provided |
+| `description` | Set | Replaced if provided |
+| `importance` | Set | Replaced if provided |
+| `status` | Set | Replaced (server-managed: auto-set by SUPERSEDES, archive, quarantine) |
+| `observations` | Set | Appended (exact duplicates skipped) |
+| `reasoning` | Set | Replaced if provided |
+| `prompt` | Set | Replaced if provided |
+| `relations` | Set | Appended (deduped by target+type) |
+| `body` | Set | Replaced if provided |
+| `source` | Set | Replaced if provided |
 
 ---
 
@@ -467,19 +472,7 @@ Every gate decision is recorded in `memory/audit.jsonl` with machine-readable ve
 
 ### Upsert Immutability
 
-| Field | On Create | On Merge |
-|-------|-----------|----------|
-| `name` | Set (merge key) | Immutable |
-| `schema` | Set | Immutable |
-| `provenance` | Set | Immutable |
-| `project` | Set | Immutable |
-| `filepath` | Set | Immutable |
-| `created_at` | Set (auto) | Immutable |
-| `description` | Set | Replaced |
-| `status` | Set | Replaced (server-managed: auto-set by SUPERSEDES, archive, quarantine) |
-| `observations` | Set | Appended (deduped) |
-| `relations` | Set | Appended (deduped by target+type) |
-| Other fields | Set | Replaced |
+See the consolidated upsert table in §Upsert Semantics above.
 
 ---
 
@@ -493,4 +486,4 @@ Every gate decision is recorded in `memory/audit.jsonl` with machine-readable ve
 | XML escaping required | No CDATA support — keeps parser simple |
 | Strict mode optional | Quality checks (kebab-case name, description length, atomic observations) in strict only — defined in `validator.py`, not in this document. Graceful handling of imperfect output |
 | v1 backward compatible | v2 adds optional fields only — all v1 files remain valid |
-| v3 (current) | Adds `status`, `provenance` attributes. Deprecates `PARENT_OF`, `CHILD_OF` relations. Adds V11, V12, R6 validation rules. |
+| v3 (current) | Adds `status`, `provenance` attributes. Deprecates `PARENT_OF`, `CHILD_OF` relations. Adds V11, V12, V13, R6, R7 validation rules. |
