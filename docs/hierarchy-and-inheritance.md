@@ -413,7 +413,7 @@ from memoryschema import (
 ## 8. Design Decisions
 
 - **Parent wins on conflict** — enforcement hierarchy, not customization. The root agent is authoritative.
-- **Schema stays v2** — dot-notation is a naming convention, not a structural change.
+- **Schema stays v3** — dot-notation is a naming convention, not a structural change.
 - **`hierarchy.py` separate from `inheritance.py`** — hierarchy is string operations (zero deps). Inheritance is filesystem walking (needs `tomllib`).
 - **Marker-based walk** — `_walk_upward` skips intermediate directories cleanly. No fragile gap counting.
 - **Backward compatible** — flat project names, env-var-only config, and no-TOML setups all work unchanged.

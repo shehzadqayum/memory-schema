@@ -74,7 +74,7 @@ Parent wins on filename conflict. Child's unique rules are additive. Walk uses `
 ## Design Decisions
 
 - **Parent wins on conflict** — enforcement hierarchy, not customization
-- **Schema stays v2** — dot-notation is a convention, not a structural change
+- **Schema stays v3** — dot-notation is a convention, not a structural change
 - **`hierarchy.py` separate from `inheritance.py`** — hierarchy is string ops, inheritance is filesystem
 - **Neo4j vector search**: over-fetch 3x then post-filter (vector index doesn't support pre-filtering)
 - **Backward compatible** — flat project names and env-var-only config still work unchanged
