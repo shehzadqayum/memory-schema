@@ -541,3 +541,26 @@ def force_cmd(config, force_type, target, level):
     audit_path = str(config.memory_dir / 'audit.jsonl')
     log_force(audit_path, force_type, target, level=level)
     click.echo(f"Force recorded: {force_type} → {target} (level: {level})")
+
+
+# --- Decline ---
+
+@click.command("decline")
+@click.option("--reason", required=True, help="Why the write was declined.")
+@click.option("--name-hint", default=None, help="Name the candidate would have had.")
+@click.pass_obj
+def decline_cmd(config, reason, name_hint):
+    """Record a write decline — a deliberate decision not to write a memory candidate.
+
+    Deliberately frictionless: one command, no file, no confirmation.
+    Instruments only considered candidates; candidates never considered
+    are invisible by construction.
+
+    Example:
+        memoryschema decline --reason "mechanical test output, no novel fact"
+        memoryschema decline --reason "duplicate of existing entry" --name-hint session-state
+    """
+    from memoryschema.audit import log_decline
+    audit_path = str(config.memory_dir / 'audit.jsonl')
+    log_decline(audit_path, name_hint=name_hint, reason=reason)
+    click.echo(f"Decline recorded: {reason}")

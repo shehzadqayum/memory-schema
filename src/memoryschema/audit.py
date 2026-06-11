@@ -1,10 +1,10 @@
-"""Append-only audit log for memory mutations.
+"""Append-only audit log for memory mutations and write decisions.
 
-Records every create/upsert/archive/delete/status-change to
-memory/audit.jsonl with timestamp, operation, fields changed,
-and prior value hashes.
+Records every create/upsert/archive/delete/status-change, gate decision,
+force event, and write decline to memory/audit.jsonl with timestamp,
+operation, and relevant fields.
 
-One line per mutation. Never modified or truncated — append only.
+One line per event. Never modified or truncated — append only.
 """
 
 import hashlib
@@ -74,6 +74,34 @@ def log_force(audit_path, force_type, target, level='entry', source=None):
     }
     if source:
         record['source'] = source
+
+    os.makedirs(os.path.dirname(audit_path), exist_ok=True)
+
+    with open(audit_path, 'a', encoding='utf-8') as f:
+        f.write(json.dumps(record, ensure_ascii=False) + '\n')
+
+
+def log_decline(audit_path, name_hint=None, reason='', context_hash=None):
+    """Log a write decline — a deliberate decision not to write a memory candidate.
+
+    Instruments only *considered* candidates; candidates never considered
+    are invisible by construction, and the data must not be over-read.
+
+    Args:
+        audit_path: Path to audit.jsonl file.
+        name_hint: Optional name the candidate would have had.
+        reason: Why the write was declined.
+        context_hash: Optional hash of the conversation context.
+    """
+    record = {
+        'timestamp': _now_iso(),
+        'operation': 'write_decline',
+        'reason': reason,
+    }
+    if name_hint:
+        record['name_hint'] = name_hint
+    if context_hash:
+        record['context_hash'] = context_hash
 
     os.makedirs(os.path.dirname(audit_path), exist_ok=True)
 

@@ -45,6 +45,16 @@ Scope (which project sees a memory) is handled by the `project` field, not impor
 
 Write to `memory/<name>.md` where `<name>` is kebab-case and describes the content.
 
+## Write decline instrumentation
+
+When the selective-write policy above is weighed and the decision is **not** to write, record a decline:
+
+```bash
+memoryschema decline --reason "mechanical test output, no novel fact"
+```
+
+**Limitation:** declines instrument only *considered* candidates — cases where the write was actively weighed and rejected. Candidates never considered are invisible by construction. The decline data must not be over-read as complete coverage of non-write decisions.
+
 ## Compact resilience
 
 The PostToolUse hook automatically appends working memory entries to MEMORY.md. After a `/compact` event, all working memory remains visible in context via the MEMORY.md index. L0 budget enforcement evicts lowest-scoring entries when the index exceeds the configured token limit.
