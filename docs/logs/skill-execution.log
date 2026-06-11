@@ -285,3 +285,7 @@
 2026-06-11 23:45:09	checkpoint	START	—	—
 2026-06-11 23:47:22	checkpoint	END	completed	Session 15: all 8 phases complete, R1+R2 resolved, 563 tests, 1 deferred residual
 2026-06-11 23:47:53	session-close	START	—	—
+2026-06-11 23:50:01	session-close	END	completed	Session 15: 5bd2970, 5 commits, 563 tests, v4 plan complete, 1 residual (salience eval)
+2026-06-11 23:50:29	session-open	START	—	—
+2026-06-11 23:51:21	session-open	END	completed	Session 16 briefing — new session after S4 5bd2970, 1 residual (salience eval), v4 plan complete
+2026-06-11 23:54:47	plan-commit	START	—	—
