@@ -299,3 +299,9 @@
 2026-06-12 00:15:20	session-open	START	—	—
 2026-06-12 00:17:45	session-open	END	completed	Session 17 briefing — new session after S4 97553d0, zero residuals, no active initiative
 2026-06-12 13:06:55	plan-commit	START	—	—
+2026-06-12 14:01:36	plan-commit	END	completed	S1 d890832: post-v4 docs alignment, ~40 discrepancies, 5 phases
+2026-06-12 14:02:45	implement	START	—	—
+2026-06-12 14:09:47	implement	END	completed	Post-v4 docs alignment: schema=4 sweep (12 files), test counts, basis factor, CLI docstrings — 569 tests
+2026-06-12 14:10:27	checkpoint	START	—	—
+2026-06-12 14:11:51	checkpoint	END	completed	Session 17: post-v4 docs alignment 9/9 PASS, 569 tests, zero residuals
+2026-06-12 14:14:07	session-close	START	—	—
