@@ -1,4 +1,4 @@
-# Memory Schema Rules (v3)
+# Memory Schema Rules (v4)
 
 These rules define what a valid memory entity looks like.
 They say nothing about when to write or what to capture — that is determined by the scope guidelines.
@@ -15,14 +15,14 @@ Every memory entity MUST be a `<memory:entity>` XML block in a `.md` file.
 
 | Field | Location | Constraints |
 |-------|----------|-------------|
-| `schema` | attribute | Positive integer. Current: `3`. |
+| `schema` | attribute | Positive integer. Current: `4`. |
 | `name` | attribute | Kebab-case, unique, filesystem-safe. |
 | `description` | child element | One-line summary, under 120 characters. |
 
 ### Minimal valid entity:
 
 ```xml
-<memory:entity schema="3" name="unique-identifier">
+<memory:entity schema="4" name="unique-identifier">
   <memory:description>One-line summary</memory:description>
 </memory:entity>
 ```
@@ -30,7 +30,7 @@ Every memory entity MUST be a `<memory:entity>` XML block in a `.md` file.
 ### Full entity (all optional fields):
 
 ```xml
-<memory:entity schema="3" name="unique-identifier" type="semantic" importance="7">
+<memory:entity schema="4" name="unique-identifier" type="semantic" importance="7">
   <memory:description>One-line summary</memory:description>
   <memory:observations>
     <memory:observation>Atomic fact 1</memory:observation>
@@ -141,6 +141,8 @@ score = recency(0.995^hours) × w_r + importance/10 × w_i + cosine_similarity �
 | Semantic | 0.2 | 0.3 | 0.5 |
 
 Type factor: semantic `max(recency, 0.6)`, episodic standard decay, procedural `recency^(1/(1+0.3*min(accesses,10)))`.
+
+Basis factor (v4): `measured`=1.0, `inferred`=0.97, `reported`=0.93, unlabelled=1.0 (neutral). Applied after trust multiplier. Lowest-reliability labelled observation determines the factor.
 
 Bonuses: hub `+0.05 * ln(1 + backlinks)`, text match `+0.1` substring (Neo4j) or BM25 up to `+0.3` (JSONL).
 

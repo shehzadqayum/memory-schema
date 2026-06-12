@@ -7,7 +7,7 @@ Two independent but complementary features:
 - **Hierarchy** (`hierarchy.py`) — dot-notation project names encode parent/child relationships. Controls which memories an agent can see.
 - **Inheritance** (`inheritance.py`) — TOML config files and `.claude/rules/` directories cascade from parent to child. Parent always wins on conflict.
 
-Both are backward compatible. Flat project names and env-var-only config still work unchanged. Schema is v3 — dot-notation is a naming convention, not a structural schema change.
+Both are backward compatible. Flat project names and env-var-only config still work unchanged. Schema is v4 — dot-notation is a naming convention, not a structural schema change.
 
 ---
 

@@ -11,7 +11,7 @@ import click
 @click.option("--json", "as_json", is_flag=True, help="Output as JSON for agent consumption.")
 @click.pass_obj
 def validate(config, path, strict, as_json):
-    """Validate memory files against schema (V1-V13, R1-R7, F1, F3).
+    """Validate memory files against schema (V1-V14, R1-R7, F1, F3).
 
     If PATH is a file, validates that file. If a directory, validates
     all .md files in it. If omitted, validates memory/ directory.

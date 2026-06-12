@@ -118,7 +118,7 @@ def write_entity(memory, output_dir):
     imp = memory.get('importance', 5)
     typ = memory.get('type', 'semantic')
 
-    content = f"""<memory:entity schema="3" name="{memory['name']}" type="{typ}" importance="{imp}">
+    content = f"""<memory:entity schema="4" name="{memory['name']}" type="{typ}" importance="{imp}">
   <memory:description>{xml_escape(memory['description'])}</memory:description>{obs_xml}{prompt_xml}{reasoning_xml}{rels_xml}
 </memory:entity>
 """

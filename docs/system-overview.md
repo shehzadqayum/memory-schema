@@ -12,7 +12,7 @@ Everything else — the store, embeddings, hooks, scripts — is infrastructure 
 A memory is a single, atomic unit of storage. It has a name, a description, and optionally any combination of observations, reasoning, prompt, relations, and source. Every memory uses the same structure:
 
 ```xml
-<memory:entity schema="3" name="unique-name" type="semantic" importance="7">
+<memory:entity schema="4" name="unique-name" type="semantic" importance="7">
   <memory:description>One-line summary</memory:description>
   <memory:observations>
     <memory:observation>A specific fact</memory:observation>

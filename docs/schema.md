@@ -21,7 +21,7 @@ The guidelines determine how the entity IS used — which optional fields to fil
 Minimal (required fields only):
 
 ```xml
-<memory:entity schema="3" name="unique-identifier">
+<memory:entity schema="4" name="unique-identifier">
   <memory:description>One-line summary</memory:description>
 </memory:entity>
 ```
@@ -29,7 +29,7 @@ Minimal (required fields only):
 Full (all optional fields included):
 
 ```xml
-<memory:entity schema="3" name="unique-identifier" type="semantic" importance="7">
+<memory:entity schema="4" name="unique-identifier" type="semantic" importance="7">
   <memory:description>One-line summary</memory:description>
   <memory:observations>
     <memory:observation>Atomic fact 1</memory:observation>
@@ -55,7 +55,7 @@ Optional body text follows after the closing tag.
 
 | Field | Location | Constraints |
 | --- | --- | --- |
-| **schema** | attribute | Positive integer. Current version: `3`. |
+| **schema** | attribute | Positive integer. Current version: `4`. |
 | **name** | attribute | Kebab-case, unique within project, filesystem-safe. |
 | **description** | child element | One-line summary, under 120 characters. |
 
@@ -131,7 +131,7 @@ Three memory types. Optional — defaults to `semantic` if omitted.
 
 ## Relation Types
 
-Eight relation types define explicit connections between memories.
+Nine relation types define explicit connections between memories (seven active, two deprecated).
 
 | Type | Direction | Meaning |
 | --- | --- | --- |

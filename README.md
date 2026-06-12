@@ -142,7 +142,7 @@ URI:     bolt://localhost:7687
 Write a memory file:
 
 ```xml
-<memory:entity schema="3" name="first-memory" type="semantic" importance="7">
+<memory:entity schema="4" name="first-memory" type="semantic" importance="7">
   <memory:description>My first memory entity</memory:description>
   <memory:reasoning>Testing the memory system</memory:reasoning>
 </memory:entity>
@@ -309,7 +309,7 @@ pytest tests/ --cov=memoryschema --cov-report=term-missing
 pytest tests/test_store.py -v
 ```
 
-**472 tests** across 27 test files covering all modules:
+**569 tests** across 33 test files covering all modules:
 
 | Category | Files | Tests | What's tested |
 |----------|------:|------:|---------------|

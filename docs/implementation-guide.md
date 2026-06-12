@@ -144,7 +144,7 @@ pip install memory-schema[all,dev]
 pytest tests/ -v --cov=memoryschema
 ```
 
-472 tests, 27 files. External dependencies are mocked — no Docker or API keys needed to run tests.
+569 tests, 33 files. External dependencies are mocked — no Docker or API keys needed to run tests.
 
 ### Write tests for custom ingest scripts
 

@@ -26,6 +26,10 @@ Validation & Quality:
     validate       Validate memory files against schema
     eval           Run retrieval quality evaluation (recall@k, MRR, nDCG)
 
+Audit & Instrumentation:
+    force          Record typed force event (world-change, contradiction, supersession)
+    decline        Record write decline (deliberate non-write)
+
 Indexing & Embeddings:
     index          Batch index un-indexed files
     embed          Re-embed entries by prefix or all

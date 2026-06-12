@@ -2,7 +2,7 @@
 
 ## Overview
 
-**Schema:** `docs/schema.md` (source of truth, v3)
+**Schema:** `docs/schema.md` (source of truth, v4)
 **Guidelines:** `.claude/rules/memory-*.md` (per-scope usage)
 **Embedding model:** Voyage AI `voyage-4-lite` (1024 dimensions)
 **Primary store:** Neo4j (L2b, optional)
@@ -34,10 +34,10 @@ Each layer adds capability without being required. The system degrades gracefull
 
 ---
 
-## Entity Structure (Schema v3)
+## Entity Structure (Schema v4)
 
 ```xml
-<memory:entity schema="3" name="unique-identifier" type="semantic" importance="7">
+<memory:entity schema="4" name="unique-identifier" type="semantic" importance="7">
   <memory:description>One-line summary</memory:description>
   <memory:observations>
     <memory:observation>Atomic fact</memory:observation>
@@ -269,7 +269,7 @@ from memoryschema import Neo4jMemoryStore, embed_text, embed_batch, rerank
 
 ### Coverage
 
-472 tests across 27 files. 21/21 doctor checks. Target: 100% module coverage.
+569 tests across 33 files. 21/21 doctor checks. Target: 100% module coverage.
 
 | Category | Test files | Tests |
 |----------|-----------|------:|
