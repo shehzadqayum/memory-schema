@@ -8,7 +8,7 @@ After completing the v4 verification axis plan (sessions 13-16, 472→569 tests)
 
 None.
 
-## Phase 1 — Implementation fixes (code-level, before docs)
+## Phase 1-5 — All fixes (single commit) ✓ 5513f7e
 
 ### 1A. validate_cmd.py docstring
 - Line 14: "V1-V13" → "V1-V14"
