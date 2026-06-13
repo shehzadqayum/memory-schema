@@ -86,8 +86,16 @@ if voyage_key:
     try:
         from memoryschema.embeddings import embed_text
         from memoryschema.embedding_input import compose_embedding_text
-        text = compose_embedding_text(memory)
-        memory['embedding'] = embed_text(text, config=hook_config)
+        # Default space (all fields blended)
+        text = compose_embedding_text(memory, space='default')
+        default_vec = embed_text(text, config=hook_config)
+        memory['embedding'] = default_vec
+        memory['embeddings'] = {'default': default_vec}
+        # Field spaces: observations and reasoning (skip if empty)
+        for space in ('observations', 'reasoning'):
+            field_text = compose_embedding_text(memory, space=space)
+            if field_text:
+                memory['embeddings'][space] = embed_text(field_text, config=hook_config)
     except Exception:
         pass  # Embedding failure does not block — stages 4-6 skip gracefully
 
