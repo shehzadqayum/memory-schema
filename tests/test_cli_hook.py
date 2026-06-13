@@ -78,6 +78,37 @@ class TestHookUninstall:
         assert "unregistered" in result.output.lower()
 
 
+class TestParseNonEntityFiles:
+    """Verify parse_memory_file returns None for non-entity files (Phase 0)."""
+
+    def test_yaml_frontmatter_returns_none(self, tmp_path):
+        """Auto-memory YAML frontmatter files are not memory entities."""
+        from memoryschema.tags import parse_memory_file
+        f = tmp_path / "auto-memory.md"
+        f.write_text("---\nname: test\ntype: project\n---\n\nSome content.\n")
+        assert parse_memory_file(str(f)) is None
+
+    def test_plain_markdown_returns_none(self, tmp_path):
+        """Plain markdown without entity block returns None."""
+        from memoryschema.tags import parse_memory_file
+        f = tmp_path / "plain.md"
+        f.write_text("# Title\n\nJust some markdown text.\n")
+        assert parse_memory_file(str(f)) is None
+
+    def test_valid_entity_returns_dict(self, tmp_path):
+        """Verify real entity files still parse correctly."""
+        from memoryschema.tags import parse_memory_file
+        f = tmp_path / "valid.md"
+        f.write_text(
+            '<memory:entity schema="4" name="test-entity">\n'
+            '  <memory:description>A test entity</memory:description>\n'
+            '</memory:entity>\n'
+        )
+        result = parse_memory_file(str(f))
+        assert result is not None
+        assert result['name'] == 'test-entity'
+
+
 class TestHookHelp:
     def test_group_help(self, runner):
         result = runner.invoke(cli, ["hook", "--help"])

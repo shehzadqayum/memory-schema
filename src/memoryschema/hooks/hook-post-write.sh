@@ -56,8 +56,8 @@ from memoryschema.tags import parse_memory_file
 
 memory = parse_memory_file(filepath)
 if memory is None:
-    print(f'hook: failed to parse {filepath}', file=sys.stderr)
-    sys.exit(2)
+    # Not a memory entity file (e.g., YAML frontmatter, plain markdown) — skip
+    sys.exit(0)
 
 # Generator stamp (v4): read MEMORY_GENERATOR env var
 generator_id = os.environ.get('MEMORY_GENERATOR')

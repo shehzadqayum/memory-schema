@@ -354,3 +354,5 @@
 2026-06-13 17:37:30	plan-commit	START	—	—
 2026-06-13 17:38:58	plan-commit	END	completed	Framework hardening plan committed as b33147b, 1 residual addressing
 2026-06-13 17:50:22	plan-commit	START	—	—
+2026-06-13 17:52:36	plan-commit	END	completed	Plan amended with Phase 0 hook fix — cd54819
+2026-06-13 17:52:57	implement	START	—	—
