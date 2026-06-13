@@ -48,6 +48,38 @@ class TestInit:
         assert "bolt://explicit:7687" in str(call_args)
 
 
+class TestAuthErrorHandling:
+    def test_auth_error_raises_connection_error(self):
+        """Auth failure produces a helpful ConnectionError, not raw Neo4j error."""
+        from memoryschema.neo4j_store import Neo4jMemoryStore
+        mock_driver = MagicMock()
+        mock_session = MagicMock()
+        mock_session.run.side_effect = Exception(
+            "Neo.ClientError.Security.Unauthorized: authentication failure"
+        )
+        mock_driver.session.return_value.__enter__ = MagicMock(return_value=mock_session)
+        mock_driver.session.return_value.__exit__ = MagicMock(return_value=False)
+
+        with patch("memoryschema.neo4j_store.GraphDatabase") as mock_gd:
+            mock_gd.driver.return_value = mock_driver
+            with pytest.raises(ConnectionError, match="NEO4J_PASSWORD"):
+                Neo4jMemoryStore(uri="bolt://localhost:7687", user="neo4j", password="wrong")
+
+    def test_non_auth_error_reraises(self):
+        """Non-auth errors re-raise as-is, not wrapped in ConnectionError."""
+        from memoryschema.neo4j_store import Neo4jMemoryStore
+        mock_driver = MagicMock()
+        mock_session = MagicMock()
+        mock_session.run.side_effect = RuntimeError("connection refused")
+        mock_driver.session.return_value.__enter__ = MagicMock(return_value=mock_session)
+        mock_driver.session.return_value.__exit__ = MagicMock(return_value=False)
+
+        with patch("memoryschema.neo4j_store.GraphDatabase") as mock_gd:
+            mock_gd.driver.return_value = mock_driver
+            with pytest.raises(RuntimeError, match="connection refused"):
+                Neo4jMemoryStore(uri="bolt://localhost:7687", user="neo4j", password="x")
+
+
 class TestCRUD:
     def test_upsert(self, mock_neo4j):
         driver, session, _ = mock_neo4j

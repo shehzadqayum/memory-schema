@@ -74,8 +74,18 @@ class Neo4jMemoryStore:
             password = password or config.neo4j_password
 
         self._driver = GraphDatabase.driver(uri, auth=(user, password))
-        with self._driver.session() as session:
-            session.run('RETURN 1')
+        try:
+            with self._driver.session() as session:
+                session.run('RETURN 1')
+        except Exception as e:
+            self._driver.close()
+            err = str(e).lower()
+            if 'credentials' in err or 'unauthorized' in err or 'authentication' in err:
+                raise ConnectionError(
+                    f"Neo4j auth failed at {uri}. "
+                    f"Set NEO4J_PASSWORD env var or check memoryschema.toml [neo4j] section."
+                ) from e
+            raise
 
     def close(self):
         self._driver.close()
