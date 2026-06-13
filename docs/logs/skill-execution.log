@@ -352,3 +352,5 @@
 2026-06-13 16:03:29	session-open	START	—	—
 2026-06-13 16:04:04	session-open	END	completed	Session 21 briefing — M1 complete NO SHIP, no active initiative
 2026-06-13 17:37:30	plan-commit	START	—	—
+2026-06-13 17:38:58	plan-commit	END	completed	Framework hardening plan committed as b33147b, 1 residual addressing
+2026-06-13 17:50:22	plan-commit	START	—	—

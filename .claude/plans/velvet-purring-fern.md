@@ -2,11 +2,43 @@
 
 ## Context
 
-After completing the multi-space embedding experiment (M1, NO SHIP), a full framework audit revealed 6 gaps: one untested module (l0_budget.py), no end-to-end pipeline test, broken Neo4j auth, a non-functional reflect command, an unresolved hook integration test residual (session 18), and mocked-only Neo4j tests. This plan fixes all of them in priority order.
+After completing the multi-space embedding experiment (M1, NO SHIP), a full framework audit revealed 7 gaps: hook parse errors blocking auto-memory writes, one untested module (l0_budget.py), no end-to-end pipeline test, broken Neo4j auth, a non-functional reflect command, an unresolved hook integration test residual (session 18), and mocked-only Neo4j tests. This plan fixes all of them in priority order.
 
 ## Prior Residuals (from [S4] d4043ce)
 
-- Hook integration test: E2 write path Tested but not Operative via subprocess → addressing in Phase 5
+- Hook integration test: E2 write path Tested but not Operative via subprocess → addressing in Phase 6
+
+## Phase 0 — Fix hook parse errors on non-entity files
+
+The hook at `src/memoryschema/hooks/hook-post-write.sh` blocks writes to any `.md` file under a `/memory/` path that doesn't contain `<memory:entity>` XML. Auto-memory files (YAML frontmatter format) trigger this on every write, producing "failed to parse" errors and exit code 2.
+
+**Root cause:** Lines 57-60 of the hook's Python block treat `parse_memory_file() → None` as a fatal error (exit 2). A file without `<memory:entity>` is not an error — it's a non-entity file that should be skipped.
+
+### 0.1 Fix hook to skip non-entity files gracefully
+In `hook-post-write.sh`, change the None-return handling:
+```python
+# BEFORE (lines 57-60):
+memory = parse_memory_file(filepath)
+if memory is None:
+    print(f'hook: failed to parse {filepath}', file=sys.stderr)
+    sys.exit(2)
+
+# AFTER:
+memory = parse_memory_file(filepath)
+if memory is None:
+    # Not a memory entity file (e.g., YAML frontmatter) — skip silently
+    sys.exit(0)
+```
+
+### 0.2 Add test for non-entity file handling
+In `tests/test_cli_hook.py` (or new test):
+- `test_parse_returns_none_for_yaml_frontmatter` — write a YAML frontmatter .md file, call `parse_memory_file()`, verify returns None
+- `test_parse_returns_none_for_plain_markdown` — plain markdown without entity block returns None
+
+### Key file
+- `src/memoryschema/hooks/hook-post-write.sh` — lines 57-60
+
+**Verification:** Operative (auto-memory writes no longer produce hook errors)
 
 ## Phase 1 — l0_budget.py test coverage
 
@@ -86,7 +118,7 @@ docker-compose.yml uses `NEO4J_AUTH=neo4j/${NEO4J_PASSWORD}` (shell variable). C
 
 ## Phase 5 — Hook integration test (session 18 residual)
 
-The hook's Python block calls gate_pipeline with store + config. This was fixed in E2 but never verified end-to-end.
+The hook's Python block calls gate_pipeline with store + config. This was fixed in E2 but never verified end-to-end. Phase 0 fixes the parse-error path; this phase tests the gate pipeline path.
 
 ### 5.1 Add hook pipeline tests to tests/test_e2e_pipeline.py
 - `TestHookPipeline`:
@@ -123,6 +155,7 @@ The hook's Python block calls gate_pipeline with store + config. This was fixed 
 
 | # | Criterion | Phase | Status type |
 |---|-----------|-------|-------------|
+| 0 | Auto-memory writes no longer produce hook parse errors | 0 | Operative |
 | 1 | l0_budget.py has dedicated test coverage for all 4 functions | 1 | Tested |
 | 2 | Single test exercises write → gate → store → recall | 2 | Tested |
 | 3 | reflect() produces >0 clusters on fixture data | 3 | Tested |
