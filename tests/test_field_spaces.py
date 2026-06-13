@@ -12,7 +12,9 @@ Covers:
 import json
 import pytest
 from memoryschema.embedding_input import compose_embedding_text
-from memoryschema.spaces import get_registry, get_space, combine_similarities
+from memoryschema.spaces import (
+    get_registry, get_space, combine_similarities, EXPERIMENT_WEIGHTS,
+)
 from memoryschema.store import MemoryStore, _cosine_similarity
 
 
@@ -297,3 +299,89 @@ class TestScoreAllEntriesMultiSpace:
         assert loaded['embeddings']['observations'] == _VEC_B
         assert loaded['embeddings']['reasoning'] == _VEC_C
         assert loaded['embedding'] == _VEC_A
+
+
+# --- M1.4: Experiment combiner configuration ---
+
+class TestExperimentCombiner:
+    """Verify the M1 experiment configuration: equal weighting, no query-type
+    classification, coverage-aware. These tests exercise the full scoring path
+    to confirm the combiner is wired correctly."""
+
+    def test_experiment_weights_is_none(self):
+        """M1 experiment uses equal weighting (None = coverage-aware average)."""
+        assert EXPERIMENT_WEIGHTS is None
+
+    def test_three_space_equal_weight_through_scoring(self, store):
+        """Full path: entry with 3 spaces → combiner averages all 3."""
+        entry = {
+            'name': 'three-space', 'importance': 5,
+            'embeddings': {
+                'default': _VEC_A,
+                'observations': _VEC_A,
+                'reasoning': _VEC_B,
+            },
+        }
+        # With query aligned to A: default=1.0, obs=1.0, reasoning=0.0
+        # Equal weight: (1.0 + 1.0 + 0.0) / 3 ≈ 0.667
+        score_3 = store._score_entry(entry, query_embedding=_VEC_A)
+
+        # Same entry with only default space
+        entry_1 = {
+            'name': 'one-space', 'importance': 5,
+            'embeddings': {'default': _VEC_A},
+        }
+        # With query aligned to A: default=1.0 (identity)
+        score_1 = store._score_entry(entry_1, query_embedding=_VEC_A)
+
+        # Three-space score should be lower because reasoning drags it down
+        assert score_3 < score_1
+
+    def test_structural_absence_does_not_penalize(self, store):
+        """Entry missing reasoning → combiner averages 2 spaces, not 3 with zero."""
+        entry_2 = {
+            'name': 'two-space', 'importance': 5,
+            'embeddings': {
+                'default': _VEC_A,
+                'observations': _VEC_A,
+                # No reasoning — structural absence
+            },
+        }
+        # Both present spaces have sim=1.0 → combined = 1.0
+        # NOT (1.0 + 1.0 + 0.0) / 3
+        entry_3_all_aligned = {
+            'name': 'three-aligned', 'importance': 5,
+            'embeddings': {
+                'default': _VEC_A,
+                'observations': _VEC_A,
+                'reasoning': _VEC_A,
+            },
+        }
+        score_2 = store._score_entry(entry_2, query_embedding=_VEC_A)
+        score_3 = store._score_entry(entry_3_all_aligned, query_embedding=_VEC_A)
+        # Both should be identical — all present spaces have sim=1.0
+        assert abs(score_2 - score_3) < 0.01
+
+    def test_field_disagreement_detectable(self):
+        """Cross-space disagreement is observable from per-space sims."""
+        entry = {
+            'name': 'disagree',
+            'embeddings': {
+                'default': _VEC_AB,
+                'observations': _VEC_A,
+                'reasoning': _VEC_B,
+            },
+        }
+        query = _VEC_A  # aligned with observations, orthogonal to reasoning
+        rel = MemoryStore._multi_space_relevance(entry, query)
+
+        # Compute per-space sims directly
+        sim_obs = _cosine_similarity(query, _VEC_A)   # ≈ 1.0
+        sim_rea = _cosine_similarity(query, _VEC_B)   # ≈ 0.0
+        disagreement = abs(sim_obs - sim_rea)
+
+        assert disagreement > 0.9  # High disagreement is detectable
+        # Combined score is the average
+        sim_def = _cosine_similarity(query, _VEC_AB)
+        expected = (max(0, sim_def) + max(0, sim_obs) + max(0, sim_rea)) / 3
+        assert abs(rel - expected) < 0.02

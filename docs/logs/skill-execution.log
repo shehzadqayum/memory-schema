@@ -340,3 +340,5 @@
 2026-06-13 13:39:15	implement	START	—	—
 2026-06-13 13:45:07	implement	END	completed	M1.2 multi-space storage — aadfe03, 603 tests passing
 2026-06-13 13:45:31	implement	START	—	—
+2026-06-13 13:51:24	implement	END	completed	M1.3 per-space reembedding — 25a1340, 608 tests passing
+2026-06-13 13:51:47	implement	START	—	—

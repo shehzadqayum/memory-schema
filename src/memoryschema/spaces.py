@@ -57,12 +57,23 @@ def get_space(name):
 
 # --- Combiner ---
 
-def combine_similarities(per_space_sims, weights=None):
+# M1 experiment: equal weighting across present spaces (no query-type
+# classification). This is the unlearned heuristic — measure whether
+# field separation alone helps before adding query-conditioned weights.
+# None = equal weighting over present spaces (coverage-aware).
+EXPERIMENT_WEIGHTS = None
+
+
+def combine_similarities(per_space_sims, weights=EXPERIMENT_WEIGHTS):
     """Combine per-space similarities into a single score.
 
     Coverage-aware: iterates only spaces present in per_space_sims.
     Never reads an absent space as zero — corpus memories lacking
     prompt/reasoning spaces are structural, not exceptional.
+
+    M1 experiment: weights=None (equal weighting). If the field-space
+    experiment does not beat the single-space baseline, this combiner
+    does not ship to default scoring.
 
     Args:
         per_space_sims: dict mapping space_name → similarity score.
