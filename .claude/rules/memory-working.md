@@ -1,10 +1,10 @@
 # Working Memory Guidelines
 
-**Enforcement: MANDATORY — write a memory entity on every response (testing mode).**
+**Enforcement: MANDATORY — write a memory entity at the end of every response.**
 
-Write a `memory/<name>.md` entity file on EVERY response. The PostToolUse hook will parse, embed (via Voyage AI), gate-check, and index it automatically. This ensures the full write pipeline (parse → embed → gate → store → MEMORY.md) is exercised continuously.
+Write a `memory/<name>.md` entity file as the LAST action of every response. The PostToolUse hook will parse, embed (via Voyage AI), gate-check, and index it automatically.
 
-The entity MUST contain at minimum: name, description, and one observation capturing what happened in the response. Use your judgement for type and importance.
+The entity MUST contain at minimum: name, description, and one observation capturing what happened in the response. Include prompt and reasoning when the response involved decisions, corrections, or novel facts. Use your judgement for type and importance.
 
 ---
 
@@ -37,16 +37,6 @@ Scope (which project sees a memory) is handled by the `project` field, not impor
 ## File path
 
 Write to `memory/<name>.md` where `<name>` is kebab-case and describes the content.
-
-## Write decline instrumentation
-
-When the selective-write policy above is weighed and the decision is **not** to write, record a decline:
-
-```bash
-memoryschema decline --reason "mechanical test output, no novel fact"
-```
-
-**Limitation:** declines instrument only *considered* candidates — cases where the write was actively weighed and rejected. Candidates never considered are invisible by construction. The decline data must not be over-read as complete coverage of non-write decisions.
 
 ## Compact resilience
 
