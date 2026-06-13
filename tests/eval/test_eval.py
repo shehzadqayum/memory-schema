@@ -6,12 +6,12 @@ Tests the fixture store, metrics computation, and poisoning defenses.
 import pytest
 
 from memoryschema.store import MemoryStore
-from tests.eval.fixtures import (
+from memoryschema.eval.fixtures import (
     build_fixture_entries,
     build_query_set,
     build_poisoning_entries,
 )
-from tests.eval.metrics import recall_at_k, mrr, ndcg_at_k, evaluate_all
+from memoryschema.eval.metrics import recall_at_k, mrr, ndcg_at_k, evaluate_all
 
 
 @pytest.fixture
@@ -135,12 +135,12 @@ class TestEvaluateAll:
 
 class TestSalienceFixtures:
     def test_fixtures_exist(self):
-        from tests.eval.fixtures import build_salience_fixtures
+        from memoryschema.eval.fixtures import build_salience_fixtures
         fixtures = build_salience_fixtures()
         assert len(fixtures) >= 20
 
     def test_fixtures_balanced(self):
-        from tests.eval.fixtures import build_salience_fixtures
+        from memoryschema.eval.fixtures import build_salience_fixtures
         fixtures = build_salience_fixtures()
         writes = sum(1 for f in fixtures if f['decision'] == 'write')
         declines = sum(1 for f in fixtures if f['decision'] == 'decline')
@@ -148,7 +148,7 @@ class TestSalienceFixtures:
         assert declines >= 8
 
     def test_fixture_structure(self):
-        from tests.eval.fixtures import build_salience_fixtures
+        from memoryschema.eval.fixtures import build_salience_fixtures
         for f in build_salience_fixtures():
             assert 'excerpt' in f
             assert 'decision' in f
@@ -158,8 +158,8 @@ class TestSalienceFixtures:
 
 class TestSalienceMetrics:
     def test_perfect_score(self):
-        from tests.eval.fixtures import build_salience_fixtures
-        from tests.eval.metrics import evaluate_salience
+        from memoryschema.eval.fixtures import build_salience_fixtures
+        from memoryschema.eval.metrics import evaluate_salience
         fixtures = build_salience_fixtures()
         perfect = [{'excerpt': f['excerpt'], 'decision': f['decision']} for f in fixtures]
         result = evaluate_salience(perfect, fixtures)
@@ -169,8 +169,8 @@ class TestSalienceMetrics:
         assert result['correct'] == result['total']
 
     def test_all_write_baseline(self):
-        from tests.eval.fixtures import build_salience_fixtures
-        from tests.eval.metrics import evaluate_salience
+        from memoryschema.eval.fixtures import build_salience_fixtures
+        from memoryschema.eval.metrics import evaluate_salience
         fixtures = build_salience_fixtures()
         all_write = [{'excerpt': f['excerpt'], 'decision': 'write'} for f in fixtures]
         result = evaluate_salience(all_write, fixtures)
@@ -179,8 +179,8 @@ class TestSalienceMetrics:
         assert result['total'] == len(fixtures)
 
     def test_all_decline_baseline(self):
-        from tests.eval.fixtures import build_salience_fixtures
-        from tests.eval.metrics import evaluate_salience
+        from memoryschema.eval.fixtures import build_salience_fixtures
+        from memoryschema.eval.metrics import evaluate_salience
         fixtures = build_salience_fixtures()
         all_decline = [{'excerpt': f['excerpt'], 'decision': 'decline'} for f in fixtures]
         result = evaluate_salience(all_decline, fixtures)

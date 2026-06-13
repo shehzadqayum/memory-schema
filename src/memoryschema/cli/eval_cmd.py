@@ -1,7 +1,8 @@
-"""CLI command for retrieval evaluation.
+"""CLI command for retrieval and salience evaluation.
 
-Runs the evaluation harness against the fixture store and reports
-recall@k, MRR, and nDCG@10 metrics.
+Modes:
+  retrieval — recall@k, MRR, nDCG@10 against real or fixture store
+  salience  — precision/recall of write-decision fixtures + audit log scoring
 """
 
 import json
@@ -13,46 +14,65 @@ import click
 @click.command()
 @click.option("--mode", type=click.Choice(["retrieval", "salience"]),
               default="retrieval", help="Evaluation mode: retrieval quality or write-decision salience.")
+@click.option("--store", "store_path", default=None, type=click.Path(),
+              help="Path to store.jsonl for real-data eval. Default: configured store.")
 @click.option("--json", "as_json", is_flag=True, help="Output results as JSON.")
 @click.pass_obj
-def eval_cmd(config, mode, as_json):
-    """Run evaluation against fixture store.
+def eval_cmd(config, mode, store_path, as_json):
+    """Run evaluation against real or fixture store.
 
     Modes:
-      retrieval (default) — recall@k, MRR, nDCG@10 against synthetic entities
+      retrieval (default) — recall@k, MRR, nDCG@10
+        Without --store: runs against synthetic fixture store
+        With --store: runs against real data (the single-space baseline)
+
       salience — precision/recall of write-decision fixtures
 
     Example:
         memoryschema eval
+        memoryschema eval --store memory/store.jsonl
         memoryschema eval --mode salience
         memoryschema eval --json
     """
     if mode == 'salience':
         _run_salience_eval(as_json)
         return
+
+    _run_retrieval_eval(config, store_path, as_json)
+
+
+def _run_retrieval_eval(config, store_path, as_json):
+    """Run retrieval evaluation — synthetic fixtures or real store."""
     from memoryschema.store import MemoryStore
-    import tempfile
-    import os
+    from memoryschema.eval.fixtures import build_fixture_entries, build_query_set
+    from memoryschema.eval.metrics import evaluate_all
 
-    # Build fixture store in temp directory
-    with tempfile.TemporaryDirectory() as tmpdir:
-        store_path = os.path.join(tmpdir, 'eval.jsonl')
+    if store_path:
+        # Real-data evaluation against actual store
         store = MemoryStore(store_path)
-
-        from tests.eval.fixtures import build_fixture_entries, build_query_set
+        query_set = build_query_set()
+        source = f"real store ({store_path})"
+    else:
+        # Synthetic fixture evaluation
+        import tempfile
+        import os
+        tmpdir = tempfile.mkdtemp()
+        fixture_path = os.path.join(tmpdir, 'eval.jsonl')
+        store = MemoryStore(fixture_path)
         for entry in build_fixture_entries():
             store.upsert(entry)
-
-        from tests.eval.metrics import evaluate_all
         query_set = build_query_set()
-        result = evaluate_all(store, query_set)
+        source = "synthetic fixtures"
+
+    result = evaluate_all(store, query_set)
+    result['source'] = source
 
     if as_json:
         click.echo(json.dumps(result, indent=2))
         return
 
-    click.echo("Retrieval Evaluation Results")
-    click.echo("=" * 40)
+    click.echo(f"Retrieval Evaluation ({source})")
+    click.echo("=" * 50)
     click.echo()
 
     for qr in result['queries']:
@@ -73,8 +93,8 @@ def eval_cmd(config, mode, as_json):
 
 def _run_salience_eval(as_json):
     """Run salience evaluation — write-decision quality against fixtures."""
-    from tests.eval.fixtures import build_salience_fixtures
-    from tests.eval.metrics import evaluate_salience
+    from memoryschema.eval.fixtures import build_salience_fixtures
+    from memoryschema.eval.metrics import evaluate_salience
 
     fixtures = build_salience_fixtures()
 
@@ -108,6 +128,3 @@ def _run_salience_eval(as_json):
     click.echo()
     click.echo("Perfect:")
     click.echo(f"  precision={perfect_result['precision']:.3f}  recall={perfect_result['recall']:.3f}  f1={perfect_result['f1']:.3f}")
-    click.echo()
-    click.echo("To evaluate an actual decision source, use the evaluate_salience()")
-    click.echo("function from tests.eval.metrics with your decision list.")
