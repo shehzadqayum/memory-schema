@@ -59,23 +59,16 @@ if memory is None:
     print(f'hook: failed to parse {filepath}', file=sys.stderr)
     sys.exit(2)
 
-# Write gate: validate before indexing
-try:
-    from memoryschema.write_gate import gate_check
-    ok, gate_warnings = gate_check(memory)
-    for w in gate_warnings:
-        print(f'hook: gate: {w}', file=sys.stderr)
-    if not ok:
-        print(f'hook: write gate rejected {filepath}', file=sys.stderr)
-        sys.exit(2)
-except ImportError:
-    pass  # write_gate not available — skip validation
+# Generator stamp (v4): read MEMORY_GENERATOR env var
+generator_id = os.environ.get('MEMORY_GENERATOR')
+if generator_id:
+    memory['generator'] = generator_id
 
-# Embed if VOYAGE_API_KEY is set (optional, graceful degradation)
+# Embed BEFORE gate (stages 4-6 need the embedding vector)
 if os.environ.get('VOYAGE_API_KEY'):
     try:
         from memoryschema.embeddings import embed_text
-        parts = [memory.get('name', ''), memory.get('description', ''), ' '.join(memory.get('observations', []))]
+        parts = [memory.get('name', ''), memory.get('description', ''), ' '.join(str(o) for o in memory.get('observations', []))]
         if memory.get('prompt'):
             parts.append(memory['prompt'])
         if memory.get('reasoning'):
@@ -83,7 +76,40 @@ if os.environ.get('VOYAGE_API_KEY'):
         text = ' '.join(parts)
         memory['embedding'] = embed_text(text.strip())
     except Exception:
-        pass  # Embedding failure does not block indexing
+        pass  # Embedding failure does not block — stages 4-6 skip gracefully
+
+# Construct store + config for full gate pipeline
+hook_store = None
+hook_config = None
+try:
+    from memoryschema.config import MemoryConfig
+    hook_config = MemoryConfig(project_root=project_root)
+except Exception:
+    pass
+try:
+    from memoryschema.store import MemoryStore
+    hook_store = MemoryStore(store_path)
+except Exception:
+    pass
+
+# Write gate: full pipeline with store + config (stages 1-6)
+try:
+    from memoryschema.write_gate import gate_pipeline, GateVerdict
+    gate_result = gate_pipeline(memory, store=hook_store, config=hook_config)
+    for w in gate_result.warnings:
+        print(f'hook: gate: {w}', file=sys.stderr)
+    for r in gate_result.reasons:
+        print(f'hook: gate: {r}', file=sys.stderr)
+    if gate_result.verdict == GateVerdict.REJECT:
+        print(f'hook: write gate REJECTED {filepath}', file=sys.stderr)
+        sys.exit(2)
+    if gate_result.verdict == GateVerdict.QUARANTINE:
+        print(f'hook: write gate QUARANTINED {filepath}', file=sys.stderr)
+        memory['status'] = 'quarantined'
+        # Fall through to upsert — quarantined entries are saved unembedded
+        memory.pop('embedding', None)
+except ImportError:
+    pass  # write_gate not available — skip validation
 
 # Try Neo4j first (O(1) upsert, <10ms)
 indexed = False

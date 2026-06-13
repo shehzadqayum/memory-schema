@@ -215,10 +215,29 @@ def write(config, file_path):
             click.echo(f"  [{rule}] {msg}")
         sys.exit(1)
 
-    # Write gate pipeline
-    from memoryschema.write_gate import gate_pipeline, GateVerdict
+    # Generator stamp (v4)
+    if config.generator_id:
+        memory['generator'] = config.generator_id
+
+    # Embed BEFORE gate (stages 4-6 need the embedding vector)
     store = _get_store(config)
-    gate_result = gate_pipeline(memory, store=store)
+    if config.voyage_api_key:
+        try:
+            from memoryschema.embeddings import embed_text
+            parts = [memory.get('name', ''), memory.get('description', '')]
+            parts.extend(str(o) for o in memory.get('observations', []))
+            if memory.get('prompt'):
+                parts.append(memory['prompt'])
+            if memory.get('reasoning'):
+                parts.append(memory['reasoning'])
+            memory['embedding'] = embed_text(' '.join(parts), config=config)
+            click.echo(f"Embedded: {len(memory['embedding'])} dimensions.")
+        except Exception as e:
+            click.echo(f"Warning: Embedding failed: {e}", err=True)
+
+    # Write gate pipeline (all 6 stages, with store + config)
+    from memoryschema.write_gate import gate_pipeline, GateVerdict
+    gate_result = gate_pipeline(memory, store=store, config=config)
 
     # Audit log — every gate decision is recorded
     try:
@@ -244,25 +263,12 @@ def write(config, file_path):
         for r in gate_result.reasons:
             click.echo(f"QUARANTINED: {r}", err=True)
         memory['status'] = 'quarantined'
+        memory.pop('embedding', None)  # quarantined = unembedded
         store.upsert(memory)
         click.echo(f"Quarantined: {memory['name']} (review with: memoryschema quarantine review {memory['name']})")
         return
 
-    # ACCEPT path — embed and index
-    if config.voyage_api_key:
-        try:
-            from memoryschema.embeddings import embed_text
-            parts = [memory.get('description', '')]
-            parts.extend(memory.get('observations', []))
-            if memory.get('prompt'):
-                parts.append(memory['prompt'])
-            if memory.get('reasoning'):
-                parts.append(memory['reasoning'])
-            memory['embedding'] = embed_text(' '.join(parts), config=config)
-            click.echo(f"Embedded: {len(memory['embedding'])} dimensions.")
-        except Exception as e:
-            click.echo(f"Warning: Embedding failed: {e}", err=True)
-
+    # ACCEPT path — embed already done above, just index
     store.upsert(memory)
     click.echo(f"Indexed: {memory['name']}")
 

@@ -89,8 +89,9 @@ def parse_forum_post(filepath, primary_author=None):
 
     return {
         'name': name,
-        'schema': 2,
+        'schema': 4,
         'type': 'semantic',
+        'provenance': 'ingested',
         'importance': importance,
         'description': description,
         'observations': observations,
