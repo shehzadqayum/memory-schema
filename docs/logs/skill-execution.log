@@ -309,3 +309,13 @@
 2026-06-12 23:30:55	session-open	START	—	—
 2026-06-13 06:57:04	session-open	END	completed	Session 18 briefing — new session after S4 13d4836, zero residuals, no active initiative
 2026-06-13 08:09:33	plan-commit	START	—	—
+2026-06-13 08:16:50	plan-commit	END	completed	S1 ac02c69: multi-space enabling phases + registry plan
+2026-06-13 08:17:55	implement	START	—	—
+2026-06-13 08:25:33	implement	END	completed	Phase E1: eval harness packaged + --store + baselines — OPERATIVE (commands run, numbers emitted)
+2026-06-13 08:26:41	implement	START	—	—
+2026-06-13 08:30:19	implement	END	completed	Phase E2: embed-before-gate, gate_pipeline with store+config, generator stamp, ingest provenance — TESTED not yet Operative
+2026-06-13 08:31:31	implement	START	—	—
+2026-06-13 08:37:28	implement	END	completed	Phase M0: embedding_input.py canonical function, spaces.py registry+combiner, 6 drift copies collapsed — TESTED
+2026-06-13 08:45:35	checkpoint	START	—	—
+2026-06-13 08:50:00	checkpoint	END	completed	Session 18: E1+E2+M0 complete, 9/9 PASS, 569 tests, 2 residuals (hook test, query set)
+2026-06-13 09:02:50	session-close	START	—	—
