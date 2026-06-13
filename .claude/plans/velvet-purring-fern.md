@@ -95,6 +95,22 @@ None.
 
 **Verification status required:** Tested + Operative (tests pass AND eval baseline unchanged)
 
+## Phase R1 — Resolve residuals: real-data query set + hook test
+
+### R1.1 Real-data query set
+The eval fixture queries reference synthetic entities (knowledge-0, session-event-0, etc.) that don't exist in the real store. The real store has 36 entities: session-close memories, plans, and project memories. Build a query set matched to real content:
+- 4-6 queries with relevant entity lists drawn from actual stored names
+- Cover: session history recall, plan recall, project fact recall, cross-session search
+- Run `memoryschema eval --store memory/store.jsonl` and record the real baseline
+
+### R1.2 Hook integration test
+Write a test that exercises the hook's Python block end-to-end:
+- Extract the hook's Python into a callable function (or invoke it as subprocess)
+- Seed a contradiction in the store, write a conflicting entry, verify quarantine
+- If full subprocess test is impractical, at minimum call gate_pipeline with the same args the hook constructs and verify the numeric probe fires
+
+**Verification:** Real baseline numbers recorded (Measured). Hook path verified (Operative or Tested with explanation).
+
 ## Phase M1 — First field space: observations vs reasoning (GATED)
 
 ### M1.1 Add field spaces to registry
