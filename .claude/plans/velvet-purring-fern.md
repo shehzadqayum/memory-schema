@@ -95,7 +95,7 @@ None.
 
 **Verification status required:** Tested + Operative (tests pass AND eval baseline unchanged)
 
-## Phase R1 — Resolve residuals: real-data query set + hook test
+## Phase R1 — Resolve residuals: real-data query set + hook test ✓ bb17c4a
 
 ### R1.1 Real-data query set
 The eval fixture queries reference synthetic entities (knowledge-0, session-event-0, etc.) that don't exist in the real store. The real store has 36 entities: session-close memories, plans, and project memories. Build a query set matched to real content:
