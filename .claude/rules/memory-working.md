@@ -1,17 +1,10 @@
 # Working Memory Guidelines
 
-**Enforcement: selective — write memory when it matters, not on every response.**
+**Enforcement: MANDATORY — write a memory entity on every response (testing mode).**
 
-Write when:
-- A decision was made (architectural, design, or process)
-- A correction was received (user feedback, bug discovery)
-- A novel durable fact was established (not already captured)
-- A session boundary was reached (open, checkpoint, close)
+Write a `memory/<name>.md` entity file on EVERY response. The PostToolUse hook will parse, embed (via Voyage AI), gate-check, and index it automatically. This ensures the full write pipeline (parse → embed → gate → store → MEMORY.md) is exercised continuously.
 
-Skip when:
-- The response is purely mechanical (running tests, staging files)
-- The information is already captured in an existing memory
-- The response is a clarification question with no new facts
+The entity MUST contain at minimum: name, description, and one observation capturing what happened in the response. Use your judgement for type and importance.
 
 ---
 
