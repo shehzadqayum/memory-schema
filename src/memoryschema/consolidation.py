@@ -18,18 +18,12 @@ from memoryschema.discovery import discover_memory_files
 from memoryschema.store import MemoryStore
 
 
-def _embedding_text(memory):
-    """Compose the text to embed for a memory.
+from memoryschema.embedding_input import compose_embedding_text
 
-    Uses name + description + observations + prompt + reasoning.
-    """
-    parts = [memory.get('name', ''), memory.get('description', '')]
-    parts.extend(memory.get('observations', []))
-    if memory.get('prompt'):
-        parts.append(memory['prompt'])
-    if memory.get('reasoning'):
-        parts.append(memory['reasoning'])
-    return ' '.join(parts)
+
+def _embedding_text(memory):
+    """Compose the text to embed for a memory (delegates to canonical function)."""
+    return compose_embedding_text(memory)
 
 
 def consolidate(base_path, project, store, embed=False):

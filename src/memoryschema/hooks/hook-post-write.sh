@@ -68,13 +68,9 @@ if generator_id:
 if os.environ.get('VOYAGE_API_KEY'):
     try:
         from memoryschema.embeddings import embed_text
-        parts = [memory.get('name', ''), memory.get('description', ''), ' '.join(str(o) for o in memory.get('observations', []))]
-        if memory.get('prompt'):
-            parts.append(memory['prompt'])
-        if memory.get('reasoning'):
-            parts.append(memory['reasoning'])
-        text = ' '.join(parts)
-        memory['embedding'] = embed_text(text.strip())
+        from memoryschema.embedding_input import compose_embedding_text
+        text = compose_embedding_text(memory)
+        memory['embedding'] = embed_text(text)
     except Exception:
         pass  # Embedding failure does not block — stages 4-6 skip gracefully
 

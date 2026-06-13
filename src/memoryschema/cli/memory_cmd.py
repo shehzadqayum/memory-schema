@@ -224,13 +224,9 @@ def write(config, file_path):
     if config.voyage_api_key:
         try:
             from memoryschema.embeddings import embed_text
-            parts = [memory.get('name', ''), memory.get('description', '')]
-            parts.extend(str(o) for o in memory.get('observations', []))
-            if memory.get('prompt'):
-                parts.append(memory['prompt'])
-            if memory.get('reasoning'):
-                parts.append(memory['reasoning'])
-            memory['embedding'] = embed_text(' '.join(parts), config=config)
+            from memoryschema.embedding_input import compose_embedding_text
+            text = compose_embedding_text(memory)
+            memory['embedding'] = embed_text(text, config=config)
             click.echo(f"Embedded: {len(memory['embedding'])} dimensions.")
         except Exception as e:
             click.echo(f"Warning: Embedding failed: {e}", err=True)

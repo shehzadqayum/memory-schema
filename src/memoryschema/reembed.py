@@ -16,20 +16,7 @@ import tempfile
 import time
 
 
-def compose_embedding_text(entry, max_chars=2000):
-    """Compose full embedding text from all available fields.
-
-    Uses name + description + observations + prompt + reasoning.
-    Body excluded (may contain unstructured content).
-    """
-    parts = [entry.get('name', ''), entry.get('description', '')]
-    parts.extend(entry.get('observations', []))
-    if entry.get('prompt'):
-        parts.append(entry['prompt'])
-    if entry.get('reasoning'):
-        parts.append(entry['reasoning'])
-    text = ' '.join(parts).strip()
-    return text[:max_chars]
+from memoryschema.embedding_input import compose_embedding_text  # canonical source
 
 
 def reembed(prefix, config=None, batch_size=20, max_chars=2000, dry_run=False, skip_assoc=False):
@@ -76,7 +63,7 @@ def reembed(prefix, config=None, batch_size=20, max_chars=2000, dry_run=False, s
 
     for i in range(0, total, batch_size):
         batch = target_entries[i:i + batch_size]
-        texts = [compose_embedding_text(e, max_chars) for e in batch]
+        texts = [compose_embedding_text(e, max_chars=max_chars) for e in batch]
 
         max_retries = 3
         for attempt in range(max_retries):
