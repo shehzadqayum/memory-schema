@@ -28,7 +28,7 @@ None.
 - **Minimal (2 fields):** description+observations — ingest examples
 - No canonical compose function in embeddings.py; callers duplicate logic
 
-## Phase E1 — Make the eval harness measure the real system
+## Phase E1 — Make the eval harness measure the real system ✓ 27c4d32
 
 ### E1.1 Make tests.eval importable at runtime
 - Move `tests/eval/fixtures.py` and `tests/eval/metrics.py` to `src/memoryschema/eval/` as a proper subpackage
@@ -48,7 +48,7 @@ None.
 
 **Verification status required:** Operative (command runs on real data and emits numbers, not just "code written")
 
-## Phase E2 — Make the write path trustworthy
+## Phase E2 — Make the write path trustworthy ✓ b5aaec4
 
 ### E2.1 Fix gate-before-embed ordering in hook
 - In hook-post-write.sh: compute embedding BEFORE calling gate
@@ -73,7 +73,7 @@ None.
 
 **Verification status required:** Operative (end-to-end hook test quarantines seeded contradiction; generator stamp non-null; ingested entries gated from L0)
 
-## Phase M0 — Registry and combiner slots (behavior-neutral)
+## Phase M0 — Registry and combiner slots (behavior-neutral) ✓ 2e003d8
 
 ### M0.1 Canonical embedding input function
 - Create `src/memoryschema/embedding_input.py` with single `compose_embedding_text(entry, space='default')` function
