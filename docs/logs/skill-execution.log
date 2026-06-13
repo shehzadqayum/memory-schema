@@ -346,3 +346,5 @@
 2026-06-13 13:56:35	implement	START	—	—
 2026-06-13 14:01:44	implement	END	completed	M1.5 gating experiment — 234adbf, NO SHIP: multi nDCG 0.601 < single 0.608
 2026-06-13 14:02:29	checkpoint	START	—	—
+2026-06-13 14:06:17	checkpoint	END	completed	Session 20 — M1 complete, NO SHIP, 5/5 PASS, 612 tests
+2026-06-13 14:24:01	session-close	START	—	—
