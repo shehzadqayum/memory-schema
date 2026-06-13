@@ -370,3 +370,5 @@
 2026-06-13 19:16:42	implement	START	—	—
 2026-06-13 19:21:56	implement	END	completed	Phase 6 Neo4j integration tests — b56090f, 654+2 tests, all phases complete
 2026-06-13 19:30:00	checkpoint	START	—	—
+2026-06-13 19:51:42	checkpoint	END	completed	Session 21 — framework hardening 7/7 PASS, 654+2 tests
+2026-06-13 19:56:44	session-close	START	—	—
