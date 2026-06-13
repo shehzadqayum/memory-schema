@@ -1,5 +1,10 @@
-"""Tests for Neo4j store (mocked — no real Neo4j required)."""
+"""Tests for Neo4j store (mocked + optional integration).
 
+Mocked tests run in standard pytest. Integration tests require a running
+Neo4j instance and are skipped by default (run with: pytest -m integration).
+"""
+
+import os
 from unittest.mock import patch, MagicMock, PropertyMock
 
 import pytest
@@ -175,3 +180,65 @@ class TestNodeConversion:
         node = {'name': 'test', 'observations': None}
         result = store._node_to_dict(node)
         assert result['observations'] == []
+
+
+# --- Integration tests (require running Neo4j) ---
+
+def _neo4j_available():
+    """Check if Neo4j is reachable with current credentials."""
+    try:
+        from memoryschema.neo4j_store import Neo4jMemoryStore
+        store = Neo4jMemoryStore()
+        store.count()
+        store.close()
+        return True
+    except Exception:
+        return False
+
+
+@pytest.mark.integration
+class TestNeo4jIntegration:
+    """Integration tests against a real Neo4j instance.
+
+    Skipped by default. Run with: pytest -m integration
+    Requires NEO4J_PASSWORD set and container running.
+    """
+
+    @pytest.fixture(autouse=True)
+    def skip_if_unavailable(self):
+        if not _neo4j_available():
+            pytest.skip("Neo4j not available (set NEO4J_PASSWORD and start container)")
+
+    def test_connect_and_count(self):
+        from memoryschema.neo4j_store import Neo4jMemoryStore
+        store = Neo4jMemoryStore()
+        count = store.count()
+        assert isinstance(count, int)
+        assert count >= 0
+        store.close()
+
+    def test_upsert_get_roundtrip(self):
+        from memoryschema.neo4j_store import Neo4jMemoryStore
+        store = Neo4jMemoryStore()
+        test_name = '_integration_test_entry'
+
+        try:
+            store.upsert({
+                'name': test_name,
+                'schema': 4,
+                'type': 'semantic',
+                'description': 'Integration test entry — safe to delete',
+                'observations': ['Test observation'],
+                'importance': 1,
+            })
+
+            result = store.get(test_name)
+            assert result is not None
+            assert result['name'] == test_name
+            assert result['description'] == 'Integration test entry — safe to delete'
+            assert 'Test observation' in [str(o) for o in result.get('observations', [])]
+        finally:
+            # Clean up
+            store.delete(test_name)
+            assert store.get(test_name) is None
+            store.close()

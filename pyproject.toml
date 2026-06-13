@@ -41,7 +41,10 @@ memoryschema = ["templates/*", "hooks/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-q"
+addopts = "-q -m 'not integration'"
+markers = [
+    "integration: requires external services (Neo4j, Voyage) — run with pytest -m integration",
+]
 
 [tool.coverage.run]
 source = ["memoryschema"]
