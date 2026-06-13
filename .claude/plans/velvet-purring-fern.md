@@ -1,4 +1,4 @@
-# Fix Hook Embedding Gap
+# Fix Hook Embedding Gap (COMPLETE)
 
 ## Context
 
@@ -8,7 +8,7 @@ The PostToolUse hook constructs a `MemoryConfig` (line 82) but never passes it t
 
 None.
 
-## Phase 1 — Pass config to embed_text in hook
+## Phase 1 — Pass config to embed_text in hook ✓ 1c2c04a
 
 ### 1.1 Fix hook embedding to use config
 In `src/memoryschema/hooks/hook-post-write.sh`, two changes:

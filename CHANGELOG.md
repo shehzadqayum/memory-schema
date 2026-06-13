@@ -7,6 +7,7 @@
 - Reflect: `_cluster_by_associations` score threshold (0.7) fixes 0-cluster bug from giant connected component
 - Neo4j: auth failure now raises ConnectionError with actionable message instead of raw driver error
 - Neo4j: deleted orphaned test entries (`imported`, `test`), stores in sync at 34/34
+- Hook: pass config to embed_text — embeddings now work via TOML api_key, not just env var
 
 ### Added (Framework Hardening)
 - `tests/test_l0_budget.py`: 22 tests for token budget enforcement (was the only untested module)
