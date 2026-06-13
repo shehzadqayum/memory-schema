@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+### Fixed (Framework Hardening)
+- Hook: skip non-entity files (YAML frontmatter) instead of blocking with exit 2
+- Reflect: `_cluster_by_associations` score threshold (0.7) fixes 0-cluster bug from giant connected component
+- Neo4j: auth failure now raises ConnectionError with actionable message instead of raw driver error
+
+### Added (Framework Hardening)
+- `tests/test_l0_budget.py`: 22 tests for token budget enforcement (was the only untested module)
+- `tests/test_e2e_pipeline.py`: 10 tests covering write -> gate -> store -> recall + hook pipeline
+- Neo4j integration tests with `pytest.mark.integration` marker (deselected by default)
+- `--score-threshold` CLI option for `memoryschema reflect`
+
 ### Added (Multi-space — M1, NO SHIP)
 - Field-level embedding spaces: `observations` and `reasoning` in embedding_input.py
 - Space registry: 3 spaces (default, observations, reasoning) in spaces.py

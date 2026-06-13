@@ -1,4 +1,4 @@
-# Framework Hardening: Test Gaps + Broken Paths
+# Framework Hardening: Test Gaps + Broken Paths (COMPLETE)
 
 ## Context
 
@@ -8,7 +8,7 @@ After completing the multi-space embedding experiment (M1, NO SHIP), a full fram
 
 - Hook integration test: E2 write path Tested but not Operative via subprocess → addressing in Phase 6
 
-## Phase 0 — Fix hook parse errors on non-entity files
+## Phase 0 — Fix hook parse errors on non-entity files ✓ 8acfaec
 
 The hook at `src/memoryschema/hooks/hook-post-write.sh` blocks writes to any `.md` file under a `/memory/` path that doesn't contain `<memory:entity>` XML. Auto-memory files (YAML frontmatter format) trigger this on every write, producing "failed to parse" errors and exit code 2.
 
@@ -40,7 +40,7 @@ In `tests/test_cli_hook.py` (or new test):
 
 **Verification:** Operative (auto-memory writes no longer produce hook errors)
 
-## Phase 1 — l0_budget.py test coverage
+## Phase 1 — l0_budget.py test coverage ✓ cbe8c83
 
 The only module (out of 21) without dedicated tests. Token budget enforcement for MEMORY.md is critical — if it silently breaks, the L0 index grows unbounded.
 
@@ -55,7 +55,7 @@ The only module (out of 21) without dedicated tests. Token budget enforcement fo
 
 **Verification:** Tested (all functions exercised with assertions)
 
-## Phase 2 — E2E pipeline test
+## Phase 2 — E2E pipeline test ✓ 665eb8a
 
 No single test exercises write → gate → embed → store → recall. The closest is test_consolidation.py (discover → parse → upsert) but it skips the gate and recall.
 
@@ -73,7 +73,7 @@ No single test exercises write → gate → embed → store → recall. The clos
 
 **Verification:** Tested (full pipeline exercised end-to-end in one test)
 
-## Phase 3 — Fix reflect clustering (0 clusters)
+## Phase 3 — Fix reflect clustering (0 clusters) ✓ 84edacf
 
 `_cluster_by_associations` uses connected components via BFS. With k-NN associating all episodic entries transitively, they form one giant component (size ~17) that exceeds `max_cluster=10`. Result: 0 clusters output.
 
@@ -94,7 +94,7 @@ No single test exercises write → gate → embed → store → recall. The clos
 
 **Verification:** Tested + Operative (reflect produces >0 clusters on fixture data)
 
-## Phase 4 — Fix Neo4j auth + improved error handling
+## Phase 4 — Fix Neo4j auth + improved error handling ✓ b0fec82
 
 docker-compose.yml uses `NEO4J_AUTH=neo4j/${NEO4J_PASSWORD}` (shell variable). Container started without NEO4J_PASSWORD set → auth undefined. Constructor has no error handling — raw Neo4j error bubbles up.
 
@@ -116,7 +116,7 @@ docker-compose.yml uses `NEO4J_AUTH=neo4j/${NEO4J_PASSWORD}` (shell variable). C
 
 **Verification:** Operative (neo4j status shows connected + 34 nodes)
 
-## Phase 5 — Hook integration test (session 18 residual)
+## Phase 5 — Hook integration test (session 18 residual) ✓ 30e7a1b
 
 The hook's Python block calls gate_pipeline with store + config. This was fixed in E2 but never verified end-to-end. Phase 0 fixes the parse-error path; this phase tests the gate pipeline path.
 
@@ -132,7 +132,7 @@ The hook's Python block calls gate_pipeline with store + config. This was fixed 
 
 **Verification:** Tested (hook's Python logic exercised as callable with same construction)
 
-## Phase 6 — Neo4j integration test (optional)
+## Phase 6 — Neo4j integration test (optional) ✓ b56090f
 
 16 mocked tests verify logic but not real connectivity. A single integration test confirms the Phase 4 fix.
 
