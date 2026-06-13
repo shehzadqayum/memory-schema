@@ -1,11 +1,11 @@
-"""Tests for consolidation module — batch indexing pipeline."""
+"""Tests for consolidation module — batch indexing pipeline + clustering."""
 
 import os
 from unittest.mock import patch, MagicMock
 
 import pytest
 
-from memoryschema.consolidation import consolidate, _embedding_text
+from memoryschema.consolidation import consolidate, _embedding_text, _cluster_by_associations
 from memoryschema.store import MemoryStore
 
 
@@ -109,3 +109,96 @@ class TestConsolidate:
         result = consolidate(str(tmp_path), "test", store, embed=False)
         assert result["synced"] == 0
         assert result["skipped"] == 0
+
+
+# --- Clustering tests (Phase 3) ---
+
+def _make_episodic(name, associations=None):
+    """Helper: create a minimal episodic entry with associations."""
+    entry = {
+        'name': name,
+        'type': 'episodic',
+        'status': 'active',
+        'description': f'Session event {name}',
+    }
+    if associations:
+        entry['associations'] = associations
+    return entry
+
+
+class TestClusterByAssociations:
+    def test_threshold_splits_components(self):
+        """High-score pairs cluster together, weak cross-links are filtered."""
+        entries = [
+            _make_episodic('a', [{'name': 'b', 'score': 0.9}, {'name': 'c', 'score': 0.4}]),
+            _make_episodic('b', [{'name': 'a', 'score': 0.9}, {'name': 'd', 'score': 0.3}]),
+            _make_episodic('c', [{'name': 'd', 'score': 0.85}, {'name': 'a', 'score': 0.4}]),
+            _make_episodic('d', [{'name': 'c', 'score': 0.85}, {'name': 'b', 'score': 0.3}]),
+        ]
+        clusters = _cluster_by_associations(entries, min_cluster=2, max_cluster=10,
+                                             score_threshold=0.7)
+        assert len(clusters) == 2
+        cluster_names = [sorted(e['name'] for e in c) for c in clusters]
+        assert ['a', 'b'] in cluster_names
+        assert ['c', 'd'] in cluster_names
+
+    def test_threshold_zero_preserves_old_behavior(self):
+        """With threshold=0, all edges kept — one giant component."""
+        entries = [
+            _make_episodic('a', [{'name': 'b', 'score': 0.1}]),
+            _make_episodic('b', [{'name': 'c', 'score': 0.1}]),
+            _make_episodic('c', [{'name': 'a', 'score': 0.1}]),
+        ]
+        clusters = _cluster_by_associations(entries, min_cluster=2, max_cluster=10,
+                                             score_threshold=0)
+        assert len(clusters) == 1
+        assert len(clusters[0]) == 3
+
+    def test_giant_component_filtered_by_threshold(self):
+        """Reproduce the real bug: 12 entries all connected, max_cluster=10.
+        With threshold=0 -> 0 clusters (component too large).
+        With threshold=0.7 -> smaller clusters that fit."""
+        # Build a chain of 12 entries with weak links (0.5) and strong pairs (0.9)
+        entries = []
+        for i in range(12):
+            assocs = []
+            # Strong link to partner (pairs: 0-1, 2-3, 4-5, etc.)
+            partner = i + 1 if i % 2 == 0 else i - 1
+            if 0 <= partner < 12:
+                assocs.append({'name': f'e-{partner}', 'score': 0.9})
+            # Weak links to neighbors
+            if i > 0:
+                assocs.append({'name': f'e-{i-1}', 'score': 0.5})
+            if i < 11:
+                assocs.append({'name': f'e-{i+1}', 'score': 0.5})
+            entries.append(_make_episodic(f'e-{i}', assocs))
+
+        # threshold=0: one giant component of 12 > max_cluster=10 -> 0 clusters
+        clusters_old = _cluster_by_associations(entries, max_cluster=10,
+                                                 score_threshold=0)
+        assert len(clusters_old) == 0
+
+        # threshold=0.7: only strong pairs -> 6 clusters of 2
+        clusters_new = _cluster_by_associations(entries, max_cluster=10,
+                                                 score_threshold=0.7)
+        assert len(clusters_new) == 6
+        for cluster in clusters_new:
+            assert len(cluster) == 2
+
+    def test_no_associations_no_clusters(self):
+        """Entries without associations produce no clusters."""
+        entries = [_make_episodic('a'), _make_episodic('b')]
+        clusters = _cluster_by_associations(entries)
+        assert len(clusters) == 0
+
+    def test_min_cluster_filter(self):
+        """Singletons below min_cluster are excluded."""
+        entries = [
+            _make_episodic('a', [{'name': 'b', 'score': 0.9}]),
+            _make_episodic('b', [{'name': 'a', 'score': 0.9}]),
+            _make_episodic('c'),  # isolated
+        ]
+        clusters = _cluster_by_associations(entries, min_cluster=2)
+        assert len(clusters) == 1
+        names = sorted(e['name'] for e in clusters[0])
+        assert names == ['a', 'b']

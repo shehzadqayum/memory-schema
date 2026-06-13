@@ -12,9 +12,12 @@ import click
 @click.option("--dry-run", is_flag=True, help="Preview clusters without creating summaries.")
 @click.option("--include-contradictory", is_flag=True, default=False,
               help="Synthesize contradictory clusters with min importance and CONTRADICTS edges.")
+@click.option("--score-threshold", default=0.7, type=float,
+              help="Minimum association score for clustering edges. Default: 0.7.")
 @click.option("--json", "as_json", is_flag=True, help="Output as JSON.")
 @click.pass_obj
-def reflect(config, project, min_cluster, max_cluster, dry_run, include_contradictory, as_json):
+def reflect(config, project, min_cluster, max_cluster, dry_run, include_contradictory,
+            score_threshold, as_json):
     """Cluster episodic entries and synthesise semantic summaries.
 
     Groups related episodic memories by association neighbourhood,
@@ -27,6 +30,7 @@ def reflect(config, project, min_cluster, max_cluster, dry_run, include_contradi
         memoryschema reflect
         memoryschema reflect --project my-project --dry-run
         memoryschema reflect --min-cluster 3 --max-cluster 8
+        memoryschema reflect --score-threshold 0.5
     """
     from memoryschema.consolidation import reflect as do_reflect
     from memoryschema.store import get_store
@@ -34,7 +38,8 @@ def reflect(config, project, min_cluster, max_cluster, dry_run, include_contradi
     store = get_store(config=config)
     result = do_reflect(store, project=project, min_cluster=min_cluster,
                         max_cluster=max_cluster, dry_run=dry_run,
-                        include_contradictory=include_contradictory)
+                        include_contradictory=include_contradictory,
+                        score_threshold=score_threshold)
 
     if as_json:
         click.echo(json_mod.dumps(result, indent=2))

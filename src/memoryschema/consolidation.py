@@ -89,19 +89,27 @@ def consolidate(base_path, project, store, embed=False):
     }
 
 
-def _cluster_by_associations(entries, min_cluster=2, max_cluster=10):
+def _cluster_by_associations(entries, min_cluster=2, max_cluster=10,
+                              score_threshold=0.7):
     """Group entries by association neighbourhood (connected components).
 
     Returns list of clusters (each a list of entry dicts).
     Only returns clusters with min_cluster <= size <= max_cluster.
+
+    Args:
+        score_threshold: Minimum association score to create an edge.
+            Filters weak k-NN connections that would otherwise merge
+            all entries into one giant component. Default 0.7 keeps
+            only strong associations.
     """
-    # Build adjacency from associations
+    # Build adjacency from associations, filtered by score threshold
     name_to_entry = {e['name']: e for e in entries}
     adjacency = {e['name']: set() for e in entries}
     for entry in entries:
         for assoc in entry.get('associations', []):
             target = assoc.get('name') or assoc.get('target')
-            if target and target in adjacency:
+            score = assoc.get('score', 0.0)
+            if target and target in adjacency and score >= score_threshold:
                 adjacency[entry['name']].add(target)
                 adjacency[target].add(entry['name'])
 
@@ -237,7 +245,7 @@ def _check_cluster_contradictions(cluster):
 
 
 def reflect(store, project=None, min_cluster=2, max_cluster=10,
-            dry_run=False, include_contradictory=False):
+            dry_run=False, include_contradictory=False, score_threshold=0.7):
     """Cluster episodic entries and synthesise semantic summaries.
 
     For each cluster of related episodic entries (grouped by
@@ -256,6 +264,8 @@ def reflect(store, project=None, min_cluster=2, max_cluster=10,
         dry_run: If True, return clusters without creating summaries.
         include_contradictory: If True, synthesize contradictory clusters
             with min importance, CONTRADICTS edges, and inferred basis.
+        score_threshold: Minimum association score for clustering edges.
+            Default 0.7 filters weak k-NN connections.
 
     Returns:
         Dict with counts: {clusters, summaries, archived, skipped, dry_run}.
@@ -265,7 +275,8 @@ def reflect(store, project=None, min_cluster=2, max_cluster=10,
                 if e.get('type') == 'episodic'
                 and e.get('status', 'active') == 'active']
 
-    clusters = _cluster_by_associations(episodic, min_cluster, max_cluster)
+    clusters = _cluster_by_associations(episodic, min_cluster, max_cluster,
+                                        score_threshold=score_threshold)
 
     stats = {
         'clusters': len(clusters),
