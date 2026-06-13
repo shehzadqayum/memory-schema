@@ -191,6 +191,52 @@ def build_query_set():
     ]
 
 
+def build_real_data_query_set():
+    """Build query set matched to actual stored entities (not synthetic fixtures).
+
+    These queries reference real entity names from the memory-schema project's
+    own session history, plans, and project memories.
+    """
+    return [
+        {
+            'query': 'schema v4 verification axis basis attribute',
+            'relevant': ['v4-verification-plan', 'session-13-close', 'session-14-close', 'session-15-close'],
+            'project': None,
+            'description': 'v4 plan and implementation sessions',
+        },
+        {
+            'query': 'hierarchy inheritance parent wins config rules',
+            'relevant': ['agent-inheritance-implemented', 'hierarchy-docs-plan', 'nested-agents-discussion'],
+            'project': None,
+            'description': 'Hierarchy and inheritance feature memories',
+        },
+        {
+            'query': 'documentation alignment audit fixes',
+            'relevant': ['docs-alignment-plan', 'docs-update-plan', 'v3-docs-alignment-plan', 'session-11-close', 'session-12-close'],
+            'project': None,
+            'description': 'Documentation alignment sessions and plans',
+        },
+        {
+            'query': 'package audit code review bug fix',
+            'relevant': ['package-audit-plan', 'inheritance-review-fixes', 'session-5-close'],
+            'project': None,
+            'description': 'Code audit and review sessions',
+        },
+        {
+            'query': 'memory system setup deployment Neo4j Voyage',
+            'relevant': ['deployment-verified', 'session-memory-switch', 'repo-created'],
+            'project': None,
+            'description': 'Initial setup and deployment memories',
+        },
+        {
+            'query': 'superseded outdated plan resolved',
+            'relevant': [],  # superseded entries should not be retrieved
+            'project': None,
+            'description': 'Superseded plans — should be excluded from default recall',
+        },
+    ]
+
+
 # Poisoning test entries
 def build_poisoning_entries():
     """Build MINJA-style poisoning test entries.

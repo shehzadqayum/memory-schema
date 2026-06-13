@@ -49,8 +49,9 @@ def _run_retrieval_eval(config, store_path, as_json):
 
     if store_path:
         # Real-data evaluation against actual store
+        from memoryschema.eval.fixtures import build_real_data_query_set
         store = MemoryStore(store_path)
-        query_set = build_query_set()
+        query_set = build_real_data_query_set()
         source = f"real store ({store_path})"
     else:
         # Synthetic fixture evaluation
