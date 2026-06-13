@@ -342,3 +342,5 @@
 2026-06-13 13:45:31	implement	START	—	—
 2026-06-13 13:51:24	implement	END	completed	M1.3 per-space reembedding — 25a1340, 608 tests passing
 2026-06-13 13:51:47	implement	START	—	—
+2026-06-13 13:55:26	implement	END	completed	M1.4 experiment combiner — 321229e, 612 tests passing
+2026-06-13 13:56:35	implement	START	—	—

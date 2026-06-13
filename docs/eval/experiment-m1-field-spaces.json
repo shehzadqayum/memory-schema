@@ -1,0 +1,51 @@
+{
+  "experiment": "M1 — Field spaces: observations vs reasoning",
+  "date": "2026-06-13",
+  "pre_registered_rule": "if multi-space does not beat single-space baseline, does not ship to default scoring",
+  "decision": "NO SHIP — multi-space does not beat single-space, remains opt-in",
+  "store": {
+    "entries": 34,
+    "observations_embedded": 34,
+    "reasoning_embedded": 31,
+    "reasoning_skipped": 3
+  },
+  "results": {
+    "no_embedding_baseline": {
+      "recall@5": 0.458,
+      "recall@10": 0.500,
+      "mrr": 0.611,
+      "ndcg@10": 0.476,
+      "note": "From docs/eval/baseline-single-space.json, measured without embeddings"
+    },
+    "single_space_with_embeddings": {
+      "recall@5": 0.622,
+      "recall@10": 0.622,
+      "mrr": 0.778,
+      "ndcg@10": 0.608,
+      "note": "Default space only (embeddings.default)"
+    },
+    "multi_space": {
+      "recall@5": 0.622,
+      "recall@10": 0.622,
+      "mrr": 0.778,
+      "ndcg@10": 0.601,
+      "note": "default + observations + reasoning, equal 1/3 weighting"
+    }
+  },
+  "per_query_comparison": [
+    {"query": "v4 plan and implementation", "single_ndcg": 1.000, "multi_ndcg": 0.956, "delta": -0.044},
+    {"query": "hierarchy inheritance", "single_ndcg": 0.235, "multi_ndcg": 0.235, "delta": 0.000},
+    {"query": "docs alignment", "single_ndcg": 0.509, "multi_ndcg": 0.509, "delta": 0.000},
+    {"query": "code audit", "single_ndcg": 0.469, "multi_ndcg": 0.469, "delta": 0.000},
+    {"query": "setup deployment", "single_ndcg": 0.437, "multi_ndcg": 0.437, "delta": 0.000},
+    {"query": "superseded (exclusion)", "single_ndcg": 1.000, "multi_ndcg": 1.000, "delta": 0.000}
+  ],
+  "cross_space_disagreement": {
+    "average": 0.072,
+    "max": 0.299,
+    "max_entry": "centralize-env-vars",
+    "correlation_with_relevance": "none observed",
+    "note": "Disagreement too low and uncorrelated to be useful as a signal"
+  },
+  "analysis": "Equal-weight field-space averaging dilutes the default space signal. The v4 query regressed from nDCG 1.0 to 0.956 because field-space similarities pulled the combined score away from the strong default match. All other queries unchanged — field spaces neither help nor hurt. Cross-space disagreement averages 0.07, too low to serve as a quality signal."
+}
