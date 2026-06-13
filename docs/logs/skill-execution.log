@@ -372,3 +372,7 @@
 2026-06-13 19:30:00	checkpoint	START	—	—
 2026-06-13 19:51:42	checkpoint	END	completed	Session 21 — framework hardening 7/7 PASS, 654+2 tests
 2026-06-13 19:56:44	session-close	START	—	—
+2026-06-13 20:13:11	session-close	END	completed	Session 21 — 321e183 — framework hardening 7/7, 654+2 tests, 1 residual
+2026-06-13 21:05:02	session-open	START	—	—
+2026-06-13 21:19:52	session-open	END	completed	Session 22 briefing — no active initiative, 1 residual
+2026-06-13 21:57:04	implement	START	—	—
