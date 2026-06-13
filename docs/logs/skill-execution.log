@@ -329,3 +329,8 @@
 2026-06-13 12:06:12	checkpoint	START	—	—
 2026-06-13 13:11:54	checkpoint	END	completed	Session 19: R1.1 baseline recorded (recall@5=0.492), R1.2 deferred, M1 unblocked
 2026-06-13 13:13:22	session-close	START	—	—
+2026-06-13 13:15:43	session-close	END	completed	Session 19: 100ff7c, 3 commits, 569 tests, 1 residual (hook test), M1 unblocked
+2026-06-13 13:16:43	session-open	START	—	—
+2026-06-13 13:17:27	session-open	END	completed	Session 20 briefing — new session after S4 100ff7c, 1 residual (hook test), M1 next
+2026-06-13 13:25:18	implement	START	—	—
+2026-06-13 13:26:33	plan-commit	START	—	—

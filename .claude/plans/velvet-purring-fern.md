@@ -4,9 +4,9 @@
 
 The multi-space embedding plan requires two enabling fixes before any space work begins. The eval harness cannot measure the real system (imports break on clean install, runs only against synthetic fixtures). The write path silently drops gate stages 4-6 (hook embeds after gate with no store/config; numeric probe and L0 echo are unreachable). Building spaces on unmeasurable, broken infrastructure reproduces the project's documented failure pattern: features built, unit-tested, marked complete, found unreachable.
 
-## Prior Residuals (from [S4] 13d4836)
+## Prior Residuals (from [S4] 100ff7c)
 
-None.
+- Hook integration test: E2 write path correct by inspection but not end-to-end verified via hook subprocess → deferring (out of M1 scope; hook path is Tested, not blocking field-space experiment)
 
 ## Exploration Findings
 
@@ -113,20 +113,40 @@ Write a test that exercises the hook's Python block end-to-end:
 
 ## Phase M1 — First field space: observations vs reasoning (GATED)
 
-### M1.1 Add field spaces to registry
-- `observations` space: input = observation text only
-- `reasoning` space: input = reasoning text only
-- Keep `default` blend as co-equal space
-- Each gets separate embedding + stored vector
+### M1.1 Add field spaces to embedding_input.py + registry
+- `embedding_input.py`: add space='observations' branch (observation text only) and space='reasoning' branch (reasoning + prompt text)
+- `spaces.py` registry: add SpaceDefinition('observations', 'immutable', 'observations', 'voyage') and SpaceDefinition('reasoning', 'immutable', 'reasoning', 'voyage')
+- Keep `default` blend as co-equal space — MFAR found combined beat field-only
 
-### M1.2 Query-conditioned combiner
-- Heuristic weighting: factual queries → observations weight, rationale queries → reasoning weight, unclear → even blend
-- Unlearned heuristic — treat as unproven until experiment
+### M1.2 Multi-space storage
+- JSONL: store per-space vectors in `embeddings` dict: `{'default': [...], 'observations': [...], 'reasoning': [...]}`
+- Keep `embedding` field for backward compat (= default space vector)
+- Entries missing field spaces (no reasoning, no observations) → those spaces absent, combiner skips them
+- `store.py _score_entry`: compute per-space similarities, pass to `combine_similarities()`
+- `_score_all_entries` numpy path: compute per-space matrices separately
 
-### M1.3 GATING EXPERIMENT (mandatory)
-- Compare retrieval: single blended space vs observation/reasoning split with combiner
-- Test cross-space disagreement as signal for contradiction/quality/drift
-- **Pre-registered decision rule:** if split does not beat single-space baseline, does not ship to default scoring
+### M1.3 Embed existing entries in new spaces
+- Add `memoryschema reembed --space observations` and `--space reasoning` to reembed.py
+- Run on the 34 JSONL entries to populate field-space vectors
+- Entries without reasoning/observations → those space vectors not computed (structural absence)
+
+### M1.4 Query-conditioned combiner (unlearned heuristic)
+- Heuristic: equal 1/3 weighting across present spaces (default + observations + reasoning)
+- No query-type classification in v1 — uniform weighting, measure whether field separation alone helps
+- Treat as unproven until experiment says otherwise
+
+### M1.5 GATING EXPERIMENT (mandatory)
+- Run `memoryschema eval --store memory/store.jsonl` with multi-space combiner
+- Compare against recorded baseline (recall@5=0.492, nDCG=0.504)
+- Test cross-space disagreement: for each entry, compute |sim_observations - sim_reasoning| and check if high disagreement correlates with any property
+- **Pre-registered decision rule:** if multi-space does not beat single-space baseline on the 6-query set, does not ship to default scoring. May remain as opt-in.
+
+### Key files to modify
+- `src/memoryschema/embedding_input.py` — add observations/reasoning spaces
+- `src/memoryschema/spaces.py` — registry + combiner weights
+- `src/memoryschema/store.py` — _score_entry multi-space, _score_all_entries numpy path
+- `src/memoryschema/reembed.py` — per-space reembedding
+- `src/memoryschema/eval/fixtures.py` — query_type labels (optional)
 
 **Verification status required:** Measured (experiment ran, numbers recorded, ship/no-ship decision made per pre-registered rule)
 
