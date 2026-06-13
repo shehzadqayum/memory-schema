@@ -1,35 +1,44 @@
-# Resolve Residuals: JSONL/Neo4j Sync (COMPLETE)
+# Fix Hook Embedding Gap
 
 ## Context
 
-The JSONL store has 34 entries, Neo4j has 36 nodes. The 2 extra Neo4j entries (`imported` and `test`) are orphaned test data from prior development — they have no status field and are not real memory entities. Syncing them to JSONL would pollute the store. The fix is to delete them from Neo4j and verify alignment.
+The PostToolUse hook constructs a `MemoryConfig` (line 82) but never passes it to `embed_text()` (line 73). The embed guard checks `os.environ.get('VOYAGE_API_KEY')` which isn't available in the hook subprocess. The config already supports reading the key from TOML or env. The CLI `hook test` command does it correctly: `embed_text(text, config=config)`.
 
-## Prior Residuals (from [S4] 321e183)
+## Prior Residuals (from [S4] bb5a825)
 
-- JSONL/Neo4j count mismatch: 34 vs 36 → addressing in Phase 1
+None.
 
-## Phase 1 — Sync JSONL and Neo4j stores ✓ d8dad45
+## Phase 1 — Pass config to embed_text in hook
 
-### 1.1 Delete orphaned Neo4j entries
-- Delete `imported` and `test` from Neo4j: `memoryschema delete imported` and `memoryschema delete test` (with NEO4J_PASSWORD=changeme)
-- These are test artifacts, not real memory entities
+### 1.1 Fix hook embedding to use config
+In `src/memoryschema/hooks/hook-post-write.sh`, two changes:
 
-### 1.2 Verify sync
-- Run `memoryschema sync` — should show 34/34, "in sync"
-- Run `memoryschema neo4j status` — should show 34 nodes
+1. Move the embed block AFTER config construction (currently embed is lines 68-75, config is lines 78-89 — embed runs before config exists)
+2. Change the embed guard to check config, and pass config to embed_text:
 
-### 1.3 Add sync verification test
-- Add to `tests/test_e2e_pipeline.py` or existing test: verify that after upsert to both stores, counts match
-- Optional: if too narrow for a dedicated test, skip and rely on operational verification
+```python
+# BEFORE (lines 68-75):
+if os.environ.get('VOYAGE_API_KEY'):
+    ...
+    memory['embedding'] = embed_text(text)
 
-### Key files
-- `src/memoryschema/cli/migrate_cmd.py` — sync command
-- `src/memoryschema/cli/memory_cmd.py` — delete command
+# AFTER (moved after config construction):
+if os.environ.get('VOYAGE_API_KEY') or (hook_config and hook_config.voyage_api_key):
+    ...
+    memory['embedding'] = embed_text(text, config=hook_config)
+```
 
-**Verification:** Operative (memoryschema sync shows 34/34 in sync)
+### 1.2 Add test
+Add to `tests/test_cli_hook.py`:
+- `test_embed_text_accepts_config` — verify `embed_text(text, config=config)` works with config that has voyage_api_key set (mocked Voyage client)
+
+### Key file
+- `src/memoryschema/hooks/hook-post-write.sh` — lines 68-89
+
+**Verification:** Operative (write a test memory, verify it has an embedding)
 
 ## Verification Criteria
 
 | # | Criterion | Phase | Status type |
 |---|-----------|-------|-------------|
-| 1 | Neo4j orphans deleted, sync shows 34/34 | 1 | Operative |
+| 1 | Hook embeds on write using config (not just env) | 1 | Operative |
