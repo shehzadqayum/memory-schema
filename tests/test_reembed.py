@@ -110,3 +110,82 @@ class TestReembed:
         with open(path) as f:
             preserved = [json.loads(line) for line in f if line.strip()]
         assert len(preserved) == 3
+
+
+class TestReembedFieldSpaces:
+    """Tests for per-space reembedding (M1.3)."""
+
+    @pytest.fixture
+    def store_with_fields(self, tmp_path):
+        """Create store with entries that have/lack observations and reasoning."""
+        entries = [
+            {"name": "full-1", "description": "Full entry",
+             "observations": ["Fact A"], "reasoning": "Because X", "prompt": "Why?"},
+            {"name": "obs-only", "description": "Observations only",
+             "observations": ["Fact B", "Fact C"]},
+            {"name": "reason-only", "description": "Reasoning only",
+             "reasoning": "Because Y"},
+            {"name": "bare", "description": "No observations or reasoning"},
+        ]
+        path = tmp_path / "store.jsonl"
+        with open(path, 'w') as f:
+            for e in entries:
+                f.write(json.dumps(e) + '\n')
+        return str(path), entries
+
+    def test_observations_space_skips_empty(self, store_with_fields):
+        path, _ = store_with_fields
+        config = MemoryConfig(store_path=path)
+        result = reembed(prefix="", config=config, space='observations', dry_run=True)
+        assert result['matched'] == 4
+        assert result['space'] == 'observations'
+
+    def test_reasoning_space_skips_empty(self, store_with_fields):
+        path, _ = store_with_fields
+        config = MemoryConfig(store_path=path)
+        result = reembed(prefix="", config=config, space='reasoning', dry_run=True)
+        assert result['matched'] == 4
+        assert result['space'] == 'reasoning'
+
+    def test_observations_space_embeds(self, store_with_fields):
+        """Observations space: embeds entries with observations, skips others."""
+        path, _ = store_with_fields
+        config = MemoryConfig(store_path=path)
+        mock_vectors = [[0.1] * 10, [0.2] * 10]  # 2 entries have observations
+        with patch("memoryschema.embeddings.embed_batch", return_value=mock_vectors):
+            result = reembed(prefix="", config=config, space='observations',
+                             skip_assoc=True)
+        assert result['embedded'] == 2
+        assert result['skipped_empty'] == 2
+        # Verify embeddings dict was populated
+        with open(path) as f:
+            rewritten = [json.loads(line) for line in f if line.strip()]
+        full = next(e for e in rewritten if e['name'] == 'full-1')
+        assert 'observations' in full.get('embeddings', {})
+        bare = next(e for e in rewritten if e['name'] == 'bare')
+        assert 'observations' not in bare.get('embeddings', {})
+
+    def test_reasoning_space_embeds(self, store_with_fields):
+        """Reasoning space: embeds entries with reasoning/prompt, skips others."""
+        path, _ = store_with_fields
+        config = MemoryConfig(store_path=path)
+        mock_vectors = [[0.3] * 10, [0.4] * 10]  # 2 entries have reasoning
+        with patch("memoryschema.embeddings.embed_batch", return_value=mock_vectors):
+            result = reembed(prefix="", config=config, space='reasoning',
+                             skip_assoc=True)
+        assert result['embedded'] == 2
+        assert result['skipped_empty'] == 2
+
+    def test_default_space_populates_both_fields(self, store_with_fields):
+        """Default space (space=None): sets both embedding and embeddings.default."""
+        path, _ = store_with_fields
+        config = MemoryConfig(store_path=path)
+        mock_vectors = [[0.5] * 10] * 4
+        with patch("memoryschema.embeddings.embed_batch", return_value=mock_vectors):
+            result = reembed(prefix="", config=config, skip_assoc=True)
+        assert result['embedded'] == 4
+        with open(path) as f:
+            rewritten = [json.loads(line) for line in f if line.strip()]
+        for e in rewritten:
+            assert 'embedding' in e
+            assert e.get('embeddings', {}).get('default') == e['embedding']

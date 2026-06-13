@@ -47,14 +47,17 @@ def index(config, base_path, project_scope, do_embed):
 @click.option("--coverage", is_flag=True, help="Show embedding coverage stats only.")
 @click.option("--batch-size", default=20, type=int, help="Embedding batch size. Default: 20.")
 @click.option("--dry-run", is_flag=True, help="Show stats without re-embedding.")
+@click.option("--space", "space", default=None,
+              help="Embedding space (observations, reasoning). Default: default space.")
 @click.option("--json", "as_json", is_flag=True, help="Output as JSON.")
 @click.pass_obj
-def embed(config, prefix, embed_all, coverage, batch_size, dry_run, as_json):
+def embed(config, prefix, embed_all, coverage, batch_size, dry_run, space, as_json):
     """Re-embed entries by prefix or all.
 
     Example:
         memoryschema embed --prefix forum- --batch-size 50
         memoryschema embed --all --dry-run
+        memoryschema embed --all --space observations
         memoryschema embed --coverage
     """
     if coverage:
@@ -79,14 +82,19 @@ def embed(config, prefix, embed_all, coverage, batch_size, dry_run, as_json):
         prefix = ""
 
     from memoryschema.reembed import reembed
-    result = reembed(prefix=prefix, config=config, batch_size=batch_size, dry_run=dry_run)
+    result = reembed(prefix=prefix, config=config, batch_size=batch_size,
+                     dry_run=dry_run, space=space)
 
     if as_json:
         click.echo(json.dumps(result))
     else:
+        if result.get('space'):
+            click.echo(f"Space:        {result['space']}")
         click.echo(f"Total:        {result['total']:,}")
         click.echo(f"Matched:      {result['matched']:,}")
         click.echo(f"Embedded:     {result['embedded']:,}")
+        if result.get('skipped_empty'):
+            click.echo(f"Skipped:      {result['skipped_empty']:,} (empty text for space)")
         if result.get('associations'):
             click.echo(f"Associations: {result['associations']:,}")
         if result.get('dry_run'):

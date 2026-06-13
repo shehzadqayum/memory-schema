@@ -19,7 +19,8 @@ import time
 from memoryschema.embedding_input import compose_embedding_text  # canonical source
 
 
-def reembed(prefix, config=None, batch_size=20, max_chars=2000, dry_run=False, skip_assoc=False):
+def reembed(prefix, config=None, batch_size=20, max_chars=2000, dry_run=False,
+            skip_assoc=False, space=None):
     """Re-embed entries matching prefix.
 
     Args:
@@ -29,9 +30,13 @@ def reembed(prefix, config=None, batch_size=20, max_chars=2000, dry_run=False, s
         max_chars: Max chars per embedding text.
         dry_run: Show stats without re-embedding.
         skip_assoc: Skip association recomputation.
+        space: Embedding space to target (e.g., 'observations', 'reasoning').
+            If None, embeds in the default space (backward compat).
+            Entries with empty text for the target space are skipped
+            (structural absence — no observations or no reasoning).
 
     Returns:
-        Dict with stats: {total, matched, embedded, associations}.
+        Dict with stats: {total, matched, embedded, skipped_empty, associations}.
     """
     if config is None:
         from memoryschema.config import MemoryConfig
@@ -48,29 +53,47 @@ def reembed(prefix, config=None, batch_size=20, max_chars=2000, dry_run=False, s
         'total': len(entries),
         'matched': len(target_entries),
         'embedded': 0,
+        'skipped_empty': 0,
         'associations': 0,
     }
+    if space:
+        stats['space'] = space
 
     if not target_entries or dry_run:
         stats['dry_run'] = dry_run
         return stats
 
+    # For field spaces, filter out entries with empty text (structural absence)
+    embed_space = space or 'default'
+    embeddable = []
+    for e in target_entries:
+        text = compose_embedding_text(e, space=embed_space, max_chars=max_chars)
+        if text:
+            embeddable.append((e, text))
+        else:
+            stats['skipped_empty'] += 1
+
+    if not embeddable:
+        return stats
+
     from memoryschema.embeddings import embed_batch as _embed_batch
 
     embedded = 0
-    total = len(target_entries)
-    total_batches = (total + batch_size - 1) // batch_size
 
-    for i in range(0, total, batch_size):
-        batch = target_entries[i:i + batch_size]
-        texts = [compose_embedding_text(e, max_chars=max_chars) for e in batch]
+    for i in range(0, len(embeddable), batch_size):
+        batch = embeddable[i:i + batch_size]
+        texts = [text for _, text in batch]
 
         max_retries = 3
         for attempt in range(max_retries):
             try:
                 vectors = _embed_batch(texts, config=config)
-                for e, vec in zip(batch, vectors):
-                    e['embedding'] = vec
+                for (e, _), vec in zip(batch, vectors):
+                    if space:
+                        e.setdefault('embeddings', {})[space] = vec
+                    else:
+                        e['embedding'] = vec
+                        e.setdefault('embeddings', {})['default'] = vec
                 embedded += len(batch)
                 break
             except Exception as ex:
