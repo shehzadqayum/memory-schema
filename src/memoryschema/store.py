@@ -736,12 +736,37 @@ class MemoryStore:
         # Normalize to a boost range (~0.0 to 0.3)
         return min(score * 0.1, 0.3)
 
+    @staticmethod
+    def _multi_space_relevance(entry, query_embedding):
+        """Compute combined relevance across all available embedding spaces.
+
+        Uses per-space cosine similarities combined through the space combiner.
+        Falls back to single embedding for legacy entries without embeddings dict.
+        """
+        from memoryschema.spaces import combine_similarities as _combine_sims
+
+        per_space_sims = {}
+        embeddings = entry.get('embeddings', {})
+
+        if embeddings:
+            for space_name, space_vec in embeddings.items():
+                if space_vec:
+                    per_space_sims[space_name] = max(
+                        0.0, _cosine_similarity(query_embedding, space_vec))
+        elif entry.get('embedding'):
+            per_space_sims['default'] = max(
+                0.0, _cosine_similarity(query_embedding, entry['embedding']))
+
+        if not per_space_sims:
+            return 0.0
+        return _combine_sims(per_space_sims)
+
     def _score_entry(self, entry, query_embedding=None, mode='semantic',
                      precomputed_relevance=None):
         """Score a memory entry for retrieval ranking.
 
         Args:
-            precomputed_relevance: If provided, use this cosine similarity
+            precomputed_relevance: If provided, use this combined relevance
                 instead of computing it. Used by the numpy batch path.
         """
         recency = 0.5
@@ -778,8 +803,8 @@ class MemoryStore:
 
         if precomputed_relevance is not None:
             relevance = precomputed_relevance
-        elif query_embedding and entry.get('embedding'):
-            relevance = max(0.0, _cosine_similarity(query_embedding, entry['embedding']))
+        elif query_embedding:
+            relevance = self._multi_space_relevance(entry, query_embedding)
         else:
             relevance = 0.0
 
@@ -789,7 +814,8 @@ class MemoryStore:
             w_r, w_i, w_v = 0.2, 0.3, 0.5
 
         has_relevance = (precomputed_relevance is not None
-                         or (query_embedding and entry.get('embedding')))
+                         or (query_embedding and (
+                             entry.get('embeddings') or entry.get('embedding'))))
         if not has_relevance:
             w_r += w_v * 0.4
             w_i += w_v * 0.6
@@ -834,36 +860,73 @@ class MemoryStore:
         return round(min(score, 1.0), 4)
 
     def _score_all_entries(self, entries, query, query_embedding):
-        """Score all entries against a query. Uses numpy when available."""
+        """Score all entries against a query. Uses numpy when available.
+
+        Multi-space aware: computes per-space cosine similarities in batch
+        via numpy, combines through the space combiner, then scores.
+        Falls back to per-entry scoring without numpy.
+        """
         q_lower = query.lower() if query else ''
 
         if query_embedding:
             try:
                 import numpy as np
+                from memoryschema.spaces import combine_similarities as _combine_sims
 
-                embedded_entries = []
+                query_vec = np.array(query_embedding, dtype=np.float32)
+                query_norm = np.linalg.norm(query_vec)
+
+                # Collect per-entry space embeddings (multi-space or legacy)
+                entry_space_embs = []  # list of (entry, {space: vec})
                 non_embedded = []
                 for e in entries:
-                    if e.get('embedding'):
-                        embedded_entries.append(e)
+                    space_embs = e.get('embeddings', {})
+                    if not space_embs and e.get('embedding'):
+                        space_embs = {'default': e['embedding']}
+                    if space_embs:
+                        entry_space_embs.append((e, space_embs))
                     else:
                         non_embedded.append(e)
 
                 results = []
 
-                if embedded_entries:
-                    matrix = np.array([e['embedding'] for e in embedded_entries], dtype=np.float32)
-                    query_vec = np.array(query_embedding, dtype=np.float32)
-                    norms = np.linalg.norm(matrix, axis=1)
-                    query_norm = np.linalg.norm(query_vec)
-                    similarities = (matrix @ query_vec) / (norms * query_norm + 1e-10)
-                    similarities = np.clip(similarities, 0.0, 1.0)
+                if entry_space_embs:
+                    # Discover all spaces present across entries
+                    all_spaces = set()
+                    for _, se in entry_space_embs:
+                        all_spaces.update(se.keys())
 
-                    for i, entry in enumerate(embedded_entries):
+                    # Batch compute cosine similarity per space
+                    space_sims = {}  # space -> {entry_idx: sim}
+                    for space_name in all_spaces:
+                        indices = []
+                        vecs = []
+                        for idx, (_, se) in enumerate(entry_space_embs):
+                            if space_name in se and se[space_name]:
+                                indices.append(idx)
+                                vecs.append(se[space_name])
+                        if vecs:
+                            matrix = np.array(vecs, dtype=np.float32)
+                            norms = np.linalg.norm(matrix, axis=1)
+                            sims = (matrix @ query_vec) / (norms * query_norm + 1e-10)
+                            sims = np.clip(sims, 0.0, 1.0)
+                            space_sims[space_name] = {
+                                indices[i]: float(sims[i])
+                                for i in range(len(indices))
+                            }
+
+                    # Combine per-space similarities for each entry
+                    for idx, (entry, _) in enumerate(entry_space_embs):
+                        per_space = {}
+                        for space_name, idx_sim_map in space_sims.items():
+                            if idx in idx_sim_map:
+                                per_space[space_name] = idx_sim_map[idx]
+                        combined = _combine_sims(per_space) if per_space else 0.0
                         score = self._score_entry(
-                            entry, precomputed_relevance=float(similarities[i]))
+                            entry, precomputed_relevance=combined)
                         if q_lower:
-                            score += self._bm25_score(q_lower, self._searchable_text(entry))
+                            score += self._bm25_score(
+                                q_lower, self._searchable_text(entry))
                         results.append((entry, score))
 
                 for entry in non_embedded:

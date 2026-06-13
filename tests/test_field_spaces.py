@@ -1,15 +1,19 @@
-"""Tests for field-level embedding spaces (M1.1).
+"""Tests for field-level embedding spaces (M1.1 + M1.2).
 
 Covers:
 - compose_embedding_text for observations and reasoning spaces
 - Registry contains all three spaces
 - Combiner handles multi-space inputs
 - Empty field returns empty string (structural absence)
+- Multi-space scoring in MemoryStore (_score_entry, _score_all_entries)
+- Backward compat: entries with only `embedding` field
 """
 
+import json
 import pytest
 from memoryschema.embedding_input import compose_embedding_text
 from memoryschema.spaces import get_registry, get_space, combine_similarities
+from memoryschema.store import MemoryStore, _cosine_similarity
 
 
 # --- Embedding input composition ---
@@ -155,3 +159,141 @@ class TestCombinerMultiSpace:
         weights = {'default': 1.0, 'observations': 1.0, 'reasoning': 1.0}
         result = combine_similarities(sims, weights=weights)
         assert abs(result - 0.6) < 1e-9
+
+
+# --- Multi-space scoring in MemoryStore (M1.2) ---
+
+# Helper: unit vectors for deterministic scoring tests
+_VEC_A = [1.0, 0.0, 0.0]
+_VEC_B = [0.0, 1.0, 0.0]
+_VEC_C = [0.0, 0.0, 1.0]
+_VEC_AB = [0.7071, 0.7071, 0.0]  # ~45 degrees between A and B
+
+
+@pytest.fixture
+def store(tmp_path):
+    return MemoryStore(str(tmp_path / 'test.jsonl'))
+
+
+class TestMultiSpaceRelevance:
+    """Tests for _multi_space_relevance static method."""
+
+    def test_multi_space_three_spaces(self):
+        entry = {
+            'name': 'test',
+            'embeddings': {
+                'default': _VEC_A,
+                'observations': _VEC_A,
+                'reasoning': _VEC_B,
+            },
+        }
+        # Query aligned with A → default=1.0, observations=1.0, reasoning=0.0
+        rel = MemoryStore._multi_space_relevance(entry, _VEC_A)
+        expected = (1.0 + 1.0 + 0.0) / 3
+        assert abs(rel - expected) < 0.01
+
+    def test_legacy_embedding_backward_compat(self):
+        """Entry with only `embedding` field uses it as default space."""
+        entry = {'name': 'legacy', 'embedding': _VEC_A}
+        rel = MemoryStore._multi_space_relevance(entry, _VEC_A)
+        assert abs(rel - 1.0) < 0.01
+
+    def test_embeddings_dict_takes_precedence(self):
+        """Entry with both `embeddings` and `embedding` uses the dict."""
+        entry = {
+            'name': 'both',
+            'embedding': _VEC_A,  # legacy, should be ignored
+            'embeddings': {'default': _VEC_B},  # should be used
+        }
+        # Query aligned with A → default (B) gives 0.0
+        rel = MemoryStore._multi_space_relevance(entry, _VEC_A)
+        assert abs(rel - 0.0) < 0.01
+
+    def test_structural_absence(self):
+        """Entry missing a space → combiner averages only present spaces."""
+        entry = {
+            'name': 'partial',
+            'embeddings': {
+                'default': _VEC_A,
+                'observations': _VEC_A,
+                # No 'reasoning' — structural absence
+            },
+        }
+        rel = MemoryStore._multi_space_relevance(entry, _VEC_A)
+        # Both present spaces have sim=1.0 → average = 1.0
+        assert abs(rel - 1.0) < 0.01
+
+    def test_no_embeddings_returns_zero(self):
+        entry = {'name': 'bare'}
+        rel = MemoryStore._multi_space_relevance(entry, _VEC_A)
+        assert rel == 0.0
+
+
+class TestScoreEntryMultiSpace:
+    """Tests for _score_entry with multi-space embeddings."""
+
+    def test_multi_space_higher_than_no_embedding(self, store):
+        with_emb = {
+            'name': 'has-emb', 'importance': 5,
+            'embeddings': {'default': _VEC_A},
+        }
+        no_emb = {'name': 'no-emb', 'importance': 5}
+        score_with = store._score_entry(with_emb, query_embedding=_VEC_A)
+        score_without = store._score_entry(no_emb, query_embedding=_VEC_A)
+        assert score_with > score_without
+
+    def test_precomputed_still_works(self, store):
+        entry = {'name': 'test', 'importance': 5}
+        score = store._score_entry(entry, precomputed_relevance=0.9)
+        assert score > 0
+
+    def test_legacy_embedding_scores(self, store):
+        entry = {'name': 'legacy', 'importance': 5, 'embedding': _VEC_A}
+        score = store._score_entry(entry, query_embedding=_VEC_A)
+        assert score > 0
+
+
+class TestScoreAllEntriesMultiSpace:
+    """Tests for _score_all_entries numpy path with multi-space."""
+
+    def test_mixed_entries(self, store):
+        entries = [
+            {'name': 'multi', 'importance': 5,
+             'embeddings': {'default': _VEC_A, 'observations': _VEC_A}},
+            {'name': 'legacy', 'importance': 5, 'embedding': _VEC_A},
+            {'name': 'bare', 'importance': 5},
+        ]
+        scored = store._score_all_entries(entries, 'test', _VEC_A)
+        assert len(scored) == 3
+        names = {e['name'] for e, _ in scored}
+        assert names == {'multi', 'legacy', 'bare'}
+
+    def test_multi_space_entries_scored(self, store):
+        entries = [
+            {'name': 'aligned', 'importance': 5,
+             'embeddings': {'default': _VEC_A, 'observations': _VEC_A}},
+            {'name': 'orthogonal', 'importance': 5,
+             'embeddings': {'default': _VEC_B, 'observations': _VEC_B}},
+        ]
+        scored = store._score_all_entries(entries, 'test', _VEC_A)
+        scores = {e['name']: s for e, s in scored}
+        assert scores['aligned'] > scores['orthogonal']
+
+    def test_embeddings_dict_persisted_in_jsonl(self, store):
+        """Verify embeddings dict round-trips through JSONL serialization."""
+        entry = {
+            'name': 'persist-test', 'schema': 4,
+            'description': 'Test persistence',
+            'embedding': _VEC_A,
+            'embeddings': {
+                'default': _VEC_A,
+                'observations': _VEC_B,
+                'reasoning': _VEC_C,
+            },
+        }
+        store.upsert(entry)
+        loaded = store.get('persist-test')
+        assert loaded['embeddings']['default'] == _VEC_A
+        assert loaded['embeddings']['observations'] == _VEC_B
+        assert loaded['embeddings']['reasoning'] == _VEC_C
+        assert loaded['embedding'] == _VEC_A
