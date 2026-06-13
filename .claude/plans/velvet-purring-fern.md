@@ -111,31 +111,31 @@ Write a test that exercises the hook's Python block end-to-end:
 
 **Verification:** Real baseline numbers recorded (Measured). Hook path verified (Operative or Tested with explanation).
 
-## Phase M1 — First field space: observations vs reasoning (GATED)
+## Phase M1 — First field space: observations vs reasoning (COMPLETE — NO SHIP)
 
-### M1.1 Add field spaces to embedding_input.py + registry
+### M1.1 Add field spaces to embedding_input.py + registry ✓ 950a482
 - `embedding_input.py`: add space='observations' branch (observation text only) and space='reasoning' branch (reasoning + prompt text)
 - `spaces.py` registry: add SpaceDefinition('observations', 'immutable', 'observations', 'voyage') and SpaceDefinition('reasoning', 'immutable', 'reasoning', 'voyage')
 - Keep `default` blend as co-equal space — MFAR found combined beat field-only
 
-### M1.2 Multi-space storage
+### M1.2 Multi-space storage ✓ aadfe03
 - JSONL: store per-space vectors in `embeddings` dict: `{'default': [...], 'observations': [...], 'reasoning': [...]}`
 - Keep `embedding` field for backward compat (= default space vector)
 - Entries missing field spaces (no reasoning, no observations) → those spaces absent, combiner skips them
 - `store.py _score_entry`: compute per-space similarities, pass to `combine_similarities()`
 - `_score_all_entries` numpy path: compute per-space matrices separately
 
-### M1.3 Embed existing entries in new spaces
+### M1.3 Embed existing entries in new spaces ✓ 25a1340
 - Add `memoryschema reembed --space observations` and `--space reasoning` to reembed.py
 - Run on the 34 JSONL entries to populate field-space vectors
 - Entries without reasoning/observations → those space vectors not computed (structural absence)
 
-### M1.4 Query-conditioned combiner (unlearned heuristic)
+### M1.4 Query-conditioned combiner (unlearned heuristic) ✓ 321229e
 - Heuristic: equal 1/3 weighting across present spaces (default + observations + reasoning)
 - No query-type classification in v1 — uniform weighting, measure whether field separation alone helps
 - Treat as unproven until experiment says otherwise
 
-### M1.5 GATING EXPERIMENT (mandatory)
+### M1.5 GATING EXPERIMENT (mandatory) ✓ 234adbf — NO SHIP
 - Run `memoryschema eval --store memory/store.jsonl` with multi-space combiner
 - Compare against recorded baseline (recall@5=0.492, nDCG=0.504)
 - Test cross-space disagreement: for each entry, compute |sim_observations - sim_reasoning| and check if high disagreement correlates with any property

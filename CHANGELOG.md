@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Added (Multi-space — M1, NO SHIP)
+- Field-level embedding spaces: `observations` and `reasoning` in embedding_input.py
+- Space registry: 3 spaces (default, observations, reasoning) in spaces.py
+- Multi-space scoring: `_multi_space_relevance()` in store.py with coverage-aware combiner
+- Multi-space numpy batch path in `_score_all_entries`
+- Per-space reembedding: `memoryschema embed --all --space observations` CLI option
+- Structural absence handling: entries without observations/reasoning skip those spaces
+- `EXPERIMENT_WEIGHTS = None` constant for explicit experiment configuration
+- Gating experiment result: multi-space nDCG 0.601 < single-space 0.608, NO SHIP
+
 ### Added (v4 — Unit C)
 - `log_decline()` in audit.py — write decline records for salience instrumentation
 - CLI: `memoryschema decline --reason "..." [--name-hint X]` — frictionless decline recording
