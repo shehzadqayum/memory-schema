@@ -334,3 +334,5 @@
 2026-06-13 13:17:27	session-open	END	completed	Session 20 briefing — new session after S4 100ff7c, 1 residual (hook test), M1 next
 2026-06-13 13:25:18	implement	START	—	—
 2026-06-13 13:26:33	plan-commit	START	—	—
+2026-06-13 13:34:01	plan-commit	END	completed	M1 plan committed as 341ae4c, 1 residual deferred
+2026-06-13 13:35:07	implement	START	—	—

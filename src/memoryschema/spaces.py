@@ -37,9 +37,11 @@ class SpaceDefinition:
         return compose_embedding_text(entry, space=self.input_selector)
 
 
-# Default registry: one space = today's system
+# Registry: default (blended) + field-level spaces
 _REGISTRY = {
     'default': SpaceDefinition('default', 'immutable', 'default', 'voyage'),
+    'observations': SpaceDefinition('observations', 'immutable', 'observations', 'voyage'),
+    'reasoning': SpaceDefinition('reasoning', 'immutable', 'reasoning', 'voyage'),
 }
 
 

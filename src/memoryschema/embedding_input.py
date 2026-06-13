@@ -35,4 +35,22 @@ def compose_embedding_text(entry, space='default', max_chars=2000):
         text = ' '.join(parts).strip()
         return text[:max_chars]
 
+    if space == 'observations':
+        obs = entry.get('observations', [])
+        if not obs:
+            return ''
+        text = ' '.join(str(o) for o in obs).strip()
+        return text[:max_chars]
+
+    if space == 'reasoning':
+        parts = []
+        if entry.get('reasoning'):
+            parts.append(entry['reasoning'])
+        if entry.get('prompt'):
+            parts.append(entry['prompt'])
+        if not parts:
+            return ''
+        text = ' '.join(parts).strip()
+        return text[:max_chars]
+
     raise ValueError(f"Unknown embedding space: {space!r}")
