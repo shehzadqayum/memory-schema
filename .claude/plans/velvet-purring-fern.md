@@ -1,185 +1,131 @@
-# Multi-Space Embedding: Enabling Phases + Registry
+# Framework Hardening: Test Gaps + Broken Paths
 
 ## Context
 
-The multi-space embedding plan requires two enabling fixes before any space work begins. The eval harness cannot measure the real system (imports break on clean install, runs only against synthetic fixtures). The write path silently drops gate stages 4-6 (hook embeds after gate with no store/config; numeric probe and L0 echo are unreachable). Building spaces on unmeasurable, broken infrastructure reproduces the project's documented failure pattern: features built, unit-tested, marked complete, found unreachable.
+After completing the multi-space embedding experiment (M1, NO SHIP), a full framework audit revealed 6 gaps: one untested module (l0_budget.py), no end-to-end pipeline test, broken Neo4j auth, a non-functional reflect command, an unresolved hook integration test residual (session 18), and mocked-only Neo4j tests. This plan fixes all of them in priority order.
 
-## Prior Residuals (from [S4] 100ff7c)
+## Prior Residuals (from [S4] d4043ce)
 
-- Hook integration test: E2 write path correct by inspection but not end-to-end verified via hook subprocess → deferring (out of M1 scope; hook path is Tested, not blocking field-space experiment)
+- Hook integration test: E2 write path Tested but not Operative via subprocess → addressing in Phase 5
 
-## Exploration Findings
+## Phase 1 — l0_budget.py test coverage
 
-### Eval harness (E1 preconditions)
-- eval_cmd.py imports `from tests.eval.fixtures/metrics` — tests/ not in package, breaks on clean install
-- Salience mode shows synthetic baselines only; never connects to actual gate/audit data
-- Retrieval mode runs against synthetic tempdir fixture store only; no --store path option
+The only module (out of 21) without dedicated tests. Token budget enforcement for MEMORY.md is critical — if it silently breaks, the L0 index grows unbounded.
 
-### Write path (E2 preconditions)
-- **Hook (hook-post-write.sh:64):** calls `gate_check(memory)` with NO store, NO config. Stages 3-6 unreachable.
-- **Hook (hook-post-write.sh:74-86):** embeds AFTER gate. Stage 4 consistency probe + stages 5-6 probes need embedding → dead code on hook path.
-- **CLI write (memory_cmd.py:221):** calls `gate_pipeline(memory, store=store)` — has store but NO config. Embeds after gate.
-- **MEMORY_GENERATOR:** never read by hook. generator_id is null on every write.
-- **Ingest examples:** provenance not set (defaults to first-party, disabling L0 gating). Schema dict says 2, f-string says 4.
+### 1.1 Create tests/test_l0_budget.py
+- `TestEstimateTokens`: empty string → 0, known length → chars//4
+- `TestParseIndexEntries`: extracts `- [name](file.md)` entries, preserves other lines, handles empty content
+- `TestEnforceBudget`: under budget no-op, over budget evicts, FIFO without store, score-based with store, file rewritten correctly, custom budget, multiple blank line cleanup
+- `TestCategorizeIndex`: groups by type (semantic→Knowledge, episodic→Session History, procedural→Procedures), unknown type defaults to Knowledge, preserves title, file rewritten
 
-### Embedding input drift (M0 precondition)
-- **Full (5 fields):** name+description+observations+prompt+reasoning — consolidation.py, reembed.py, hook
-- **Partial (4 fields):** description+observations+prompt+reasoning — memory_cmd.py, hook_cmd.py (missing name)
-- **Minimal (2 fields):** description+observations — ingest examples
-- No canonical compose function in embeddings.py; callers duplicate logic
+### Key file
+- `src/memoryschema/l0_budget.py` — 4 functions: `estimate_tokens`, `parse_index_entries`, `enforce_budget`, `categorize_index`
 
-## Phase E1 — Make the eval harness measure the real system ✓ 27c4d32
+**Verification:** Tested (all functions exercised with assertions)
 
-### E1.1 Make tests.eval importable at runtime
-- Move `tests/eval/fixtures.py` and `tests/eval/metrics.py` to `src/memoryschema/eval/` as a proper subpackage
-- Update eval_cmd.py imports: `from memoryschema.eval.fixtures import ...`
-- Update test_eval.py imports to use the new location
-- Keep tests/eval/test_eval.py as the test file (tests stay in tests/)
-- Verify: `pip install -e .` in clean venv, `memoryschema eval` runs without ImportError
+## Phase 2 — E2E pipeline test
 
-### E1.2 Wire real data into eval modes
-- **Retrieval mode:** add `--store PATH` option (default: configured store path). Load real store instead of synthetic tempdir.
-- **Salience mode:** add `--audit PATH` option. Read `write_decline` and `gate_decision` records from audit.jsonl, build decision list, score against fixtures.
+No single test exercises write → gate → embed → store → recall. The closest is test_consolidation.py (discover → parse → upsert) but it skips the gate and recall.
 
-### E1.3 Produce baseline report
-- Run retrieval eval against current real store (36 nodes indexed)
-- Record recall@k, MRR, nDCG as the single-space baseline
-- Store results in docs/eval/ or similar — this is the number every future space must beat
+### 2.1 Create tests/test_e2e_pipeline.py
+- `TestWriteGateStoreRecall`:
+  - `test_accept_store_recall` — memory dict → gate_pipeline ACCEPT → upsert → recall by query returns it (mocked embeddings)
+  - `test_reject_never_stored` — nameless memory → REJECT → not in store
+  - `test_quarantine_stored_with_status` — provenance conflict → QUARANTINE → stored with status=quarantined
+- `TestRelationCascade`:
+  - `test_backlink_recall` — create A, create B with INFORMS→A, compute_backlinks, recall A at depth=1, verify B appears via backlink channel
 
-**Verification status required:** Operative (command runs on real data and emits numbers, not just "code written")
+### Key files
+- `src/memoryschema/write_gate.py` — `gate_pipeline(memory, store, config)`
+- `src/memoryschema/store.py` — `MemoryStore.upsert()`, `MemoryStore.recall()`
 
-## Phase E2 — Make the write path trustworthy ✓ b5aaec4
+**Verification:** Tested (full pipeline exercised end-to-end in one test)
 
-### E2.1 Fix gate-before-embed ordering in hook
-- In hook-post-write.sh: compute embedding BEFORE calling gate
-- Call `gate_pipeline(memory, store=store, config=config)` instead of `gate_check(memory)` with no args
-- Construct store and config in the hook's Python block
-- Integration test: seed a numeric contradiction in the store, write a conflicting entry through the hook, assert quarantine fires
+## Phase 3 — Fix reflect clustering (0 clusters)
 
-### E2.2 Fix CLI write path
-- Pass config to gate_pipeline: `gate_pipeline(memory, store=store, config=config)`
-- Embed BEFORE gate so stages 4-6 have a vector
-- Verify: CLI write with seeded contradiction triggers quarantine
+`_cluster_by_associations` uses connected components via BFS. With k-NN associating all episodic entries transitively, they form one giant component (size ~17) that exceeds `max_cluster=10`. Result: 0 clusters output.
 
-### E2.3 Wire generator stamp in hook
-- Read `os.environ.get('MEMORY_GENERATOR')` in hook
-- Set `memory['generator'] = generator_id` before upsert
-- Verify: write with MEMORY_GENERATOR set, read stored record, confirm non-null generator
+### 3.1 Add score threshold to _cluster_by_associations
+- Add `score_threshold=0.7` parameter to `_cluster_by_associations(entries, min_cluster, max_cluster, score_threshold)`
+- Filter adjacency edges: only add edge if `assoc.score >= score_threshold`
+- This breaks the giant component into smaller clusters of highly related entries
+- `reflect()` passes threshold through (default 0.7)
+- CLI `--score-threshold` option (optional, can defer)
 
-### E2.4 Fix ingest examples
-- Set `provenance='ingested'` in ingest_tweets.py and ingest_forum.py
-- Fix schema dict: `'schema': 2` → `'schema': 4`
-- Verify: ingested entries have provenance='ingested' and are excluded from MEMORY.md by L0 gating
+### 3.2 Add tests
+- `test_threshold_splits_components` — 4 entries, 2 pairs with high-score (0.9) edges, cross-pair low-score (0.5). Threshold 0.7 → 2 clusters of 2.
+- `test_threshold_zero_preserves_old_behavior` — threshold=0 gives connected components (old behavior)
+- `test_single_giant_component_filtered` — reproduce the real bug: 10+ entries all connected, max_cluster=10, threshold=0.7 → smaller clusters
 
-**Verification status required:** Operative (end-to-end hook test quarantines seeded contradiction; generator stamp non-null; ingested entries gated from L0)
+### Key file
+- `src/memoryschema/consolidation.py` — `_cluster_by_associations()` (lines 92-128), `reflect()` (line 239)
 
-## Phase M0 — Registry and combiner slots (behavior-neutral) ✓ 2e003d8
+**Verification:** Tested + Operative (reflect produces >0 clusters on fixture data)
 
-### M0.1 Canonical embedding input function
-- Create `src/memoryschema/embedding_input.py` with single `compose_embedding_text(entry, space='default')` function
-- Default space: name+description+observations+prompt+reasoning (the full canonical form)
-- Replace all 6 drifting copies to call this function
-- Verify: all tests pass, baseline unchanged
+## Phase 4 — Fix Neo4j auth + improved error handling
 
-### M0.2 Space registry
-- TOML-configurable registry in config.py: `[spaces.default]` with type=immutable, input=compose_embedding_text, embedder=voyage
-- Registry resolves through TOML inheritance chain
-- Populate with exactly one entry: `default` = today's system
-- Verify: behavior unchanged, baseline unchanged
+docker-compose.yml uses `NEO4J_AUTH=neo4j/${NEO4J_PASSWORD}` (shell variable). Container started without NEO4J_PASSWORD set → auth undefined. Constructor has no error handling — raw Neo4j error bubbles up.
 
-### M0.3 Combiner slot
-- Function: `combine_similarities(per_space_sims: dict[str, float]) -> float`
-- Default: identity (return `default` space sim only)
-- Coverage-aware: iterates only present spaces, never reads absent as zero
-- Verify: all tests pass, eval baseline identical to E1.3
+### 4.1 Fix Neo4j connection
+- Set `NEO4J_PASSWORD=changeme` in environment
+- Recreate container: `docker compose down && docker compose up -d`
+- Wait for healthy, run `memoryschema neo4j schema`
+- Migrate: `memoryschema migrate jsonl-to-neo4j`
+- Verify: `memoryschema neo4j status` shows connected, 34 nodes
 
-**Verification status required:** Tested + Operative (tests pass AND eval baseline unchanged)
+### 4.2 Add auth error handling to Neo4jMemoryStore.__init__
+- Wrap the `session.run('RETURN 1')` connectivity check in try/except
+- On auth error: raise `ConnectionError` with actionable message ("Set NEO4J_PASSWORD env var or check memoryschema.toml")
+- Test: mock driver to raise auth error, verify ConnectionError with helpful message
 
-## Phase R1 — Resolve residuals: real-data query set + hook test ✓ bb17c4a
+### Key files
+- `docker-compose.yml` — `NEO4J_AUTH=neo4j/${NEO4J_PASSWORD}`
+- `src/memoryschema/neo4j_store.py` — `__init__` (lines 59-78)
 
-### R1.1 Real-data query set
-The eval fixture queries reference synthetic entities (knowledge-0, session-event-0, etc.) that don't exist in the real store. The real store has 36 entities: session-close memories, plans, and project memories. Build a query set matched to real content:
-- 4-6 queries with relevant entity lists drawn from actual stored names
-- Cover: session history recall, plan recall, project fact recall, cross-session search
-- Run `memoryschema eval --store memory/store.jsonl` and record the real baseline
+**Verification:** Operative (neo4j status shows connected + 34 nodes)
 
-### R1.2 Hook integration test
-Write a test that exercises the hook's Python block end-to-end:
-- Extract the hook's Python into a callable function (or invoke it as subprocess)
-- Seed a contradiction in the store, write a conflicting entry, verify quarantine
-- If full subprocess test is impractical, at minimum call gate_pipeline with the same args the hook constructs and verify the numeric probe fires
+## Phase 5 — Hook integration test (session 18 residual)
 
-**Verification:** Real baseline numbers recorded (Measured). Hook path verified (Operative or Tested with explanation).
+The hook's Python block calls gate_pipeline with store + config. This was fixed in E2 but never verified end-to-end.
 
-## Phase M1 — First field space: observations vs reasoning (COMPLETE — NO SHIP)
+### 5.1 Add hook pipeline tests to tests/test_e2e_pipeline.py
+- `TestHookPipeline`:
+  - `test_gate_pipeline_with_store_and_config` — construct same objects as hook (MemoryStore, MemoryConfig), run gate_pipeline, verify ACCEPT
+  - `test_quarantine_on_provenance_conflict` — seed first-party entry, gate_pipeline with ingested entry of same name → QUARANTINE
+  - `test_memory_md_update_logic` — replicate hook's MEMORY.md update: append entry, enforce_budget, categorize_index, verify file correct
+  - `test_neo4j_fallback_to_jsonl` — patch Neo4j import to raise ImportError, verify JSONL upsert succeeds
 
-### M1.1 Add field spaces to embedding_input.py + registry ✓ 950a482
-- `embedding_input.py`: add space='observations' branch (observation text only) and space='reasoning' branch (reasoning + prompt text)
-- `spaces.py` registry: add SpaceDefinition('observations', 'immutable', 'observations', 'voyage') and SpaceDefinition('reasoning', 'immutable', 'reasoning', 'voyage')
-- Keep `default` blend as co-equal space — MFAR found combined beat field-only
+### Key file
+- `src/memoryschema/hooks/hook-post-write.sh` — Python block (lines 38-175)
 
-### M1.2 Multi-space storage ✓ aadfe03
-- JSONL: store per-space vectors in `embeddings` dict: `{'default': [...], 'observations': [...], 'reasoning': [...]}`
-- Keep `embedding` field for backward compat (= default space vector)
-- Entries missing field spaces (no reasoning, no observations) → those spaces absent, combiner skips them
-- `store.py _score_entry`: compute per-space similarities, pass to `combine_similarities()`
-- `_score_all_entries` numpy path: compute per-space matrices separately
+**Verification:** Tested (hook's Python logic exercised as callable with same construction)
 
-### M1.3 Embed existing entries in new spaces ✓ 25a1340
-- Add `memoryschema reembed --space observations` and `--space reasoning` to reembed.py
-- Run on the 34 JSONL entries to populate field-space vectors
-- Entries without reasoning/observations → those space vectors not computed (structural absence)
+## Phase 6 — Neo4j integration test (optional)
 
-### M1.4 Query-conditioned combiner (unlearned heuristic) ✓ 321229e
-- Heuristic: equal 1/3 weighting across present spaces (default + observations + reasoning)
-- No query-type classification in v1 — uniform weighting, measure whether field separation alone helps
-- Treat as unproven until experiment says otherwise
+16 mocked tests verify logic but not real connectivity. A single integration test confirms the Phase 4 fix.
 
-### M1.5 GATING EXPERIMENT (mandatory) ✓ 234adbf — NO SHIP
-- Run `memoryschema eval --store memory/store.jsonl` with multi-space combiner
-- Compare against recorded baseline (recall@5=0.492, nDCG=0.504)
-- Test cross-space disagreement: for each entry, compute |sim_observations - sim_reasoning| and check if high disagreement correlates with any property
-- **Pre-registered decision rule:** if multi-space does not beat single-space baseline on the 6-query set, does not ship to default scoring. May remain as opt-in.
+### 6.1 Add pytest integration marker
+- Register `integration` marker in `pyproject.toml`
+- Standard `pytest` run skips integration tests; `pytest -m integration` runs them
 
-### Key files to modify
-- `src/memoryschema/embedding_input.py` — add observations/reasoning spaces
-- `src/memoryschema/spaces.py` — registry + combiner weights
-- `src/memoryschema/store.py` — _score_entry multi-space, _score_all_entries numpy path
-- `src/memoryschema/reembed.py` — per-space reembedding
-- `src/memoryschema/eval/fixtures.py` — query_type labels (optional)
+### 6.2 Add Neo4j integration test to tests/test_neo4j_store.py
+- `TestNeo4jIntegration` (marked `@pytest.mark.integration`):
+  - `test_connect_and_count` — connect to real Neo4j, verify count() returns integer
+  - `test_upsert_get_roundtrip` — upsert test entry, get it back, verify fields, clean up
+  - Skip guard: try/except on connection failure → pytest.skip
 
-**Verification status required:** Measured (experiment ran, numbers recorded, ship/no-ship decision made per pre-registered rule)
+### Key file
+- `tests/test_neo4j_store.py`
 
-## Phase M2 — Summary and prompt spaces (GATED, higher bar)
-
-- Per-space admission: beat baseline AND pass whole-field redundancy test (mask entire field, not one path)
-- Only after M1 experiment complete
-- Optional BM25 per-field scorer if lexical axis pursued
-
-## Phase M3 — Mutable / drift spaces (DEFERRED)
-
-- Not built in this work order
-- Registry schema reserves room
-- Event capture (log_force) already exists for when mutable spaces are declared
-
-## Reporting Standard
-
-Every deliverable reported as exactly one of:
-- **Tested:** unit test covers logic (reachability NOT established)
-- **Operative:** end-to-end run through real path produced expected effect
-- **Measured:** experiment compared to baseline, pre-registered decision made
+**Verification:** Operative (real container round-trip verified)
 
 ## Verification Criteria
 
 | # | Criterion | Phase | Status type |
 |---|-----------|-------|-------------|
-| 1 | `memoryschema eval` runs on clean install without ImportError | E1 | Operative |
-| 2 | Retrieval eval runs against real store with --store flag | E1 | Operative |
-| 3 | Single-space baseline recorded with actual numbers | E1 | Measured |
-| 4 | Hook path quarantines seeded numeric contradiction end-to-end | E2 | Operative |
-| 5 | Written memory carries non-null generator_id | E2 | Operative |
-| 6 | Ingested examples produce provenance="ingested" entries | E2 | Operative |
-| 7 | All 6 embedding input sites use one canonical function | M0 | Tested |
-| 8 | Registry holds one space, combiner is identity, baseline unchanged | M0 | Operative |
-| 9 | Field split experiment ran with recorded numbers | M1 | Measured |
-| 10 | Ship/no-ship decision made per pre-registered rule | M1 | Measured |
+| 1 | l0_budget.py has dedicated test coverage for all 4 functions | 1 | Tested |
+| 2 | Single test exercises write → gate → store → recall | 2 | Tested |
+| 3 | reflect() produces >0 clusters on fixture data | 3 | Tested |
+| 4 | Neo4j status shows connected + 34 nodes | 4 | Operative |
+| 5 | Hook Python block verified with same gate_pipeline args | 5 | Tested |
+| 6 | Real Neo4j upsert/get round-trip passes | 6 | Operative |
