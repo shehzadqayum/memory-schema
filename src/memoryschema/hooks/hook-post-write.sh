@@ -64,17 +64,7 @@ generator_id = os.environ.get('MEMORY_GENERATOR')
 if generator_id:
     memory['generator'] = generator_id
 
-# Embed BEFORE gate (stages 4-6 need the embedding vector)
-if os.environ.get('VOYAGE_API_KEY'):
-    try:
-        from memoryschema.embeddings import embed_text
-        from memoryschema.embedding_input import compose_embedding_text
-        text = compose_embedding_text(memory)
-        memory['embedding'] = embed_text(text)
-    except Exception:
-        pass  # Embedding failure does not block — stages 4-6 skip gracefully
-
-# Construct store + config for full gate pipeline
+# Construct store + config BEFORE embed (embed needs config for API key)
 hook_store = None
 hook_config = None
 try:
@@ -87,6 +77,19 @@ try:
     hook_store = MemoryStore(store_path)
 except Exception:
     pass
+
+# Embed BEFORE gate (stages 4-6 need the embedding vector)
+# Check both env var and config for API key (subprocess may not inherit env)
+voyage_key = os.environ.get('VOYAGE_API_KEY') or (
+    hook_config.voyage_api_key if hook_config else None)
+if voyage_key:
+    try:
+        from memoryschema.embeddings import embed_text
+        from memoryschema.embedding_input import compose_embedding_text
+        text = compose_embedding_text(memory)
+        memory['embedding'] = embed_text(text, config=hook_config)
+    except Exception:
+        pass  # Embedding failure does not block — stages 4-6 skip gracefully
 
 # Write gate: full pipeline with store + config (stages 1-6)
 try:

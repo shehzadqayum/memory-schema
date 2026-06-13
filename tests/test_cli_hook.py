@@ -109,6 +109,32 @@ class TestParseNonEntityFiles:
         assert result['name'] == 'test-entity'
 
 
+class TestEmbedWithConfig:
+    """Verify embed_text works with config (not just env var)."""
+
+    def test_embed_text_accepts_config(self):
+        """embed_text(text, config=config) uses config.voyage_api_key."""
+        from memoryschema.config import MemoryConfig
+        from unittest.mock import MagicMock
+        import memoryschema.embeddings as emb_mod
+
+        config = MemoryConfig(voyage_api_key='test-key-123')
+
+        mock_client = MagicMock()
+        mock_client.embed.return_value = MagicMock(embeddings=[[0.1] * 1024])
+
+        # Clear cached client so config is used
+        old_cache = emb_mod._cached_client
+        emb_mod._cached_client = None
+        try:
+            with patch.object(emb_mod.voyageai, 'Client', return_value=mock_client) as mock_cls:
+                result = emb_mod.embed_text('test text', config=config)
+            assert len(result) == 1024
+            mock_cls.assert_called_once_with(api_key='test-key-123')
+        finally:
+            emb_mod._cached_client = old_cache
+
+
 class TestHookHelp:
     def test_group_help(self, runner):
         result = runner.invoke(cli, ["hook", "--help"])
