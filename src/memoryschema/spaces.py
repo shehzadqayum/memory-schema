@@ -42,6 +42,7 @@ _REGISTRY = {
     'default': SpaceDefinition('default', 'immutable', 'default', 'voyage'),
     'observations': SpaceDefinition('observations', 'immutable', 'observations', 'voyage'),
     'reasoning': SpaceDefinition('reasoning', 'immutable', 'reasoning', 'voyage'),
+    'description': SpaceDefinition('description', 'immutable', 'description', 'voyage'),
 }
 
 

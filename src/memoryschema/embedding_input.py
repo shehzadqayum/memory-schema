@@ -53,4 +53,10 @@ def compose_embedding_text(entry, space='default', max_chars=2000):
         text = ' '.join(parts).strip()
         return text[:max_chars]
 
+    if space == 'description':
+        desc = entry.get('description', '')
+        if not desc:
+            return ''
+        return desc[:max_chars]
+
     raise ValueError(f"Unknown embedding space: {space!r}")

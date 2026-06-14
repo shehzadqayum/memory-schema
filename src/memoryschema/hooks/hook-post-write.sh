@@ -91,8 +91,8 @@ if voyage_key:
         default_vec = embed_text(text, config=hook_config)
         memory['embedding'] = default_vec
         memory['embeddings'] = {'default': default_vec}
-        # Field spaces: observations and reasoning (skip if empty)
-        for space in ('observations', 'reasoning'):
+        # Field spaces: observations, reasoning, description (skip if empty)
+        for space in ('observations', 'reasoning', 'description'):
             field_text = compose_embedding_text(memory, space=space)
             if field_text:
                 memory['embeddings'][space] = embed_text(field_text, config=hook_config)

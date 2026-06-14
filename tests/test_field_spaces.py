@@ -104,12 +104,34 @@ class TestDefaultSpaceUnchanged:
             compose_embedding_text(_make_entry(), space='nonexistent')
 
 
+class TestDescriptionSpace:
+    def test_description_only(self):
+        entry = _make_entry()
+        text = compose_embedding_text(entry, space='description')
+        assert text == 'Test description'
+        assert 'Fact A' not in text
+        assert 'verify behavior' not in text
+
+    def test_empty_description_returns_empty(self):
+        entry = _make_entry(description='')
+        assert compose_embedding_text(entry, space='description') == ''
+
+    def test_no_description_key_returns_empty(self):
+        entry = {'name': 'no-desc', 'observations': ['fact']}
+        assert compose_embedding_text(entry, space='description') == ''
+
+    def test_max_chars_truncation(self):
+        entry = _make_entry(description='x' * 200)
+        text = compose_embedding_text(entry, space='description', max_chars=50)
+        assert len(text) <= 50
+
+
 # --- Registry ---
 
 class TestRegistry:
-    def test_registry_has_three_spaces(self):
+    def test_registry_has_four_spaces(self):
         reg = get_registry()
-        assert set(reg.keys()) == {'default', 'observations', 'reasoning'}
+        assert set(reg.keys()) == {'default', 'observations', 'reasoning', 'description'}
 
     def test_all_spaces_immutable(self):
         for name, space in get_registry().items():
