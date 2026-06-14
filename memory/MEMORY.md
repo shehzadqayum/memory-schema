@@ -9,10 +9,24 @@
 - [package-audit-plan](package-audit-plan.md) — Full package audit plan — 13 findings across CRITICAL/HIGH/MEDIUM/LOW
 - [hierarchy-docs-plan](hierarchy-docs-plan.md) — Plan for hierarchy/inheritance reference doc + 7 documentation alignment fixes
 - [v3-remediation-plan](v3-remediation-plan.md) — Memory System v3 — 28-issue remediation across 7 phases: docs, lifecycle, scoring, trust, hierarchy, retrieval, evaluation
+- [multi-space-embed-discussion](multi-space-embed-discussion.md) — Discussion about enabling per-write multi-space embedding using M1 infrastructure
+- [corpus-exploration-status](corpus-exploration-status.md) — Current memory corpus state: 40 entries, multi-space reembedded, 1 cluster found
+- [type-system-explanation](type-system-explanation.md) — Explained how the type attribute works on memory entities
+- [hook-env-inheritance](hook-env-inheritance.md) — Claude Code PostToolUse hook subprocesses inherit all parent env vars including VOYAGE_API_KEY
+- [multi-space-cross-similarity](multi-space-cross-similarity.md) — Cross-space embedding similarity: observations↔reasoning diverge most at ~0.66
+- [l0-budget-design](l0-budget-design.md) — MEMORY.md L0 budget: 2000 tokens max, evicts lowest-scoring entries, groups by type
+- [scoring-formula](scoring-formula.md) — Retrieval scoring: recency × w_r + importance × w_i + cosine_sim × w_v with type/trust/basis modifiers
+- [gate-pipeline-stages](gate-pipeline-stages.md) — Write gate: 6-stage pipeline producing ACCEPT/REJECT/QUARANTINE verdicts
+- [storage-layer-architecture](storage-layer-architecture.md) — Five storage layers with graceful degradation: L0 MEMORY.md → L1 files/JSONL → L2 embeddings/Neo4j
+- [corpus-improvement-results](corpus-improvement-results.md) — After writing knowledge-rich memories, corpus grew to 50 entries with balanced types and strong recall
 
 ### Procedures
 - [session-memory-switch](session-memory-switch.md) — Switched from built-in Claude Code memory to memory-schema system
 - [working-memory-importance-change](working-memory-importance-change.md) — Changed working memory importance from tiered 7-10 to fixed 10 for all entries
+- [mandatory-memory-write-rule](mandatory-memory-write-rule.md) — Memory write enforcement changed from selective to mandatory on every response
+- [multi-space-activated](multi-space-activated.md) — Multi-space embedding activated in hook — all writes now embed in 3 spaces
+- [bash-python-quoting-rule](bash-python-quoting-rule.md) — Never use double-quoted dict keys in f-strings inside bash python3 -c blocks
+- [memory-quality-lesson](memory-quality-lesson.md) — Write facts, decisions, and patterns as semantic/procedural — not session narration as episodic
 
 ### Session History
 - [deployment-verified](deployment-verified.md) — End-to-end deployment verification of memory-schema system
@@ -25,3 +39,6 @@
 - [session-4-close](session-4-close.md) — Session 4 complete — full documentation alignment, 8 items across 12 files
 - [session-5-close](session-5-close.md) — Session 5 complete — full package audit, 15 items, 13 code fixes + 2 doc items
 - [session-6-close](session-6-close.md) — Session 6 complete — hierarchy/inheritance reference doc + 7 documentation alignment fixes
+- [out-of-session-commit](out-of-session-commit.md) — Out-of-session commit 8c12fd7 — mandatory memory write rule finalized
+- [multi-space-default-confirmed](multi-space-default-confirmed.md) — Confirmed multi-space embedding is now the default hook behavior
+- [out-of-session-multi-space](out-of-session-multi-space.md) — Out-of-session commit ba77a7f — multi-space embedding activated as default
