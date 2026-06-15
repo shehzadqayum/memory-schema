@@ -41,7 +41,6 @@ Full (all optional fields included):
   <memory:relations>
     <memory:relation target="other-memory" type="MODIFIES"/>
   </memory:relations>
-  <memory:source>session-hash-or-attribution</memory:source>
   <memory:project>project-name</memory:project>
 </memory:entity>
 
@@ -65,13 +64,13 @@ Optional body text follows after the closing tag.
 | Field | Tag | When to include |
 | --- | --- | --- |
 | **importance** | attribute | Integer 1-10. Defaults to 5 if omitted. |
+| **confidence** | attribute | Integer 1-10. Author's confidence in this memory. |
 | **type** | attribute | Free-form string. No predefined values enforced. LLM determines best usage. |
 | **observations** | `<memory:observations>` | Atomic facts. Include when there are discrete facts to record. |
 | **reasoning** | `<memory:reasoning>` | Narrative thinking — why, alternatives, connections. |
 | **prompt** | `<memory:prompt>` | The user input that triggered the response. |
 | **chain** | `<memory:chain>` | Reasoning chain context — what investigation this belongs to. |
 | **relations** | `<memory:relations>` | When the memory explicitly relates to other known memories. |
-| **source** | `<memory:source>` | Attribution (session hash, commit, URL). |
 | **project** | `<memory:project>` | When the memory is project-scoped (omit for user-scope). |
 | **status** | attribute | `active` (default), `superseded`, `archived`, or `quarantined`. |
 
@@ -96,7 +95,7 @@ Optional body text follows after the closing tag.
 | `1` | Initial tagged schema. |
 | `2` | Added `<memory:prompt>` and `<memory:reasoning>` as optional fields. Removed save/recall/result/consolidation MCP tags (unimplemented interfaces). Removed observation grammar (moved to project guidelines). Moved `<memory:observations>`, `type`, and `importance` from required to optional. Required fields reduced to: schema, name, description. All other fields optional. |
 | `3` | Added `status` attribute. Deprecated `PARENT_OF`, `CHILD_OF` relations (use `project` field). Added V11 (status), R6 (referential integrity), R7 (SUPERSEDES cycle detection). Full backward compatible with v1/v2. |
-| `4` | Added `basis` attribute on `<memory:observation>` (measured / inferred / reported). Added server-managed `verified_at`, `generator`, `embed_model`. Added `MITIGATES` relation type (7 active, 9 total). Added V14 (basis validation). Typed force records in audit trail. Numeric contradiction probe and L0 echo probe in write gate. Backward compatible with v1–v3. |
+| `4` | Added `MITIGATES` relation type (7 active, 9 total). Added `confidence` attribute (1-10). Added `chain` field. 7 embedding spaces with variance-weighted combiner. Authorised/unauthorised memory states. Content-agnostic (no trust labels). Backward compatible with v1–v3. |
 
 ### Rules
 
@@ -223,7 +222,6 @@ Only ONE memory can be authorised at a time: the active chain, tracked in `memor
 | `chain` | Set | Replaced if provided |
 | `relations` | Set | Appended (deduped by target+type) |
 | `body` | Set | Replaced if provided |
-| `source` | Set | Replaced if provided |
 
 ---
 
@@ -244,7 +242,6 @@ Only ONE memory can be authorised at a time: the active chain, tracked in `memor
 | V9 | All open tags have matching close tags |
 | V10 | If present, `schema` attribute is a valid integer from 1 to current version |
 | V11 | If present, `status` is one of: active, superseded, archived, quarantined |
-| V14 | If present, `basis` on `<memory:observation>` is one of: measured, inferred, reported |
 
 ### Relations
 
@@ -544,4 +541,4 @@ Create a chain entity when:
 | Strict mode optional | Quality checks (kebab-case name, description length, atomic observations) in strict only — defined in `validator.py`, not in this document. Graceful handling of imperfect output |
 | v1 backward compatible | v2 adds optional fields only — all v1 files remain valid |
 | v3 | Adds `status` attribute. Deprecates `PARENT_OF`, `CHILD_OF` relations. Adds V11, R6, R7 validation rules. |
-| v4 (current) | Adds `basis` on observations, `MITIGATES` relation, V14, server-managed `verified_at`/`generator`/`embed_model`, typed force records, numeric probe + L0 echo gate stages. |
+| v4 (current) | Adds `MITIGATES` relation, `confidence` attribute, `chain` field, 7 embedding spaces, variance-weighted combiner, authorised/unauthorised states. Content-agnostic. |

@@ -30,8 +30,8 @@ def _diff_fields(existing, new_dict):
     Returns dict of {field: {prior_hash, new_hash}} for changed fields.
     """
     tracked_fields = (
-        'description', 'type', 'status', 'provenance', 'importance',
-        'body', 'prompt', 'reasoning', 'source', 'project',
+        'description', 'type', 'status', 'importance',
+        'body', 'prompt', 'reasoning', 'project',
     )
     changes = {}
     for field in tracked_fields:

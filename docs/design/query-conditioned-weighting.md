@@ -26,7 +26,7 @@ Write memory/*.md → parse XML → embed (7 spaces) → gate (6 stages) → sto
 <memory:entity schema="4" name="unique-id" type="semantic" importance="7">
   <memory:description>One-line summary</memory:description>
   <memory:observations>
-    <memory:observation basis="measured">Atomic fact</memory:observation>
+    <memory:observation>Atomic fact</memory:observation>
   </memory:observations>
   <memory:prompt>The user input that triggered this memory</memory:prompt>
   <memory:reasoning>Why this approach, alternatives, connections</memory:reasoning>
@@ -65,8 +65,7 @@ Where relevance is computed by the **combiner**:
 relevance = sum(per_space_similarities) / len(per_space_similarities)
 ```
 
-Type modifiers: semantic (recency floor 0.6), procedural (access-reinforced), episodic (standard decay). Basis factor: measured=1.0, inferred=0.97, reported=0.93.
-
+Type modifiers: semantic (recency floor 0.6), procedural (access-reinforced), episodic (standard decay). 
 ### The Problem
 
 Equal-weight averaging dilutes the default space signal. Evaluation results:

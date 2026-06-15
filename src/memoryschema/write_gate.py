@@ -111,8 +111,7 @@ def gate_pipeline(memory, store=None, strict=False, config=None):
 
 
 def _run_v4_probes(memory, store, config, quarantine_reasons, warnings):
-    """Run v4 gate probes (stages 5-6). Non-blocking on failure."""
-    from memoryschema.tags import Observation
+    """Run v4 gate probes (stages 3-4). Non-blocking on failure."""
 
     # Get config values
     probe_enabled = getattr(config, 'numeric_probe_enabled', True) if config else True
@@ -194,7 +193,6 @@ def _run_v4_probes(memory, store, config, quarantine_reasons, warnings):
 def _check_l0_echo(memory, threshold, quarantine_reasons):
     """Check if the candidate restates an L0-resident entry without new content."""
     import os
-    from memoryschema.tags import Observation
 
     name = memory.get('name', '')
     description = (memory.get('description') or '').lower()
@@ -252,11 +250,6 @@ def _check_l0_echo(memory, threshold, quarantine_reasons):
     if not candidate_words:
         return
 
-    # Check for measured observations in candidate
-    has_measured = any(
-        isinstance(o, Observation) and o.basis == 'measured'
-        for o in memory.get('observations', [])
-    )
 
     # Check for relations to targets outside echoed entry
     candidate_rel_targets = {r.get('target') for r in memory.get('relations', []) if r.get('target')}
@@ -274,9 +267,9 @@ def _check_l0_echo(memory, threshold, quarantine_reasons):
         overlap = len(intersection) / len(union) if union else 0
 
         if overlap >= threshold:
-            # Check conjunction: no measured observation AND no relation outside echoed entry
+            # Check conjunction: no relation outside echoed entry
             external_targets = candidate_rel_targets - {entry_name}
-            if not has_measured and not external_targets:
+            if not external_targets:
                 quarantine_reasons.append(
                     f'l0-echo: restates {entry_name} without new content'
                 )

@@ -20,8 +20,8 @@ from neo4j import GraphDatabase
 
 import json as _json
 
-from memoryschema.config import ALL_RELATION_TYPES as _RELATION_TYPES, VERIFICATION_RANKS
-from memoryschema.tags import Observation, observation_text
+from memoryschema.config import ALL_RELATION_TYPES as _RELATION_TYPES
+from memoryschema.tags import observation_text
 from memoryschema.hierarchy import project_matches_scope
 
 
@@ -30,27 +30,24 @@ def _now_iso():
 
 
 def _neo4j_serialize_obs(obs):
-    """Serialize observation for Neo4j list property (preferred JSON-per-element model).
-
-    Unlabelled → plain string; labelled → compact JSON: {"t":"text","b":"basis"}.
-    """
-    if isinstance(obs, Observation) and obs.basis is not None:
-        return _json.dumps({'t': str(obs), 'b': obs.basis}, ensure_ascii=False)
+    """Serialize observation for Neo4j list property. Plain string."""
+    if isinstance(obs, dict):
+        return obs.get('text', str(obs))
     return str(obs)
 
 
 def _neo4j_deserialize_obs(raw):
     """Deserialize observation from Neo4j list property.
 
-    Plain strings → Observation(text); JSON strings → Observation(text, basis).
+    Plain strings or legacy JSON strings → plain string.
     """
     if isinstance(raw, str) and raw.startswith('{"t":'):
         try:
             d = _json.loads(raw)
-            return Observation(d['t'], basis=d.get('b'))
+            return d.get('t', d.get('text', str(raw)))
         except (ValueError, KeyError):
             pass
-    return Observation(str(raw))
+    return str(raw)
 
 
 class Neo4jMemoryStore:
@@ -103,7 +100,7 @@ class Neo4jMemoryStore:
         # Mutable props (applied on both CREATE and MATCH)
         props = {}
         for key in ('schema', 'type', 'status', 'description',
-                     'importance', 'body', 'source', 'filepath', 'prompt',
+                     'importance', 'body', 'filepath', 'prompt',
                      'reasoning', 'project'):
             if key in memory_dict and memory_dict[key] is not None:
                 props[key] = memory_dict[key]
@@ -111,17 +108,14 @@ class Neo4jMemoryStore:
         # Immutable props (applied on CREATE only)
 
         raw_observations = memory_dict.get('observations', [])
-        # Serialize for Neo4j: labelled → JSON string, unlabelled → plain
+        # Serialize observations for Neo4j
         neo4j_obs = [_neo4j_serialize_obs(o) for o in raw_observations]
         # observations_text stays plain text for fulltext search
         obs_text = ' '.join(observation_text(o) for o in raw_observations)
         embedding = memory_dict.get('embedding')
 
         # Set verified_at if any measured observation present
-        has_measured = any(
-            isinstance(o, Observation) and o.basis == 'measured'
-            for o in raw_observations
-        )
+
 
         with self._driver.session() as session:
             session.run("""
@@ -147,12 +141,6 @@ class Neo4jMemoryStore:
             """, name=name, props=props,
                 observations=neo4j_obs,
                 observations_text=obs_text, now=now)
-
-            if has_measured:
-                session.run("""
-                    MATCH (m:Memory {name: $name})
-                    SET m.verified_at = $now
-                """, name=name, now=_now_iso())
 
             if embedding:
                 session.run("""
@@ -180,31 +168,8 @@ class Neo4jMemoryStore:
                     MERGE (s)-[r:{rel_type}]->(t)
                 """, source=name, target=target)
 
-                # SUPERSEDES → verification guard, cycle detection, then mark target
+                # SUPERSEDES → cycle detection, then mark target
                 if rel_type == 'SUPERSEDES':
-                    # Verification guard (v4): source rank ≥ target rank
-                    source_rank = max(
-                        (VERIFICATION_RANKS.get(
-                            o.basis if isinstance(o, Observation) else None, 2)
-                         for o in raw_observations),
-                        default=2)
-                    target_obs_result = session.run("""
-                        MATCH (t:Memory {name: $target})
-                        RETURN t.observations AS obs
-                    """, target=target).single()
-                    target_rank = 2  # default neutral
-                    if target_obs_result and target_obs_result['obs']:
-                        target_obs = [_neo4j_deserialize_obs(o)
-                                      for o in target_obs_result['obs']]
-                        target_rank = max(
-                            (VERIFICATION_RANKS.get(
-                                o.basis if isinstance(o, Observation) else None, 2)
-                             for o in target_obs),
-                            default=2)
-                    if source_rank < target_rank:
-                        raise ValueError(
-                            f"Verification guard: source rank {source_rank} cannot "
-                            f"supersede target rank {target_rank}")
                     # Cycle detection (R7)
                     cycle = session.run("""
                         OPTIONAL MATCH path = (t:Memory {name: $target})
@@ -744,15 +709,10 @@ class Neo4jMemoryStore:
         if backlinks > 0:
             score += 0.05 * math.log(1 + backlinks)
 
-        # Basis factor (v4): lowest-reliability labelled observation biases ranking
-        basis_multipliers = {'measured': 1.0, 'inferred': 0.97, 'reported': 0.93}
-        labelled_bases = [
-            o.basis for o in entry.get('observations', [])
-            if isinstance(o, Observation) and o.basis is not None
-        ]
-        if labelled_bases:
-            worst = min(labelled_bases, key=lambda b: VERIFICATION_RANKS.get(b, 2))
-            score *= basis_multipliers.get(worst, 1.0)
+        # Confidence factor: author's declared confidence (1-10), default neutral
+        confidence = entry.get('confidence')
+        if confidence is not None:
+            score *= (confidence / 10.0)
 
         # MITIGATES dampening
         mitigates_count = sum(

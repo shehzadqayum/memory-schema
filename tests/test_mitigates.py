@@ -5,7 +5,7 @@ import json
 import pytest
 
 from memoryschema.store import MemoryStore
-from memoryschema.tags import Observation
+from memoryschema.tags import observation_text, serialize_observation, deserialize_observation
 from memoryschema.audit import log_force, VALID_FORCE_TYPES, VALID_FORCE_LEVELS
 
 

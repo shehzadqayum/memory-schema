@@ -23,9 +23,8 @@ import tempfile
 from contextlib import contextmanager
 from datetime import datetime, timezone
 
-from memoryschema.config import VERIFICATION_RANKS
 from memoryschema.hierarchy import project_matches_filter, project_matches_scope
-from memoryschema.tags import Observation, serialize_observation, deserialize_observation, observation_text
+from memoryschema.tags import serialize_observation, deserialize_observation, observation_text
 
 
 def _now_iso():
@@ -195,7 +194,7 @@ class MemoryStore:
 
         now = _now_iso()
 
-        # Pre-validate SUPERSEDES relations (verification guard + cycle detection R7)
+        # Pre-validate SUPERSEDES relations (cycle detection R7)
         new_rels = memory_dict.get('relations', [])
         if any(r.get('type') == 'SUPERSEDES' for r in new_rels):
             pre_map = {e['name']: e for e in entries if 'name' in e}
@@ -210,25 +209,6 @@ class MemoryStore:
                 if not target_name or (target_name, 'SUPERSEDES') in existing_pairs:
                     continue
                 if target_name in pre_map:
-                    # Verification guard (v4): source rank ≥ target rank
-                    source_obs = memory_dict.get('observations', [])
-                    if existing:
-                        source_obs = source_obs or existing.get('observations', [])
-                    source_rank = max(
-                        (VERIFICATION_RANKS.get(
-                            o.basis if isinstance(o, Observation) else None, 2)
-                         for o in source_obs),
-                        default=2)
-                    target_entry = pre_map[target_name]
-                    target_rank = max(
-                        (VERIFICATION_RANKS.get(
-                            o.basis if isinstance(o, Observation) else None, 2)
-                         for o in target_entry.get('observations', [])),
-                        default=2)
-                    if source_rank < target_rank:
-                        raise ValueError(
-                            f"Verification guard: source rank {source_rank} cannot "
-                            f"supersede target rank {target_rank}")
                     if self._detect_supersedes_cycle(entries, name, target_name):
                         raise ValueError(
                             f"SUPERSEDES cycle detected: {name} → {target_name} "
@@ -239,10 +219,6 @@ class MemoryStore:
             new_entry['created_at'] = now
             new_entry['last_accessed'] = now
             new_entry['access_count'] = 0
-            # Set verified_at if any measured observation present
-            if any(isinstance(o, Observation) and o.basis == 'measured'
-                   for o in new_entry.get('observations', [])):
-                new_entry['verified_at'] = now
             entries.append(new_entry)
 
             # Side effects for new entries with relations
@@ -296,49 +272,20 @@ class MemoryStore:
 
         # Merge (schema, filepath, project are immutable after creation)
         for key in ('type', 'status', 'description', 'importance',
-                     'body', 'source', 'prompt', 'reasoning', 'chain'):
+                     'body', 'prompt', 'reasoning', 'chain', 'confidence'):
             if key in memory_dict and memory_dict[key] is not None:
                 existing[key] = memory_dict[key]
 
-        # Observation merge with basis upgrade (v4)
+        # Observation merge (append, deduplicate by text)
         existing_obs = existing.get('observations', [])
         new_obs = memory_dict.get('observations', [])
-        # Build text→index map for existing observations
-        existing_text_map = {}
-        for i, o in enumerate(existing_obs):
-            existing_text_map.setdefault(observation_text(o), i)
-        has_measured = False
+        existing_texts = {observation_text(o) for o in existing_obs}
         for obs in new_obs:
             text = observation_text(obs)
-            obs_basis = obs.basis if isinstance(obs, Observation) else None
-            if text in existing_text_map:
-                # Duplicate text — check for basis upgrade
-                idx = existing_text_map[text]
-                stored = existing_obs[idx]
-                stored_basis = stored.basis if isinstance(stored, Observation) else None
-                new_rank = VERIFICATION_RANKS.get(obs_basis, 2)
-                stored_rank = VERIFICATION_RANKS.get(stored_basis, 2)
-                if obs_basis is not None and new_rank > stored_rank:
-                    # Higher rank → upgrade
-                    existing_obs[idx] = Observation(text, basis=obs_basis)
-                    self._audit('basis_upgrade', existing.get('name'),
-                                {'observation': text, 'from': stored_basis, 'to': obs_basis})
-                    if obs_basis == 'measured':
-                        has_measured = True
-                # Lower/equal → skip (ordinary duplicate)
-            else:
-                existing_obs.append(obs if isinstance(obs, Observation) else Observation(text, basis=obs_basis))
-                existing_text_map[text] = len(existing_obs) - 1
-                if obs_basis == 'measured':
-                    has_measured = True
+            if text not in existing_texts:
+                existing_obs.append(text)
+                existing_texts.add(text)
         existing['observations'] = existing_obs
-
-        # Advance verified_at if any measured observation was added or upgraded
-        if has_measured or any(
-            (isinstance(o, Observation) and o.basis == 'measured')
-            for o in memory_dict.get('observations', [])
-        ):
-            existing['verified_at'] = now
 
         existing_rels = existing.get('relations', [])
         new_rels = memory_dict.get('relations', [])
@@ -824,16 +771,11 @@ class MemoryStore:
         if backlinks > 0:
             score += 0.05 * math.log(1 + backlinks)
 
-        # Basis factor (v4): lowest-reliability labelled observation biases ranking
-        basis_multipliers = {'measured': 1.0, 'inferred': 0.97, 'reported': 0.93}
-        labelled_bases = [
-            o.basis for o in entry.get('observations', [])
-            if isinstance(o, Observation) and o.basis is not None
-        ]
-        if labelled_bases:
-            worst = min(labelled_bases, key=lambda b: VERIFICATION_RANKS.get(b, 2))
-            score *= basis_multipliers.get(worst, 1.0)
-        # No labelled observations → neutral (1.0), no effect
+        # Confidence factor: author's declared confidence (1-10), default neutral
+        confidence = entry.get('confidence')
+        if confidence is not None:
+            score *= (confidence / 10.0)
+        # No confidence → neutral (1.0), no effect
 
         # MITIGATES dampening: entries with inbound MITIGATES score slightly lower
         mitigates_count = sum(

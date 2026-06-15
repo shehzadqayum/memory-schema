@@ -23,17 +23,6 @@ DEPRECATED_RELATION_TYPES = frozenset({'PARENT_OF', 'CHILD_OF'})
 ALL_RELATION_TYPES = VALID_RELATION_TYPES | DEPRECATED_RELATION_TYPES
 SCHEMA_VERSION = 4
 
-# v4: basis attribute on observations — classifies how claims were obtained.
-VALID_BASES = frozenset({'measured', 'inferred', 'reported'})
-
-# Verification rank ordering for SUPERSEDES guards.
-# Higher rank can supersede same or lower; lower cannot supersede higher.
-VERIFICATION_RANKS = {
-    'measured': 3,
-    'inferred': 2,
-    'reported': 1,
-    None: 2,  # unlabelled = neutral rank
-}
 
 @dataclass
 class MemoryConfig:

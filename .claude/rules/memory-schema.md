@@ -41,7 +41,6 @@ Every memory entity MUST be a `<memory:entity>` XML block in a `.md` file.
   <memory:relations>
     <memory:relation target="other-memory" type="MODIFIES"/>
   </memory:relations>
-  <memory:source>session-hash-or-attribution</memory:source>
   <memory:project>project-name</memory:project>
 </memory:entity>
 
@@ -57,13 +56,13 @@ Include when contextually appropriate. Omit if not relevant.
 | Field | Tag | When to include |
 |-------|-----|-----------------|
 | `importance` | attribute | Integer 1-10. Defaults to 5 if omitted. |
+| `confidence` | attribute | Integer 1-10. Author's confidence in this memory. |
 | `type` | attribute | Free-form string. No predefined values enforced. |
 | `observations` | `<memory:observations>` | Atomic facts. Must contain at least one `<memory:observation>`. |
 | `reasoning` | `<memory:reasoning>` | Narrative thinking — why, alternatives, connections. |
 | `prompt` | `<memory:prompt>` | The user input that triggered the response. |
 | `chain` | `<memory:chain>` | Reasoning chain context — what investigation this belongs to. |
 | `relations` | `<memory:relations>` | Explicit links to other known memories. |
-| `source` | `<memory:source>` | Attribution (session hash, commit, URL). |
 | `project` | `<memory:project>` | Project scoping. |
 | `status` | attribute | `active` (default), `superseded`, `archived`, `quarantined`. |
 
@@ -142,8 +141,6 @@ Relevance is computed from multi-space embeddings (7 spaces: default + name + de
 | Semantic | 0.2 | 0.3 | 0.5 |
 
 Type factor: semantic `max(recency, 0.6)`, episodic standard decay, procedural `recency^(1/(1+0.3*min(accesses,10)))`.
-
-Basis factor (v4): `measured`=1.0, `inferred`=0.97, `reported`=0.93, unlabelled=1.0 (neutral). Applied after trust multiplier. Lowest-reliability labelled observation determines the factor.
 
 Bonuses: hub `+0.05 * ln(1 + backlinks)`, text match `+0.1` substring (Neo4j) or BM25 up to `+0.3` (JSONL).
 

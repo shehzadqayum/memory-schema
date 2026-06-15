@@ -16,7 +16,7 @@ import xml.etree.ElementTree as ET
 
 
 from memoryschema.config import (
-    VALID_TYPES, VALID_STATUSES, VALID_BASES,
+    VALID_TYPES, VALID_STATUSES,
     VALID_RELATION_TYPES, DEPRECATED_RELATION_TYPES, ALL_RELATION_TYPES,
     SCHEMA_VERSION,
 )
@@ -134,14 +134,6 @@ def validate(content, filepath=None, strict=False, known_names=None):
     if status_val and status_val not in VALID_STATUSES:
         errors.append(('V11', f'Invalid status "{status_val}", must be one of: {", ".join(sorted(VALID_STATUSES))}'))
 
-    # V14: basis on observations is valid (v4)
-    observations_elems_early = root.findall('observations')
-    if observations_elems_early:
-        for obs in observations_elems_early[0].findall('observation'):
-            basis_val = obs.get('basis')
-            if basis_val is not None and basis_val not in VALID_BASES:
-                errors.append(('V14', f'Invalid basis "{basis_val}" on observation, must be one of: {", ".join(sorted(VALID_BASES))}'))
-
     # V6: exactly one <memory:description>
     descriptions = root.findall('description')
     if len(descriptions) == 0:
@@ -185,13 +177,6 @@ def validate(content, filepath=None, strict=False, known_names=None):
             if reasoning_words > 500:
                 errors.append(('Q8', f'Reasoning has {reasoning_words} words, recommended max 500'))
 
-        # Q9: unlabelled observations (v4 basis adoption nudge)
-        if observations_elems_early:
-            obs_list = observations_elems_early[0].findall('observation')
-            if len(obs_list) >= 3:
-                has_any_basis = any(o.get('basis') is not None for o in obs_list)
-                if not has_any_basis:
-                    errors.append(('Q9', f'{len(obs_list)} observations, none carries a basis label'))
 
     # Relations
     relations_elems = root.findall('relations')

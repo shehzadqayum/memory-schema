@@ -2,8 +2,6 @@
 (entries will be added as memories are created)
 
 ### Knowledge
-- [chain-not-formalized](chain-not-formalized.md) — Chain entity pattern is working but not documented in schema rules, design docs, or working memory guidelines
-- [chain-type-attribute-status](chain-type-attribute-status.md) — Type attribute and fields partially resolved — chain pattern formalized but type guidance not updated for chain model
 - [scoring-formula](scoring-formula.md) — Retrieval scoring: recency × w_r + importance × w_i + cosine_sim × w_v with type/trust/basis modifiers
 - [gate-pipeline-stages](gate-pipeline-stages.md) — Write gate: 6-stage pipeline producing ACCEPT/REJECT/QUARANTINE verdicts
 - [chain-hook-embedding-investigation](chain-hook-embedding-investigation.md) — Chain: hook embedding appeared broken but was actually a bash quoting issue — 4-step debugging sequence
@@ -12,7 +10,9 @@
 - [gate-pipeline-explanation](gate-pipeline-explanation.md) — Gate pipeline: 6 stages — validation, provenance, guards, consistency, numeric probe, L0 echo
 - [provenance-explanation](provenance-explanation.md) — Provenance: declared origin of content — controls scoring, L0 access, SUPERSEDES authority, presentation
 - [provenance-source-evaluation](provenance-source-evaluation.md) — Evaluation: provenance and source overlap — provenance is overloaded (binary trust), source is underused
+- [source-field-removed](source-field-removed.md) — Source field removed from framework — architecture is provenance and source agnostic
 - [hierarchy-docs-plan](hierarchy-docs-plan.md) — Plan for hierarchy/inheritance reference doc + 7 documentation alignment fixes
+- [trust-removed-confidence-added](trust-removed-confidence-added.md) — All trust mechanisms removed, replaced with confidence (1-10) — content-agnostic architecture
 - [five-space-eval-results](five-space-eval-results.md) — 5-space eval: nDCG 0.555, recall 0.511 — continues downward trend with equal-weight combiner
 - [query-conditioned-design-doc](query-conditioned-design-doc.md) — Full design document written for query-conditioned weighting at docs/design/query-conditioned-weighting.md
 - [storage-layer-architecture](storage-layer-architecture.md) — Five storage layers with graceful degradation: L0 MEMORY.md → L1 files/JSONL → L2 embeddings/Neo4j
@@ -23,10 +23,10 @@
 - [system-explanation-post-provenance](system-explanation-post-provenance.md) — Complete memory system after provenance removal: 13 LLM fields, 7 spaces, 4-stage gate, basis-based trust
 - [nested-agents-discussion](nested-agents-discussion.md) — Architectural discussion on nested agents using project folders as agent boundaries
 - [four-space-eval-results](four-space-eval-results.md) — 4-space eval: nDCG 0.557 worse than single-space 0.608 — equal-weight averaging dilutes signal
-- [chain-implementing-live-chains](chain-implementing-live-chains.md) — Chain: implementing live accumulating chain entities — formalizing the pattern in schema and rules
 - [chain-pattern-formalized](chain-pattern-formalized.md) — Chain entity pattern formalized in schema spec, rules, and working guidelines
-- [package-audit-plan](package-audit-plan.md) — Full package audit plan — 13 findings across CRITICAL/HIGH/MEDIUM/LOW
 - [chain-definition](chain-definition.md) — A chain of reasoning is a sequence of memory events with a defined start (trigger) and end (conclusion)
+- [package-audit-plan](package-audit-plan.md) — Full package audit plan — 13 findings across CRITICAL/HIGH/MEDIUM/LOW
+- [chain-implementing-live-chains](chain-implementing-live-chains.md) — Chain: implementing live accumulating chain entities — formalizing the pattern in schema and rules
 - [immutable-memory-evaluation](immutable-memory-evaluation.md) — Evaluation: memories should be immutable after write — no upsert, no append, each memory a snapshot
 - [authorised-state-design](authorised-state-design.md) — Two memory states: unauthorised (read-only, default) and authorised (read-write, one active chain only)
 - [authorised-state-implemented](authorised-state-implemented.md) — Implemented authorised/unauthorised memory states — only active chain is writable
@@ -34,9 +34,9 @@
 - [centralize-env-vars](centralize-env-vars.md) — Plan to centralize os.environ reads into config.py — resolving session 1 residual
 - [fix-env-precedence](fix-env-precedence.md) — Plan to fix env var precedence inversion, redundant import, and add hierarchy integration tests
 - [docs-update-plan](docs-update-plan.md) — Plan to update all documentation for hierarchy and inheritance features
-- [query-conditioned-weighting-design](query-conditioned-weighting-design.md) — Query-conditioned weighting design: classify query by keywords, select space weight profile per type
-- [v3-remediation-plan](v3-remediation-plan.md) — Memory System v3 — 28-issue remediation across 7 phases: docs, lifecycle, scoring, trust, hierarchy, retrieval, evaluation
 - [chain-live-accumulation-design](chain-live-accumulation-design.md) — Live chain entity: created if absent, updated every response, released at end of cycle
+- [v3-remediation-plan](v3-remediation-plan.md) — Memory System v3 — 28-issue remediation across 7 phases: docs, lifecycle, scoring, trust, hierarchy, retrieval, evaluation
+- [query-conditioned-weighting-design](query-conditioned-weighting-design.md) — Query-conditioned weighting design: classify query by keywords, select space weight profile per type
 - [chain-entity-design](chain-entity-design.md) — Chain entity design: a meta-memory listing ordered steps as observations with USES relations to evidence
 
 ### Procedures

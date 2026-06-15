@@ -67,7 +67,6 @@ class TestParseMemoryContent:
         assert len(result['relations']) == 2
         assert result['relations'][0] == {'target': 'other-entity', 'type': 'INFORMS'}
         assert result['relations'][1] == {'target': 'another', 'type': 'USES'}
-        assert result['source'] == 'test-session-123'
         assert result['project'] == 'test-project'
         assert result['body'] == 'Body text after the entity.'
         assert result['related'] == ['other-entity', 'another']

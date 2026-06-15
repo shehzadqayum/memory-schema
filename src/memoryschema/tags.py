@@ -3,8 +3,8 @@ Memory tag parser.
 
 Parses <memory:entity> tagged files into structured dicts.
 Pure Python, zero external dependencies (stdlib xml.etree only).
-Extracts v4 attributes: status, and per-observation
-basis (measured | inferred | reported) alongside all standard fields.
+Content-agnostic — no trust mechanisms, no basis attributes.
+Observations are plain strings.
 
 Reuses XML parsing primitives from validator.py (DRY).
 """
@@ -15,65 +15,29 @@ import xml.etree.ElementTree as ET
 from memoryschema.validator import extract_entity_block, parse_entity
 
 
-class Observation(str):
-    """A string subclass carrying an optional ``basis`` attribute.
-
-    Because Observation IS a str, all existing consumers that read
-    observation text work unchanged — no consumer sweep required.
-
-    **Construction discipline:** ``Observation.__new__`` is the only
-    sanctioned constructor. Use ``deserialize_observation()`` for
-    stored data and the parser for XML data.
-
-    **Basis-loss hazard:** any string transformation (.strip(), .lower(),
-    slicing, concatenation, f-string interpolation) returns a plain str
-    and silently drops basis. Code transforming for comparison or display
-    should call ``observation_text(obs)`` explicitly. Code retaining
-    basis must rebuild via ``Observation.__new__`` with the original
-    basis. Any bare Observation→str flowing back into stored state is
-    a defect.
-
-    Future modules that handle observations as strings and write them
-    back MUST add their own basis-preservation test.
-    """
-
-    basis: str | None
-
-    def __new__(cls, text, basis=None):
-        instance = super().__new__(cls, text)
-        instance.basis = basis
-        return instance
-
-
 def observation_text(obs):
-    """Extract plain text from an observation (Observation or str).
-
-    Use this when basis should be explicitly dropped for comparison
-    or display purposes.
-    """
+    """Extract plain text from an observation (str or legacy dict)."""
+    if isinstance(obs, dict):
+        return obs.get('text', str(obs))
     return str(obs)
 
 
 def serialize_observation(obs):
-    """Serialize an observation for JSONL/JSON storage.
-
-    Returns plain string when basis is None (legacy-compatible);
-    returns {"text": ..., "basis": ...} dict when labelled.
-    """
-    if isinstance(obs, Observation) and obs.basis is not None:
-        return {'text': str(obs), 'basis': obs.basis}
+    """Serialize an observation for JSONL/JSON storage. Always a plain string."""
+    if isinstance(obs, dict):
+        return obs.get('text', str(obs))
     return str(obs)
 
 
 def deserialize_observation(raw):
     """Deserialize an observation from JSONL/JSON storage.
 
-    Accepts both plain strings (legacy) and {"text", "basis"} dicts.
-    Returns an Observation instance.
+    Accepts both plain strings and legacy {"text", "basis"} dicts.
+    Returns a plain string.
     """
     if isinstance(raw, dict):
-        return Observation(raw.get('text', ''), basis=raw.get('basis'))
-    return Observation(str(raw))
+        return raw.get('text', '')
+    return str(raw)
 
 
 def _derive_project(filepath):
@@ -153,18 +117,26 @@ def parse_memory_content(content, filepath=None):
         except ValueError:
             pass
 
+    # Confidence (author's confidence in this memory, 1-10)
+    confidence = None
+    confidence_str = root.get('confidence')
+    if confidence_str is not None:
+        try:
+            confidence = int(confidence_str)
+        except ValueError:
+            pass
+
     # Description
     desc_elem = root.find('description')
     description = desc_elem.text if desc_elem is not None and desc_elem.text else ''
 
-    # Observations (v4: per-observation basis attribute)
+    # Observations (plain strings — content agnostic)
     observations = []
     obs_elem = root.find('observations')
     if obs_elem is not None:
         for obs in obs_elem.findall('observation'):
             if obs.text:
-                basis = obs.get('basis')  # None if absent
-                observations.append(Observation(obs.text, basis=basis))
+                observations.append(obs.text)
 
     # Prompt (v2)
     prompt_elem = root.find('prompt')
@@ -188,10 +160,6 @@ def parse_memory_content(content, filepath=None):
             if target or rel_type:
                 relations.append({'target': target, 'type': rel_type})
 
-    # Source
-    source_elem = root.find('source')
-    source = source_elem.text if source_elem is not None and source_elem.text else None
-
     # Project: check entity child first, then derive from filepath
     project_elem = root.find('project')
     if project_elem is not None and project_elem.text:
@@ -208,6 +176,7 @@ def parse_memory_content(content, filepath=None):
         'type': type_val,
         'status': status,
         'importance': importance,
+        'confidence': confidence,
         'description': description,
         'observations': observations,
         'prompt': prompt,
@@ -215,7 +184,6 @@ def parse_memory_content(content, filepath=None):
         'chain': chain,
         'relations': relations,
         'body': body,
-        'source': source,
         'project': project,
         'filepath': filepath,
         'related': related,

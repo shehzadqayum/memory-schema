@@ -8,7 +8,7 @@ import pytest
 from memoryschema.numeric_probe import extract_claims, compare, extract_entity_claims
 from memoryschema.write_gate import gate_pipeline, GateVerdict
 from memoryschema.store import MemoryStore
-from memoryschema.tags import Observation
+from memoryschema.tags import observation_text, serialize_observation, deserialize_observation
 
 
 # --- extract_claims ---
@@ -126,7 +126,7 @@ class TestGateNumericProbe:
         s = MemoryStore(str(tmp_path / "probe.jsonl"))
         s.upsert({'name': 'session-10-state', 'schema': 4,
                   'description': 'Session 10 final state',
-                  'observations': [Observation('472 tests passing across 27 files')],
+                  'observations': ['472 tests passing across 27 files'],
                   'embedding': [1.0, 0.0, 0.0]})
         return s
 
@@ -140,7 +140,7 @@ class TestGateNumericProbe:
         config.l0_echo_threshold = 0.6
 
         memory = {'name': 'new', 'description': 'Test',
-                  'observations': [Observation('433 tests passing')],
+                  'observations': ['433 tests passing'],
                   'embedding': [0.99, 0.0, 0.0]}  # high sim
         result = gate_pipeline(memory, store=store, config=config)
         assert result.verdict == GateVerdict.ACCEPT
@@ -156,7 +156,7 @@ class TestGateNumericProbe:
         config.l0_echo_threshold = 0.6
 
         memory = {'name': 'new', 'description': 'Test',
-                  'observations': [Observation('433 tests passing')],
+                  'observations': ['433 tests passing'],
                   'embedding': [0.99, 0.0, 0.0]}
         result = gate_pipeline(memory, store=store, config=config)
         assert result.verdict == GateVerdict.QUARANTINE
@@ -172,7 +172,7 @@ class TestGateNumericProbe:
         config.l0_echo_threshold = 0.6
 
         memory = {'name': 'new', 'description': 'Test',
-                  'observations': [Observation('433 tests passing')],
+                  'observations': ['433 tests passing'],
                   'embedding': [0.99, 0.0, 0.0],
                   'relations': [{'target': 'session-10-state', 'type': 'CONTRADICTS'}]}
         result = gate_pipeline(memory, store=store, config=config)
@@ -188,7 +188,7 @@ class TestGateNumericProbe:
         config.l0_echo_threshold = 0.6
 
         memory = {'name': 'new', 'description': 'Test',
-                  'observations': [Observation('433 tests passing')],
+                  'observations': ['433 tests passing'],
                   'embedding': [0.99, 0.0, 0.0],
                   'relations': [{'target': 'session-10-state', 'type': 'SUPERSEDES'}]}
         result = gate_pipeline(memory, store=store, config=config)
@@ -203,7 +203,7 @@ class TestGateNumericProbe:
         config.l0_echo_threshold = 0.6
 
         memory = {'name': 'new', 'description': 'Test',
-                  'observations': [Observation('433 tests passing')]}
+                  'observations': ['433 tests passing']}
         result = gate_pipeline(memory, store=store, config=config)
         assert result.verdict == GateVerdict.ACCEPT
         assert any('skipped' in w for w in result.warnings)
@@ -224,15 +224,15 @@ class TestL0Echo:
 
         store = MemoryStore(str(memory_dir / 'store.jsonl'))
         memory = {'name': 'echo', 'description': 'important system architecture fact',
-                  'observations': [Observation('restated')]}
+                  'observations': ['restated']}
 
         from memoryschema.write_gate import _check_l0_echo
         reasons = []
         _check_l0_echo(memory, 0.6, reasons)
         assert any('l0-echo' in r for r in reasons)
 
-    def test_echo_with_measured_accepted(self, tmp_path):
-        """High overlap + measured observation → NOT echo (reinforcement)."""
+    def test_echo_with_external_relation_accepted(self, tmp_path):
+        """High overlap but with external relation target → NOT echo."""
         memory_dir = tmp_path / 'memory'
         memory_dir.mkdir()
         (memory_dir / 'MEMORY.md').write_text(
@@ -242,7 +242,8 @@ class TestL0Echo:
 
         memory = {'name': 'reinforcement',
                   'description': 'important system architecture fact',
-                  'observations': [Observation('new measured data', basis='measured')]}
+                  'observations': ['new data'],
+                  'relations': [{'target': 'other-entry', 'type': 'USES'}]}
 
         from memoryschema.write_gate import _check_l0_echo
         reasons = []

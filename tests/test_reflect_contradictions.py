@@ -5,7 +5,7 @@ import json
 import pytest
 
 from memoryschema.store import MemoryStore
-from memoryschema.tags import Observation
+from memoryschema.tags import observation_text, serialize_observation, deserialize_observation
 from memoryschema.consolidation import reflect, _check_cluster_contradictions
 
 
@@ -96,12 +96,12 @@ class TestReflectSkip:
 
 class TestIncludeContradictory:
     def test_flag_synthesizes_with_degraded_authority(self, store):
-        """--include-contradictory: min importance, CONTRADICTS edges, inferred basis."""
+        """--include-contradictory: min importance, CONTRADICTS edges."""
         _make_episodic(store, 'c-1', 'Conflicting event 1',
-                       observations=[Observation('472 tests passing')],
+                       observations=['472 tests passing'],
                        associations=[{'name': 'c-2', 'score': 0.9}])
         _make_episodic(store, 'c-2', 'Conflicting event 2',
-                       observations=[Observation('433 tests passing')],
+                       observations=['433 tests passing'],
                        associations=[{'name': 'c-1', 'score': 0.9}])
 
         result = reflect(store, min_cluster=2, include_contradictory=True)
@@ -121,11 +121,6 @@ class TestIncludeContradictory:
         contradicts_rels = [r for r in summary.get('relations', [])
                            if r.get('type') == 'CONTRADICTS']
         assert len(contradicts_rels) >= 1
-
-        # Observations labelled inferred
-        for obs in summary.get('observations', []):
-            if isinstance(obs, Observation) and obs.basis is not None:
-                assert obs.basis == 'inferred'
 
 
 class TestReflectAudit:

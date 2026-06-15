@@ -196,7 +196,6 @@ def _synthesise_summary(cluster):
         'observations': unique_obs[:10],
         'relations': [{'target': n, 'type': 'SUPERSEDES'} for n in names],
         'project': project,
-        'source': 'reflection',
         'created_at': now,
         'last_accessed': now,
         'access_count': 0,
@@ -326,10 +325,7 @@ def _synthesise_contradictory_summary(cluster, contradiction_reasons):
 
     - importance = min of cluster (not max)
     - CONTRADICTS relations to each conflicting member
-    - all observations labelled basis="inferred"
     """
-    from memoryschema.tags import Observation
-
     summary = _synthesise_summary(cluster)
 
     # Force min importance
@@ -345,10 +341,5 @@ def _synthesise_contradictory_summary(cluster, contradiction_reasons):
         if not any(r.get('target') == cname and r.get('type') == 'CONTRADICTS'
                    for r in summary['relations']):
             summary['relations'].append({'target': cname, 'type': 'CONTRADICTS'})
-
-    # Label all observations as inferred
-    summary['observations'] = [
-        Observation(str(o), basis='inferred') for o in summary['observations']
-    ]
 
     return summary
