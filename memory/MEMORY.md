@@ -23,6 +23,10 @@
 - [description-space-added](description-space-added.md) — Added description embedding space — 4 spaces now active per entry (4096 total dims)
 - [four-space-eval-results](four-space-eval-results.md) — 4-space eval: nDCG 0.557 worse than single-space 0.608 — equal-weight averaging dilutes signal
 - [system-status-snapshot](system-status-snapshot.md) — Memory system snapshot: 56 entries, 4 embedding spaces, 659 tests, single-space scoring best
+- [prompt-space-added](prompt-space-added.md) — Added prompt embedding space — 5 spaces now active (5120 max dims per entry)
+- [five-space-eval-results](five-space-eval-results.md) — 5-space eval: nDCG 0.555, recall 0.511 — continues downward trend with equal-weight combiner
+- [query-conditioned-weighting-design](query-conditioned-weighting-design.md) — Query-conditioned weighting design: classify query by keywords, select space weight profile per type
+- [query-conditioned-design-doc](query-conditioned-design-doc.md) — Full design document written for query-conditioned weighting at docs/design/query-conditioned-weighting.md
 
 ### Procedures
 - [session-memory-switch](session-memory-switch.md) — Switched from built-in Claude Code memory to memory-schema system
@@ -48,3 +52,5 @@
 - [out-of-session-multi-space](out-of-session-multi-space.md) — Out-of-session commit ba77a7f — multi-space embedding activated as default
 - [corpus-committed](corpus-committed.md) — Committed 19 knowledge-rich memory entities as 52eac73
 - [description-space-committed](description-space-committed.md) — Committed description space as f3833bd — 4 embedding spaces now active
+- [out-of-session-snapshot-commit](out-of-session-snapshot-commit.md) — Out-of-session commit 5756486 — space evaluation results and system snapshot
+- [prompt-space-committed](prompt-space-committed.md) — Committed prompt space as e16ec7b — 5 embedding spaces now active
