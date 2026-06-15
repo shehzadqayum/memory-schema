@@ -102,7 +102,7 @@ Adds the PostToolUse Write hook to `~/.claude/settings.json`. The hook:
 3. Runs write gate pipeline (REJECT / QUARANTINE / ACCEPT)
 4. Embeds via Voyage AI (if key set, non-blocking on failure)
 5. Indexes to Neo4j (primary) or JSONL (fallback)
-6. L0 gating: ingested entries (`provenance="ingested"`) never enter MEMORY.md
+6. L0: update MEMORY.md index (token-budget enforced)
 7. Appends to MEMORY.md (compact resilience)
 8. L0 budget enforcement (evicts lowest-scoring entries if over token limit)
 
@@ -255,7 +255,7 @@ All query commands support `--json` for agent consumption. All destructive comma
 
 **Enforcement:** Correlates with importance attribute (1-10):
 - **8-10** (working memory): selective — write on decisions, corrections, novel facts
-- **4-7** (corpus): standard — batch ingested
+- **4-7** (corpus): standard — batch imported
 - **1-3** (advisory): write when significant
 
 **Storage:** 5 layers with graceful degradation:

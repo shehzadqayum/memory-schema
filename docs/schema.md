@@ -373,7 +373,7 @@ Stays under 200 lines (auto-load limit). The PostToolUse hook automatically appe
 
 ### Write Gate Pipeline
 
-Every write passes through a six-stage gate before indexing. Embedding is computed BEFORE the gate (stages 4-6 need the vector). The gate never silently drops — every entry receives a logged verdict.
+Every write passes through a four-stage gate before indexing. Embedding is computed BEFORE the gate (stages 4-6 need the vector). The gate never silently drops — every entry receives a logged verdict.
 
 ```
 Parse → Embed (7 spaces) → Gate Pipeline → Index

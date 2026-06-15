@@ -7,7 +7,7 @@
 The memory-schema system stores structured memory entities as XML-tagged markdown files. Each entity flows through a PostToolUse hook pipeline on write:
 
 ```
-Write memory/*.md → parse XML → embed (7 spaces) → gate (6 stages) → store (Neo4j/JSONL) → MEMORY.md
+Write memory/*.md → parse XML → embed (7 spaces) → gate (4 stages) → store (Neo4j/JSONL) → MEMORY.md
 ```
 
 ### Storage Layers

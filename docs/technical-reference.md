@@ -47,12 +47,11 @@ Each layer adds capability without being required. The system degrades gracefull
   <memory:relations>
     <memory:relation target="other-memory" type="MODIFIES"/>
   </memory:relations>
-  <memory:source>provenance</memory:source>
 </memory:entity>
 ```
 
 **Required:** schema, name, description.
-**Optional:** importance (default 5), type (default semantic), observations, reasoning, prompt, relations, source, project.
+**Optional:** importance (default 5), confidence (1-10), type (free-form), observations, reasoning, prompt, chain, relations, project.
 
 ---
 
@@ -60,8 +59,7 @@ Each layer adds capability without being required. The system degrades gracefull
 
 | Type | Use |
 |------|-----|
-| `semantic` | Facts, references, corpus content |
-| `episodic` | Session events, decisions |
+| Free-form | LLM determines best value. Scoring recognises `semantic`, `episodic`, `procedural` for recency modifiers. |
 | `procedural` | Validated approaches, feedback |
 
 ---
@@ -79,7 +77,7 @@ score = recency(0.995^hours) × 0.2 + importance/10 × 0.3 + cosine_similarity �
 - `episodic`: standard `0.995^hours` — events age naturally
 - `procedural`: `recency^(1/(1 + 0.3*min(access_count, 10)))` — access-reinforced
 
-**Trust multiplier** (applied after weighted sum): `first-party`=1.0, `user`=1.0, `derived`=0.9, `ingested`=0.7.
+**Confidence factor** (applied after weighted sum): `confidence/10` multiplier. Default neutral (1.0) when not set.
 
 **Bonuses** (added after weighted sum, before clamping to 1.0):
 - Hub bonus: `+0.05 * ln(1 + backlinks)` — log-scale, diminishing returns
@@ -107,7 +105,7 @@ Vector k-NN seeds → explicit relations → backlinks → ASSOCIATED_WITH assoc
 Response → memory entity (.md) → PostToolUse hook
   → parse (tags.py) → write gate (REJECT/QUARANTINE/ACCEPT)
   → embed (Voyage AI, non-blocking) → Neo4j upsert (or JSONL fallback)
-  → single-node associations → L0 gating (ingested excluded)
+  → single-node associations → L0 update
   → append to MEMORY.md → L0 budget enforcement (evict if over limit)
 ```
 
@@ -126,7 +124,7 @@ All mutations and gate decisions are logged to `memory/audit.jsonl` (append-only
 
 **Gate decision record:**
 ```json
-{"timestamp": "2026-06-10T...", "operation": "gate_decision", "name": "entity-name", "verdict": "accept", "reasons": ["..."], "provenance": "first-party"}
+{"timestamp": "2026-06-10T...", "operation": "gate_decision", "name": "entity-name", "verdict": "accept", "reasons": ["..."], }
 ```
 
 **Mutation record:**
@@ -134,7 +132,7 @@ All mutations and gate decisions are logged to `memory/audit.jsonl` (append-only
 {"timestamp": "2026-06-10T...", "operation": "upsert", "name": "entity-name", "changes": {"description": {"prior_hash": "a1b2c3...", "new_hash": "d4e5f6..."}}}
 ```
 
-Tracked fields: description, type, status, provenance, importance, body, prompt, reasoning, source, project. Audit failure is silently swallowed — never blocks mutations.
+Tracked fields: description, type, status, importance, confidence, body, prompt, reasoning, chain, project. Audit failure is silently swallowed — never blocks mutations.
 
 ---
 
@@ -181,7 +179,7 @@ from memoryschema import Neo4jMemoryStore, embed_text, embed_batch, rerank
 | `memoryschema.store` | JSONL store + `get_store()` factory |
 | `memoryschema.neo4j_store` | Neo4j store (O(1) upsert, vector k-NN, graph) |
 | `memoryschema.embeddings` | Voyage AI: embed_text, embed_batch, rerank |
-| `memoryschema.validator` | Schema validation (V1-V14, R1-R7, F1, F3) |
+| `memoryschema.validator` | Schema validation (V1-V11, R1-R7, F1, F3) |
 | `memoryschema.schema` | Create Neo4j indexes and constraints |
 | `memoryschema.consolidation` | Batch index un-indexed files |
 | `memoryschema.migration` | JSONL ↔ Neo4j migration |

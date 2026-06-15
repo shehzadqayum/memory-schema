@@ -22,7 +22,6 @@ A memory is a single, atomic unit of storage. It has a name, a description, and 
   <memory:relations>
     <memory:relation target="other-memory" type="INFORMS"/>
   </memory:relations>
-  <memory:source>provenance</memory:source>
 </memory:entity>
 ```
 
@@ -40,10 +39,10 @@ Session reasoning — what was asked, what was decided, why. Selective enforceme
 
 ### Corpus Memory
 
-Ingested content — documents, posts, articles. Batch enforcement (ingested via scripts). Importance reflects source salience.
+External content — documents, posts, articles. Batch imported. Importance and confidence reflect author assessment.
 
 - `<memory:observation>` holds the source text
-- No `<memory:prompt>` or `<memory:reasoning>` (content was ingested, not generated)
+- No `<memory:prompt>` or `<memory:reasoning>` (content was imported, not generated)
 - Importance computed from source signals (engagement, authorship)
 
 ### Why They Don't Compete

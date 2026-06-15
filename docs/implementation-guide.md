@@ -107,7 +107,7 @@ Selected responses write a `<memory:entity>` to `memory/<name>.md` (per scope gu
 
 Correlates with importance:
 - **Importance 8-10** (working memory): selective — write on decisions, corrections, novel facts
-- **Importance 4-7** (corpus): standard — batch ingested, validated at ingest
+- **Importance 4-7** (corpus): standard — batch imported
 - **Importance 1-3** (advisory): write when significant
 
 ### CLI Reference

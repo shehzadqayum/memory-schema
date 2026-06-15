@@ -2,6 +2,26 @@
 
 ## [Unreleased]
 
+### Changed (Content-Agnostic Architecture)
+- Removed provenance system (VALID_PROVENANCES, TRUST_LEVELS, trust multiplier, L0 gating, SUPERSEDES trust guard)
+- Removed basis system (Observation subclass, VALID_BASES, VERIFICATION_RANKS, basis factor, verified_at, V14, Q9)
+- Removed source field from entity schema
+- Observations are now plain strings (no per-observation metadata)
+- Added `confidence` attribute (integer 1-10, author-declared, scored as confidence/10 multiplier)
+- Gate pipeline: 6 stages → 4 stages (validation, consistency, numeric, L0 echo)
+- SUPERSEDES retains cycle detection only (no trust or verification guards)
+
+### Added (7-Space Architecture)
+- 7 embedding spaces: default + name + description + observations + prompt + reasoning + chain
+- 1:1 field-to-space mapping (each field has its own embedding space)
+- Variance-weighted combiner: Σ(sim × divergence) / Σ(divergence) — no base weights, no heuristics
+- Divergence profile computed at embed time (structural fingerprint per entry)
+- `chain` field on entities for reasoning chain context
+- Chain entities: live accumulating memories with authorised/unauthorised states
+- `memoryschema chain start/release` CLI commands
+- Authorisation gate in hook: only active chain writable, all others read-only
+- Free-form `type` attribute (no predefined values enforced by validator)
+
 ### Fixed (Framework Hardening)
 - Hook: skip non-entity files (YAML frontmatter) instead of blocking with exit 2
 - Reflect: `_cluster_by_associations` score threshold (0.7) fixes 0-cluster bug from giant connected component

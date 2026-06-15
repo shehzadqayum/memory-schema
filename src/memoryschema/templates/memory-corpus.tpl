@@ -1,6 +1,6 @@
 # Corpus Memory Guidelines (importance: 4-7)
 
-**Enforcement: batch — ingested via scripts, no per-response requirement.** Validated at ingest time. Absence from a response is not a violation.
+**Enforcement: batch — imported via scripts, no per-response requirement.** Validated at import time. Absence from a response is not a violation.
 
 ---
 
@@ -10,7 +10,7 @@ Source content — documents, posts, tweets, articles. The entity is a container
 
 - `<memory:observation>` — holds the source text (one observation per discrete fact or paragraph)
 - No `<memory:prompt>` (there was no prompt — the content already existed)
-- No `<memory:reasoning>` (there was no decision — the content was ingested as-is)
+- No `<memory:reasoning>` (there was no decision — the content was imported as-is)
 
 ## Importance
 
