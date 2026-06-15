@@ -59,4 +59,10 @@ def compose_embedding_text(entry, space='default', max_chars=2000):
             return ''
         return desc[:max_chars]
 
+    if space == 'prompt':
+        prompt = entry.get('prompt', '') or ''
+        if not prompt:
+            return ''
+        return prompt[:max_chars]
+
     raise ValueError(f"Unknown embedding space: {space!r}")
