@@ -111,7 +111,9 @@ Rules: target must be a valid memory name. No self-references. No duplicate targ
 
 ## Rule 6: Upsert Semantics
 
-Re-saving with an existing `name` performs a merge, not a replacement.
+Memories are **unauthorised (read-only) by default**. Only the active chain entity is **authorised** for upsert. New memories (names not in store) are always allowed. The active chain is tracked in `memory/.active_chain` — managed via `memoryschema chain start/release`.
+
+When authorised, re-saving with an existing `name` performs a merge:
 
 | Field | Behavior |
 |-------|----------|
@@ -123,6 +125,7 @@ Re-saving with an existing `name` performs a merge, not a replacement.
 | `observations` | Appended (exact duplicates skipped) |
 | `reasoning` | Replaced if provided |
 | `prompt` | Replaced if provided |
+| `chain` | Replaced if provided |
 | `relations` | Deduplicated merge (same target+type not duplicated) |
 
 ---
@@ -165,9 +168,10 @@ Bonuses: hub `+0.05 * ln(1 + backlinks)`, text match `+0.1` substring (Neo4j) or
 A **chain entity** is a live accumulating memory that grows with each response. It represents an ongoing or completed reasoning sequence.
 
 ### Lifecycle
-1. **Create** if no active chain exists — `chain-<topic>.md`, type `semantic`
-2. **Update** on every response — upsert appends step observations, replaces description/reasoning
-3. **Release** at session end or topic change — append "Conclusion:" observation, finalize
+1. **Create** — `memoryschema chain start <name>` authorises the entity. First write creates it.
+2. **Update** — the authorised chain accepts upserts (observations append, description/reasoning replace). All other memories are read-only.
+3. **Release** — `memoryschema chain release` makes it read-only permanently. Append "Conclusion:" before releasing.
+4. **New chain** — only one authorised at a time. Release first, then start a new one.
 
 ### Structure
 - **Name:** `chain-` prefix (e.g., `chain-why-equal-weight-fails`)

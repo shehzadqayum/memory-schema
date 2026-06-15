@@ -189,7 +189,23 @@ Memories connected to other memories rank higher in retrieval.
 
 ## Upsert Semantics
 
-Re-saving with an existing `name` performs a merge, not a replacement.
+Re-saving with an existing `name` performs a merge, not a replacement, **subject to authorisation**.
+
+### Authorisation Gate
+
+Memories have two write states:
+
+| State | Write access | When |
+|-------|-------------|------|
+| **Unauthorised** (default) | Read-only | All memories after initial write |
+| **Authorised** | Read-write (upsert allowed) | Only the active chain entity |
+
+Only ONE memory can be authorised at a time: the active chain, tracked in `memory/.active_chain` (a system-managed singleton file). The hook checks this file before allowing upserts. New memories (names that don't exist in the store) are always allowed. Upserts to existing unauthorised memories are silently skipped.
+
+- `memoryschema chain start <name>` → authorises the named entity for writes
+- `memoryschema chain release` → transitions it to unauthorised (read-only, permanent)
+
+### Merge behavior (when authorised)
 
 | Field | On Create | On Merge |
 |-------|-----------|----------|
@@ -362,7 +378,7 @@ Stays under 200 lines (auto-load limit). The PostToolUse hook automatically appe
 
 ## Behavioral Specification
 
-**On Create:** Write markdown → write gate → embed (if accepted) → upsert → associations → append to MEMORY.md (working memory only).
+**On Create:** Write markdown → authorisation check → write gate → embed (if accepted) → upsert → associations → append to MEMORY.md (working memory only). New names always allowed; existing names require active chain authorisation.
 
 ### Write Gate Pipeline
 
@@ -430,8 +446,9 @@ Every gate decision is recorded in `memory/audit.jsonl` with machine-readable ve
 4. Gate decision audit-logged with verdict + reasons
 5. Entry available for review via `memoryschema quarantine review`
 
-**On Mutate (Upsert):** When an existing entry is re-upserted:
-1. Write gate evaluates the mutation
+**On Mutate (Upsert):** When an existing entry is re-upserted (must be the authorised active chain):
+1. Authorisation check (name must match `memory/.active_chain`)
+2. Write gate evaluates the mutation
 2. Immutable fields preserved (name, schema, provenance, project, filepath, created_at)
 3. Observations appended (exact duplicates skipped)
 4. Relations appended (same target+type deduplicated)
@@ -524,10 +541,10 @@ A **chain entity** is a memory that represents a sequence of reasoning steps fro
 
 Chain entities are **live accumulating** — they grow with each response in a session:
 
-1. **Create** — on first response, if no active chain exists, create `memory/chain-<topic>.md` with Step 1
-2. **Update** — on every subsequent response, upsert the same chain file. Observations append (each step adds). Description and reasoning are replaced (evolving summary). Relations merge (USES links accumulate).
-3. **Release** — at session end or topic change, append a "Conclusion:" observation and finalize. The chain becomes a permanent record.
-4. **New chain** — if the topic changes significantly, release the current chain and start a new one.
+1. **Create** — `memoryschema chain start <name>` authorises the entity for writes. First response creates `memory/<name>.md` with Step 1.
+2. **Update** — the authorised chain accepts upserts. Observations append (each step adds). Description and reasoning are replaced (evolving summary). Relations merge (USES links accumulate). All other memories remain unauthorised (read-only).
+3. **Release** — `memoryschema chain release` transitions the chain to unauthorised (read-only, permanent). Append a "Conclusion:" observation before releasing.
+4. **New chain** — if the topic changes, release the current chain and start a new one. Only one chain can be authorised at a time.
 
 The embedding is re-computed on every upsert (the hook fires on every write), so the chain's vector representation stays current as it grows.
 

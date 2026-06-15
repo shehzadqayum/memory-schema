@@ -37,6 +37,7 @@
 - [v3-remediation-plan](v3-remediation-plan.md) — Memory System v3 — 28-issue remediation across 7 phases: docs, lifecycle, scoring, trust, hierarchy, retrieval, evaluation
 - [chain-live-accumulation-design](chain-live-accumulation-design.md) — Live chain entity: created if absent, updated every response, released at end of cycle
 - [chain-entity-design](chain-entity-design.md) — Chain entity design: a meta-memory listing ordered steps as observations with USES relations to evidence
+- [docs-sync-authorisation](docs-sync-authorisation.md) — Documentation synchronized with authorised/unauthorised memory state model
 
 ### Procedures
 - [multi-space-activated](multi-space-activated.md) — Multi-space embedding activated in hook — all writes now embed in 3 spaces

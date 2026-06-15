@@ -8,14 +8,16 @@ Every session has ONE active chain entity that accumulates reasoning steps. This
 
 ### Lifecycle
 
-1. **Create** — on first response, if no active chain exists, create `memory/chain-<topic>.md` with Step 1 as an observation
-2. **Update** — on every subsequent response, UPSERT the same chain entity: append a new step observation, update description (evolving summary) and reasoning (current narrative)
-3. **Release** — at session end or topic change, append a "Conclusion:" observation and finalize the description/reasoning. The chain becomes a permanent record.
-4. **New chain** — if the topic changes significantly mid-session, release the current chain and create a new one
+1. **Start** — `memoryschema chain start <name>` authorises the entity for writes. Create the memory file on first response.
+2. **Update** — on every subsequent response, UPSERT the same chain entity (authorised = writable). All other memories are read-only (unauthorised).
+3. **Release** — `memoryschema chain release` makes it read-only permanently. Append a "Conclusion:" observation before releasing.
+4. **New chain** — only one chain authorised at a time. Release first, then start a new one.
+
+After release, all memories are read-only until a new chain is started. The active chain name is stored in `memory/.active_chain`.
 
 ### How to update
 
-Write the SAME `memory/chain-<topic>.md` file on every response. The upsert semantics handle accumulation:
+Write the SAME `memory/<chain-name>.md` file on every response. The upsert semantics handle accumulation (only works because the chain is authorised):
 - Observations are APPENDED (each step adds to the list)
 - Description is REPLACED (summary evolves)
 - Reasoning is REPLACED (narrative updated with latest thinking)
@@ -37,7 +39,7 @@ The active chain is the default. Additionally write standalone memories when:
 - A reusable pattern is validated (procedural — reinforced by access)
 - A critical decision or correction occurs (high importance, standalone)
 
-These standalone memories should be linked from the chain via USES relations.
+Standalone memories are immediately read-only after write (unauthorised). They should be linked from the chain via USES relations.
 
 ---
 
