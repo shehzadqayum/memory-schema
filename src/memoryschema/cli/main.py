@@ -285,3 +285,6 @@ cli.add_command(rules)
 cli.add_command(config_cmd, name="config")
 cli.add_command(eval_cmd, name="eval")
 cli.add_command(reflect_cmd, name="reflect")
+
+from memoryschema.cli.chain_cmd import chain as chain_group
+cli.add_command(chain_group)

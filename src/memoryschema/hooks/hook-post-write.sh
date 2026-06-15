@@ -59,6 +59,38 @@ if memory is None:
     # Not a memory entity file (e.g., YAML frontmatter, plain markdown) — skip
     sys.exit(0)
 
+# Authorisation check: only the active chain or new memories can be written
+# Active chain name stored in memory/.active_chain
+name = memory.get('name', '')
+active_chain_path = os.path.join(project_root, 'memory', '.active_chain')
+active_chain = None
+if os.path.exists(active_chain_path):
+    with open(active_chain_path, 'r') as f:
+        active_chain = f.read().strip()
+
+# Check if this name already exists in the store
+existing = None
+if os.path.exists(store_path):
+    import json as _json
+    with open(store_path, 'r') as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                entry = _json.loads(line)
+                if entry.get('name') == name:
+                    existing = entry
+                    break
+            except _json.JSONDecodeError:
+                continue
+
+if existing is not None:
+    # Entity exists — only allow upsert if this is the active chain
+    if name != active_chain:
+        print(f'hook: BLOCKED — {name} is read-only (not the active chain)', file=sys.stderr)
+        sys.exit(0)  # exit 0 = don't block the Write tool, just skip indexing
+
 # Generator stamp (v4): read MEMORY_GENERATOR env var
 generator_id = os.environ.get('MEMORY_GENERATOR')
 if generator_id:
