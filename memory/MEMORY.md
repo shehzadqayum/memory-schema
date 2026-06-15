@@ -2,7 +2,6 @@
 (entries will be added as memories are created)
 
 ### Knowledge
-- [space-evaluation-prompt-description](space-evaluation-prompt-description.md) — Evaluation: description space worth adding (high discriminative power), prompt space not (redundant with reasoning)
 - [chain-not-formalized](chain-not-formalized.md) — Chain entity pattern is working but not documented in schema rules, design docs, or working memory guidelines
 - [chain-type-attribute-status](chain-type-attribute-status.md) — Type attribute and fields partially resolved — chain pattern formalized but type guidance not updated for chain model
 - [scoring-formula](scoring-formula.md) — Retrieval scoring: recency × w_r + importance × w_i + cosine_sim × w_v with type/trust/basis modifiers
@@ -21,6 +20,7 @@
 - [chain-why-equal-weight-fails](chain-why-equal-weight-fails.md) — Chain: equal-weight multi-space averaging dilutes retrieval — proven through 4 experiments
 - [chain-memory-quality-evolution](chain-memory-quality-evolution.md) — Chain: corpus evolved from session-metadata-heavy to knowledge-rich through deliberate type classification
 - [provenance-ambiguity](provenance-ambiguity.md) — Provenance introduces trust ambiguity — self-declared labels, effectively binary, basis attribute is the better mechanism
+- [system-explanation-post-provenance](system-explanation-post-provenance.md) — Complete memory system after provenance removal: 13 LLM fields, 7 spaces, 4-stage gate, basis-based trust
 - [nested-agents-discussion](nested-agents-discussion.md) — Architectural discussion on nested agents using project folders as agent boundaries
 - [four-space-eval-results](four-space-eval-results.md) — 4-space eval: nDCG 0.557 worse than single-space 0.608 — equal-weight averaging dilutes signal
 - [chain-implementing-live-chains](chain-implementing-live-chains.md) — Chain: implementing live accumulating chain entities — formalizing the pattern in schema and rules
@@ -30,6 +30,7 @@
 - [immutable-memory-evaluation](immutable-memory-evaluation.md) — Evaluation: memories should be immutable after write — no upsert, no append, each memory a snapshot
 - [authorised-state-design](authorised-state-design.md) — Two memory states: unauthorised (read-only, default) and authorised (read-write, one active chain only)
 - [authorised-state-implemented](authorised-state-implemented.md) — Implemented authorised/unauthorised memory states — only active chain is writable
+- [provenance-removed](provenance-removed.md) — Provenance removed from entire framework — code, tests, and documentation synchronized
 - [centralize-env-vars](centralize-env-vars.md) — Plan to centralize os.environ reads into config.py — resolving session 1 residual
 - [fix-env-precedence](fix-env-precedence.md) — Plan to fix env var precedence inversion, redundant import, and add hierarchy integration tests
 - [docs-update-plan](docs-update-plan.md) — Plan to update all documentation for hierarchy and inheritance features
@@ -37,7 +38,6 @@
 - [v3-remediation-plan](v3-remediation-plan.md) — Memory System v3 — 28-issue remediation across 7 phases: docs, lifecycle, scoring, trust, hierarchy, retrieval, evaluation
 - [chain-live-accumulation-design](chain-live-accumulation-design.md) — Live chain entity: created if absent, updated every response, released at end of cycle
 - [chain-entity-design](chain-entity-design.md) — Chain entity design: a meta-memory listing ordered steps as observations with USES relations to evidence
-- [provenance-removed](provenance-removed.md) — Provenance removed from entire framework — code, tests, and documentation synchronized
 
 ### Procedures
 - [bash-python-quoting-rule](bash-python-quoting-rule.md) — Never use double-quoted dict keys in f-strings inside bash python3 -c blocks
