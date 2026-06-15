@@ -160,6 +160,31 @@ Bonuses: hub `+0.05 * ln(1 + backlinks)`, text match `+0.1` substring (Neo4j) or
 
 ---
 
+## Rule 9: Chain Entities
+
+A **chain entity** is a live accumulating memory that grows with each response. It represents an ongoing or completed reasoning sequence.
+
+### Lifecycle
+1. **Create** if no active chain exists — `chain-<topic>.md`, type `semantic`
+2. **Update** on every response — upsert appends step observations, replaces description/reasoning
+3. **Release** at session end or topic change — append "Conclusion:" observation, finalize
+
+### Structure
+- **Name:** `chain-` prefix (e.g., `chain-why-equal-weight-fails`)
+- **Type:** `semantic` (persists with recency floor 0.6)
+- **Description:** evolving summary (replaced on each upsert)
+- **Observations:** ordered steps — "Step 1: ...", "Step N: ...", "Conclusion: ..." (appended on each upsert)
+- **Prompt:** the original trigger (set on create, kept on updates)
+- **Reasoning:** evolving narrative (replaced on each upsert)
+- **Relations:** `USES` links to evidence memories (accumulated via merge)
+
+### Retrieval
+- Embedded in all spaces, re-embedded on every update (embedding stays current)
+- Recall cascade follows `USES` to surface evidence
+- As semantic type, chain persists (recency floor 0.6) even as evidence decays
+
+---
+
 ## Enforcement
 
 These rules are enforced by:

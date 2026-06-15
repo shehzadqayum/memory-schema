@@ -479,6 +479,69 @@ See the consolidated upsert table in §Upsert Semantics above.
 
 ---
 
+## Chain Entities
+
+A **chain entity** is a memory that represents a sequence of reasoning steps from trigger to conclusion. It is a regular entity — no schema changes required — that follows a specific pattern:
+
+### Structure
+
+- **Type:** `semantic` (chains persist as knowledge distillation)
+- **Name:** prefix with `chain-` (e.g., `chain-why-equal-weight-fails`)
+- **Description:** "Chain: <conclusion summary>"
+- **Observations:** Ordered steps — "Step 1: ...", "Step 2: ...", "Conclusion: ..."
+- **Prompt:** The trigger question the chain answers
+- **Reasoning:** Why the chain matters, connecting the steps
+- **Relations:** `USES` links to each evidence memory referenced by the steps
+
+### Example
+
+```xml
+<memory:entity schema="4" name="chain-why-x-fails" type="semantic" importance="8">
+  <memory:description>Chain: X fails because of Y — proven through 3 experiments</memory:description>
+  <memory:observations>
+    <memory:observation>Step 1: Tried approach A, measured result P</memory:observation>
+    <memory:observation>Step 2: Tried approach B, measured result Q</memory:observation>
+    <memory:observation>Step 3: Compared P and Q, found Q better</memory:observation>
+    <memory:observation>Conclusion: Y is the root cause, B is the fix</memory:observation>
+  </memory:observations>
+  <memory:prompt>Why does X fail?</memory:prompt>
+  <memory:reasoning>Each experiment isolated a variable...</memory:reasoning>
+  <memory:relations>
+    <memory:relation target="evidence-memory-1" type="USES"/>
+    <memory:relation target="evidence-memory-2" type="USES"/>
+  </memory:relations>
+</memory:entity>
+```
+
+### Retrieval Behavior
+
+- The chain entity is embedded in all spaces — findable by trigger question, conclusion, or any step
+- Recall cascade follows `USES` relations to surface the evidence memories (depth 1-2)
+- As a semantic type, the chain has a recency floor of 0.6 — it persists even as episodic evidence steps decay
+- This creates natural knowledge distillation: the chain is the durable summary, the evidence is the decayable detail
+
+### Lifecycle
+
+Chain entities are **live accumulating** — they grow with each response in a session:
+
+1. **Create** — on first response, if no active chain exists, create `memory/chain-<topic>.md` with Step 1
+2. **Update** — on every subsequent response, upsert the same chain file. Observations append (each step adds). Description and reasoning are replaced (evolving summary). Relations merge (USES links accumulate).
+3. **Release** — at session end or topic change, append a "Conclusion:" observation and finalize. The chain becomes a permanent record.
+4. **New chain** — if the topic changes significantly, release the current chain and start a new one.
+
+The embedding is re-computed on every upsert (the hook fires on every write), so the chain's vector representation stays current as it grows.
+
+### When to Create
+
+Create a chain entity when:
+- Starting a new session or conversation
+- A multi-step investigation begins
+- An experiment starts sequential steps
+- A debugging session begins a hypothesis → test → revise cycle
+- A design evaluation starts comparing alternatives
+
+---
+
 ## Design Decisions
 
 | Decision | Rationale |
