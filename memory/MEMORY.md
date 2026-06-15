@@ -19,6 +19,10 @@
 - [gate-pipeline-stages](gate-pipeline-stages.md) — Write gate: 6-stage pipeline producing ACCEPT/REJECT/QUARANTINE verdicts
 - [storage-layer-architecture](storage-layer-architecture.md) — Five storage layers with graceful degradation: L0 MEMORY.md → L1 files/JSONL → L2 embeddings/Neo4j
 - [corpus-improvement-results](corpus-improvement-results.md) — After writing knowledge-rich memories, corpus grew to 50 entries with balanced types and strong recall
+- [space-evaluation-prompt-description](space-evaluation-prompt-description.md) — Evaluation: description space worth adding (high discriminative power), prompt space not (redundant with reasoning)
+- [description-space-added](description-space-added.md) — Added description embedding space — 4 spaces now active per entry (4096 total dims)
+- [four-space-eval-results](four-space-eval-results.md) — 4-space eval: nDCG 0.557 worse than single-space 0.608 — equal-weight averaging dilutes signal
+- [system-status-snapshot](system-status-snapshot.md) — Memory system snapshot: 56 entries, 4 embedding spaces, 659 tests, single-space scoring best
 
 ### Procedures
 - [session-memory-switch](session-memory-switch.md) — Switched from built-in Claude Code memory to memory-schema system
@@ -42,3 +46,5 @@
 - [out-of-session-commit](out-of-session-commit.md) — Out-of-session commit 8c12fd7 — mandatory memory write rule finalized
 - [multi-space-default-confirmed](multi-space-default-confirmed.md) — Confirmed multi-space embedding is now the default hook behavior
 - [out-of-session-multi-space](out-of-session-multi-space.md) — Out-of-session commit ba77a7f — multi-space embedding activated as default
+- [corpus-committed](corpus-committed.md) — Committed 19 knowledge-rich memory entities as 52eac73
+- [description-space-committed](description-space-committed.md) — Committed description space as f3833bd — 4 embedding spaces now active
