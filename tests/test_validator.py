@@ -39,8 +39,12 @@ NO_NAME = """<memory:entity schema="2">
 NO_DESCRIPTION = """<memory:entity schema="2" name="no-desc">
 </memory:entity>"""
 
-INVALID_TYPE = """<memory:entity schema="2" name="bad-type" type="invalid">
-  <memory:description>Bad type</memory:description>
+EMPTY_TYPE = """<memory:entity schema="2" name="bad-type" type="">
+  <memory:description>Empty type</memory:description>
+</memory:entity>"""
+
+FREEFORM_TYPE = """<memory:entity schema="2" name="custom-type" type="investigation">
+  <memory:description>Custom type</memory:description>
 </memory:entity>"""
 
 INVALID_IMPORTANCE_RANGE = """<memory:entity schema="2" name="bad-imp" importance="15">
@@ -121,9 +125,13 @@ class TestStructureRules:
         errors = validate(NO_DESCRIPTION)
         assert any(r == 'V6' for r, _ in errors)
 
-    def test_v4_invalid_type(self):
-        errors = validate(INVALID_TYPE)
+    def test_v4_empty_type_rejected(self):
+        errors = validate(EMPTY_TYPE)
         assert any(r == 'V4' for r, _ in errors)
+
+    def test_v4_freeform_type_accepted(self):
+        errors = validate(FREEFORM_TYPE)
+        assert not any(r == 'V4' for r, _ in errors)
 
     def test_v5_importance_out_of_range(self):
         errors = validate(INVALID_IMPORTANCE_RANGE)

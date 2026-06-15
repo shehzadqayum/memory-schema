@@ -61,12 +61,6 @@ Importance means **salience** — how important this memory is for future sessio
 
 Scope (which project sees a memory) is handled by the `project` field, not importance.
 
-## Type guidance
-
-- `semantic` — facts, decisions, references (persist indefinitely)
-- `episodic` — session events, debugging, implementation history (decays)
-- `procedural` — validated approaches, user feedback, corrected behaviors (reinforced by access)
-
 ## File path
 
 Write to `memory/<name>.md` where `<name>` is kebab-case and describes the content.

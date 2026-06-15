@@ -114,10 +114,10 @@ def validate(content, filepath=None, strict=False, known_names=None):
         if actual != expected:
             errors.append(('V3', f'Filename "{actual}" does not match name "{name}" (expected "{expected}")'))
 
-    # V4: type is valid (optional field)
+    # V4: type is a non-empty string (optional, free-form — no predefined values enforced)
     type_val = root.get('type')
-    if type_val and type_val not in VALID_TYPES:
-        errors.append(('V4', f'Invalid type "{type_val}", must be one of: {", ".join(sorted(VALID_TYPES))}'))
+    if type_val is not None and not type_val.strip():
+        errors.append(('V4', 'Type attribute is present but empty'))
 
     # V5: importance is integer 1-10 (optional field)
     importance_str = root.get('importance')

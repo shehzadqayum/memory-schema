@@ -56,7 +56,7 @@ Include when contextually appropriate. Omit if not relevant.
 | Field | Tag | When to include |
 |-------|-----|-----------------|
 | `importance` | attribute | Integer 1-10. Defaults to 5 if omitted. |
-| `type` | attribute | `semantic`, `episodic`, or `procedural`. Defaults to `semantic`. |
+| `type` | attribute | Free-form string. No predefined values enforced. |
 | `observations` | `<memory:observations>` | Atomic facts. Must contain at least one `<memory:observation>`. |
 | `reasoning` | `<memory:reasoning>` | Narrative thinking — why, alternatives, connections. |
 | `prompt` | `<memory:prompt>` | The user input that triggered the response. |
@@ -70,13 +70,9 @@ Include when contextually appropriate. Omit if not relevant.
 
 ## Rule 3: Type System
 
-Three types. Optional — defaults to `semantic` if omitted.
+The `type` attribute is a free-form string. Optional — defaults to `semantic` when omitted (in parser). No predefined set is prescribed by the validator (any non-empty string accepted). The LLM determines the best value. Consistent usage patterns should emerge organically from the corpus.
 
-| Type | Use for |
-|------|---------|
-| `semantic` | Facts, preferences, references, decisions |
-| `episodic` | Events, incidents, implementation history |
-| `procedural` | Feedback, validated approaches, patterns |
+The scoring engine recognises `semantic`, `episodic`, `procedural` for recency modifiers. Unrecognised types get standard decay.
 
 ---
 
@@ -132,8 +128,10 @@ Re-saving with an existing `name` performs a merge, not a replacement.
 ## Rule 7: Retrieval Scoring
 
 ```
-score = recency(0.995^hours) × w_r + importance/10 × w_i + cosine_similarity × w_v
+score = recency(0.995^hours) × w_r + importance/10 × w_i + relevance × w_v
 ```
+
+Relevance is computed from multi-space embeddings (5 spaces: default, observations, reasoning, description, prompt). The combiner averages cosine similarities across present spaces (coverage-aware — absent spaces not counted as zero).
 
 | Query type | Recency | Importance | Relevance |
 |------------|---------|------------|-----------|
@@ -155,7 +153,7 @@ Bonuses: hub `+0.05 * ln(1 + backlinks)`, text match `+0.1` substring (Neo4j) or
 | L0 | MEMORY.md | Never fails (always in context) |
 | L1a | Markdown files | Never fails (git-tracked) |
 | L1b | JSONL | Never fails (stdlib Python) |
-| L2a | Voyage embeddings | Degrades to L1 |
+| L2a | Voyage embeddings (5 spaces × 1024 dims) | Degrades to L1 |
 | L2b | Neo4j | Degrades to L2a |
 
 ---
@@ -189,7 +187,8 @@ A **chain entity** is a live accumulating memory that grows with each response. 
 
 These rules are enforced by:
 - **Validator:** V1-V14 (structure), R1-R7 (relations), F1, F3 (filesystem)
-- **PostToolUse hook:** Parses, embeds, indexes on every Write to `memory/*.md`
+- **Write gate:** 6-stage pipeline (validation, provenance, guards, consistency, numeric probe, L0 echo)
+- **PostToolUse hook:** Parses, embeds (5 spaces), gate-checks, indexes on every Write to `memory/*.md`
 - **Compact resilience:** Working memory entries auto-appended to MEMORY.md by the hook
 
 The schema defines structure. How strictly it is applied depends on the scope guidelines (importance-correlated enforcement).

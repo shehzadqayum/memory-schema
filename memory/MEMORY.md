@@ -12,6 +12,7 @@
 - [l0-budget-design](l0-budget-design.md) — MEMORY.md L0 budget: 2000 tokens max, evicts lowest-scoring entries, groups by type
 - [multi-space-cross-similarity](multi-space-cross-similarity.md) — Cross-space embedding similarity: observations↔reasoning diverge most at ~0.66
 - [description-space-added](description-space-added.md) — Added description embedding space — 4 spaces now active per entry (4096 total dims)
+- [chain-type-attribute-status](chain-type-attribute-status.md) — Type attribute and fields partially resolved — chain pattern formalized but type guidance not updated for chain model
 - [space-evaluation-prompt-description](space-evaluation-prompt-description.md) — Evaluation: description space worth adding (high discriminative power), prompt space not (redundant with reasoning)
 - [scoring-formula](scoring-formula.md) — Retrieval scoring: recency × w_r + importance × w_i + cosine_sim × w_v with type/trust/basis modifiers
 - [gate-pipeline-stages](gate-pipeline-stages.md) — Write gate: 6-stage pipeline producing ACCEPT/REJECT/QUARANTINE verdicts
@@ -25,16 +26,17 @@
 - [chain-why-equal-weight-fails](chain-why-equal-weight-fails.md) — Chain: equal-weight multi-space averaging dilutes retrieval — proven through 4 experiments
 - [chain-memory-quality-evolution](chain-memory-quality-evolution.md) — Chain: corpus evolved from session-metadata-heavy to knowledge-rich through deliberate type classification
 - [four-space-eval-results](four-space-eval-results.md) — 4-space eval: nDCG 0.557 worse than single-space 0.608 — equal-weight averaging dilutes signal
+- [chain-implementing-live-chains](chain-implementing-live-chains.md) — Chain: implementing live accumulating chain entities — formalizing the pattern in schema and rules
 - [nested-agents-discussion](nested-agents-discussion.md) — Architectural discussion on nested agents using project folders as agent boundaries
 - [chain-pattern-formalized](chain-pattern-formalized.md) — Chain entity pattern formalized in schema spec, rules, and working guidelines
 - [package-audit-plan](package-audit-plan.md) — Full package audit plan — 13 findings across CRITICAL/HIGH/MEDIUM/LOW
 - [query-conditioned-weighting-design](query-conditioned-weighting-design.md) — Query-conditioned weighting design: classify query by keywords, select space weight profile per type
 - [chain-definition](chain-definition.md) — A chain of reasoning is a sequence of memory events with a defined start (trigger) and end (conclusion)
-- [chain-live-accumulation-design](chain-live-accumulation-design.md) — Live chain entity: created if absent, updated every response, released at end of cycle
 - [centralize-env-vars](centralize-env-vars.md) — Plan to centralize os.environ reads into config.py — resolving session 1 residual
 - [fix-env-precedence](fix-env-precedence.md) — Plan to fix env var precedence inversion, redundant import, and add hierarchy integration tests
 - [docs-update-plan](docs-update-plan.md) — Plan to update all documentation for hierarchy and inheritance features
 - [v3-remediation-plan](v3-remediation-plan.md) — Memory System v3 — 28-issue remediation across 7 phases: docs, lifecycle, scoring, trust, hierarchy, retrieval, evaluation
+- [chain-live-accumulation-design](chain-live-accumulation-design.md) — Live chain entity: created if absent, updated every response, released at end of cycle
 - [chain-entity-design](chain-entity-design.md) — Chain entity design: a meta-memory listing ordered steps as observations with USES relations to evidence
 
 ### Procedures
@@ -47,9 +49,6 @@
 - [session-memory-switch](session-memory-switch.md) — Switched from built-in Claude Code memory to memory-schema system
 
 ### Session History
-- [out-of-session-snapshot-commit](out-of-session-snapshot-commit.md) — Out-of-session commit 5756486 — space evaluation results and system snapshot
-- [prompt-space-committed](prompt-space-committed.md) — Committed prompt space as e16ec7b — 5 embedding spaces now active
-- [corpus-committed](corpus-committed.md) — Committed 19 knowledge-rich memory entities as 52eac73
 - [design-doc-committed](design-doc-committed.md) — Committed query-conditioned weighting design doc and 5-space eval as 38858b6
 - [deployment-verified](deployment-verified.md) — End-to-end deployment verification of memory-schema system
 - [session-5-close](session-5-close.md) — Session 5 complete — full package audit, 15 items, 13 code fixes + 2 doc items
@@ -61,4 +60,3 @@
 - [session-2-close](session-2-close.md) — Session 2 complete — centralized env var reads, resolved session 1 residual
 - [session-3-close](session-3-close.md) — Session 3 complete — fixed env var precedence, redundant import, added hierarchy integration tests
 - [session-4-close](session-4-close.md) — Session 4 complete — full documentation alignment, 8 items across 12 files
-- [chain-implementing-live-chains](chain-implementing-live-chains.md) — Chain: implementing live accumulating chain entities — formalizing the pattern in schema and rules

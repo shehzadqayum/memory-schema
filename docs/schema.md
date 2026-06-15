@@ -64,7 +64,7 @@ Optional body text follows after the closing tag.
 | Field | Tag | When to include |
 | --- | --- | --- |
 | **importance** | attribute | Integer 1-10. Defaults to 5 if omitted. |
-| **type** | attribute | `semantic`, `episodic`, or `procedural`. Defaults to `semantic` if omitted. |
+| **type** | attribute | Free-form string. No predefined values enforced. LLM determines best usage. |
 | **observations** | `<memory:observations>` | Atomic facts. Include when there are discrete facts to record. |
 | **reasoning** | `<memory:reasoning>` | Narrative thinking — why, alternatives, connections. |
 | **prompt** | `<memory:prompt>` | The user input that triggered the response. |
@@ -108,24 +108,9 @@ Optional body text follows after the closing tag.
 
 ## Type System
 
-Three memory types. Optional — defaults to `semantic` if omitted.
+The `type` attribute is a free-form string. Optional — defaults to `semantic` when omitted (in parser). The LLM determines the best value based on the content being captured. No predefined set is prescribed by the validator (any non-empty string accepted). Consistent usage patterns should emerge organically from the corpus over time.
 
-**Type factor:** Each type modifies the base recency decay differently (see Retrieval Scoring).
-
-### `semantic` — Facts and Concepts
-
-**Intended retention:** Persists indefinitely. Updated on correction.
-**Use for:** preferences, references, domain knowledge, architectural decisions.
-
-### `episodic` — Experiences and Events
-
-**Intended retention:** Ages faster via recency decay.
-**Use for:** decisions, incidents, debugging sessions, implementation history.
-
-### `procedural` — Skills and Approaches
-
-**Intended retention:** Reinforced by access (each recall strengthens).
-**Use for:** feedback, validated approaches, corrected behaviors, workflow patterns.
+**Type factor in scoring:** The scoring engine recognises three type values for recency modification (`semantic`, `episodic`, `procedural`). Unrecognised types receive standard decay. If the LLM converges on these names organically, the scoring benefits activate. See Retrieval Scoring for the formulas.
 
 ---
 
@@ -234,7 +219,7 @@ Re-saving with an existing `name` performs a merge, not a replacement.
 | V1 | File contains exactly one `<memory:entity>` root element |
 | V2 | Root element has `name` attribute |
 | V3 | `name` attribute matches the filename (without `.md` extension) |
-| V4 | If present, `type` is one of: `semantic`, `episodic`, `procedural` |
+| V4 | If present, `type` is a non-empty string (free-form, no predefined values) |
 | V5 | If present, `importance` is an integer from 1 to 10 |
 | V6 | Contains exactly one `<memory:description>` child element |
 | V7 | If present, `<memory:observations>` contains at least one `<memory:observation>` |
@@ -307,15 +292,21 @@ Procedural examples: 0 accesses → standard decay; 5 accesses → exponent 0.4 
 
 ---
 
-## Embedding Input
+## Embedding Spaces
 
-The following fields are concatenated and embedded via Voyage AI:
+Each entity is embedded in up to 5 independent vector spaces (1024 dims each, Voyage AI voyage-4-lite):
 
-```
-name + description + observations (joined) + prompt + reasoning
-```
+| Space | Input fields | Coverage | Purpose |
+|-------|-------------|----------|---------|
+| `default` | name + description + observations + prompt + reasoning | 100% | Full semantic blend |
+| `observations` | observation text only | 100% | Fact-level matching |
+| `reasoning` | reasoning + prompt text | ~83% | Rationale matching |
+| `description` | one-line description only | 100% | Topic identity (high discriminative power) |
+| `prompt` | user prompt text only | ~62% | Intent matching |
 
-Truncated to 2,000 characters. Body text is **excluded** (it may contain unstructured markdown or code that degrades embedding quality). For corpus entries with long body text, chunk separately.
+Each space is truncated to 2,000 characters. Body text is **excluded** (it may contain unstructured markdown or code that degrades embedding quality). Entries missing a field produce no vector for that space (structural absence — the combiner skips absent spaces, never counts them as zero).
+
+The canonical composition function is `compose_embedding_text(entry, space='default')` in `embedding_input.py`. All callers must use this function.
 
 Reasoning has a soft length ceiling of 500 words (strict-mode quality check Q8).
 
@@ -330,7 +321,7 @@ Each layer adds capability without being required. The system degrades gracefull
 | L0 | MEMORY.md | Always-in-context index | Never fails |
 | L1a | Markdown files | Persistence, git, human-readable | Never fails |
 | L1b | JSONL | Structured queries, backlinks, access tracking | Never fails |
-| L2a | Voyage embeddings | Semantic similarity, associations | Degrades to L1 |
+| L2a | Voyage embeddings | 5 spaces × 1024 dims, semantic similarity, associations | Degrades to L1 |
 | L2b | Neo4j | Primary store, vector k-NN, graph traversal | Degrades to L2a |
 
 ### Fallback Chain
@@ -368,16 +359,16 @@ Stays under 200 lines (auto-load limit). The PostToolUse hook automatically appe
 
 ### Write Gate Pipeline
 
-Every write passes through a four-stage gate before indexing. The gate never silently drops — every entry receives a logged verdict.
+Every write passes through a six-stage gate before indexing. Embedding is computed BEFORE the gate (stages 4-6 need the vector). The gate never silently drops — every entry receives a logged verdict.
 
 ```
-Parse → Validate → Gate Pipeline → Embed (if accepted) → Index
-                       │
-         ┌─────────────┼─────────────┐
-         │             │             │
-      ACCEPT      QUARANTINE      REJECT
-    (index + embed)  (save unembedded,  (not saved,
-                      status=quarantined)  exit with error)
+Parse → Embed (5 spaces) → Gate Pipeline → Index
+                                │
+                  ┌─────────────┼─────────────┐
+                  │             │             │
+               ACCEPT      QUARANTINE      REJECT
+             (index)     (save unembedded,  (not saved,
+                          status=quarantined)  exit with error)
 ```
 
 | Stage | Check | Failure verdict |
@@ -386,13 +377,15 @@ Parse → Validate → Gate Pipeline → Embed (if accepted) → Index
 | 2. Provenance admission | Valid provenance, source required for ingested | REJECT |
 | 3. Guards | Provenance mismatch on upsert (existing ≠ new) | QUARANTINE |
 | 4. Consistency probe | Near-duplicate (>0.95 cosine sim, different description) | QUARANTINE |
+| 5. Numeric probe | Contradiction with existing entries (extract_claims matching) | QUARANTINE (log mode) |
+| 6. L0 echo probe | Restatement check (Jaccard overlap + measured conjunction) | QUARANTINE |
 
 Every gate decision is recorded in `memory/audit.jsonl` with machine-readable verdict and reasons.
 **On Access:** Increment access_count, update last_accessed.
 **On Query:** Score candidates → search → expand via backlinks+associations → return ranked. Non-active entries are excluded from results by default (`--include-inactive` to override). Superseded entries remain traversable in BFS graph walks (their relations are followed) but are not returned in results.
 **On Consolidate:** Sync un-indexed files → backlinks → (batch embed → associations → Neo4j if available).
 **On Reflect:** Cluster episodic entries → synthesize semantic summaries:
-1. Build adjacency graph from mutual k-NN associations
+1. Build adjacency graph from mutual k-NN associations (filtered by score_threshold, default 0.7)
 2. Find connected components via BFS (min/max cluster size filtering)
 3. Synthesize summary: tries LLM via Anthropic SDK, falls back to mechanical merge (concatenate descriptions, dedup observations)
 4. Create SUPERSEDES edges from summary to cluster members

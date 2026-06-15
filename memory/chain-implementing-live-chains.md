@@ -1,21 +1,23 @@
-<memory:entity schema="4" name="chain-implementing-live-chains" type="semantic" importance="8">
-  <memory:description>Chain: implementing live accumulating chain entities — formalized in schema, rules, and working guidelines</memory:description>
+<memory:entity schema="4" name="chain-implementing-live-chains" type="knowledge" importance="8">
+  <memory:description>Chain: implemented live chain entities, freed type system, synchronized all documentation</memory:description>
   <memory:observations>
     <memory:observation>Step 1: User defined chain as sequence of memory events with start and end</memory:observation>
     <memory:observation>Step 2: Chose chain entity approach — meta-memory with ordered step observations and USES relations</memory:observation>
-    <memory:observation>Step 3: Created 3 retrospective chains (equal-weight-fails, hook-investigation, memory-quality) — verified recall works</memory:observation>
-    <memory:observation>Step 4: Formalized pattern in docs/schema.md, .claude/rules/memory-schema.md (Rule 9), .claude/rules/memory-working.md</memory:observation>
-    <memory:observation>Step 5: User proposed live accumulation — create if absent, update every response, release at cycle end</memory:observation>
-    <memory:observation>Step 6: Updated all 3 docs to reflect live chain model — upsert append semantics, evolving description/reasoning, re-embedding on every update</memory:observation>
-    <memory:observation>Step 7: Changed working memory enforcement from "new entity per response" to "maintain active chain + standalone memories for durable facts"</memory:observation>
-    <memory:observation>Step 8: Committed as cb55e30 — 20 files, 369 insertions</memory:observation>
-    <memory:observation>Conclusion: live chain pattern fully implemented and formalized — ready for use in next session</memory:observation>
+    <memory:observation>Step 3: Created 3 retrospective chains — verified recall cascade works (scores 0.72-0.78)</memory:observation>
+    <memory:observation>Step 4: Formalized in docs/schema.md, rules/memory-schema.md (Rule 9), rules/memory-working.md</memory:observation>
+    <memory:observation>Step 5: Evolved to live accumulation — create if absent, update every response, release at cycle end</memory:observation>
+    <memory:observation>Step 6: Changed enforcement from "new entity per response" to "maintain active chain"</memory:observation>
+    <memory:observation>Step 7: Freed type system — removed predefined types, validator accepts any non-empty string</memory:observation>
+    <memory:observation>Step 8: Scoring engine still recognises semantic/episodic/procedural for recency — incentive not enforcement</memory:observation>
+    <memory:observation>Step 9: Synchronized all documentation — gate 4→6 stages, embedding 1→5 spaces, type system updated, V4 validator updated</memory:observation>
+    <memory:observation>Conclusion: chain pattern, free-form types, and documentation all aligned with implementation</memory:observation>
   </memory:observations>
   <memory:prompt>How should reasoning chains be captured in the memory system?</memory:prompt>
-  <memory:reasoning>The chain evolved from retrospective summary to live accumulator across this conversation. The upsert semantics already supported it — no code changes needed, only documentation and behavioral rules. This chain is now released as a complete record of its own implementation.</memory:reasoning>
+  <memory:reasoning>This chain captured its own implementation across 10 steps. Started as retrospective summaries, evolved to live accumulators, freed the type system, and concluded with a full documentation sync. The key design principles: upsert semantics enable accumulation, scoring recognises types as incentives not constraints, documentation must track implementation not prescribe ahead of it.</memory:reasoning>
   <memory:relations>
     <memory:relation target="chain-entity-design" type="USES"/>
     <memory:relation target="chain-pattern-formalized" type="USES"/>
     <memory:relation target="chain-live-accumulation-design" type="USES"/>
+    <memory:relation target="chain-type-attribute-status" type="USES"/>
   </memory:relations>
 </memory:entity>
