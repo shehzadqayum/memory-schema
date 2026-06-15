@@ -1,6 +1,20 @@
 # Working Memory Guidelines
 
-**Enforcement: MANDATORY — maintain an active chain entity throughout every session.**
+**Enforcement: MANDATORY — recall before every response, write after.**
+
+## Recall Before Responding
+
+Before answering ANY user question, recall relevant memories:
+
+```bash
+memoryschema recall "<user's question or topic>" --limit 3
+```
+
+Use the recalled memories as context for your response. If a recalled memory directly answers the question, cite it. If recalled memories provide background, use them to inform your answer. Call `memoryschema recall` via the Bash tool — this is a real retrieval operation, not file reading.
+
+**Why:** The memory system captures knowledge across sessions. Without recall, that knowledge is write-only — captured but never used. Recall closes the loop.
+
+**When to skip:** Only skip recall for purely mechanical operations (git commits, file staging) where no prior knowledge is relevant.
 
 ## Active Chain
 
