@@ -268,15 +268,20 @@ from memoryschema import Neo4jMemoryStore, embed_text, embed_batch, rerank
 
 ### Coverage
 
-627 tests across 34 files + 2 integration. 21/21 doctor checks. Target: 100% module coverage.
+627 tests across 35 files + 2 Neo4j integration (deselected by default). 21/21 doctor checks.
 
-| Category | Test files | Tests |
-|----------|-----------|------:|
-| Core modules (config, discovery, validator, tags, store, consolidation, hierarchy) | 7 | 236 |
-| Mocked external deps (embeddings, neo4j_store, schema, migration, reembed) | 5 | 48 |
-| Lazy imports (__init__.py) | 1 | 23 |
-| CLI commands (all CLI modules) | 12 | 89 |
-| Integration (inheritance, write_gate, eval) | 2 | 76 |
+| Category | Files | Tests |
+|----------|------:|------:|
+| Core store + config (store, neo4j_store, config, schema, init, migration) | 6 | 134 |
+| Hierarchy + inheritance | 2 | 140 |
+| Embedding + spaces (field_spaces, embeddings, reembed) | 3 | 74 |
+| Gate + probes (write_gate, numeric_probe, l0_budget, validator) | 4 | 87 |
+| Chain + lifecycle (chain_state, e2e_pipeline, consolidation, reflect, mitigates) | 5 | 49 |
+| CLI commands | 11 | 84 |
+| Eval + metrics | 1 | 24 |
+| Other (tags, discovery, decline) | 3 | 35 |
+| **Total (collected)** | **35** | **627** |
+| Neo4j integration (deselected, `pytest -m integration`) | — | 2 |
 
 ### Mocking Patterns
 

@@ -144,7 +144,7 @@ pip install memory-schema[all,dev]
 pytest tests/ -v --cov=memoryschema
 ```
 
-627 tests, 34 files. External dependencies are mocked — no Docker or API keys needed to run tests. 2 additional integration tests (Neo4j) run with `pytest -m integration`.
+627 tests across 35 files. External dependencies are mocked — no Docker or API keys needed to run tests. 2 additional Neo4j integration tests run with `pytest -m integration`.
 
 ### Write tests for custom ingest scripts
 
