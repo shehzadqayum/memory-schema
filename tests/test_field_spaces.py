@@ -56,24 +56,23 @@ class TestObservationsSpace:
 
 
 class TestReasoningSpace:
-    def test_reasoning_and_prompt(self):
+    def test_reasoning_only(self):
         entry = _make_entry()
         text = compose_embedding_text(entry, space='reasoning')
         assert 'verify behavior' in text
-        assert 'What is the test' in text
+        assert 'What is the test' not in text  # prompt is NOT in reasoning space
         assert 'Fact A' not in text
         assert 'description' not in text.lower()
 
-    def test_reasoning_only_no_prompt(self):
-        entry = _make_entry(prompt=None)
+    def test_reasoning_text_exact(self):
+        entry = _make_entry()
         text = compose_embedding_text(entry, space='reasoning')
-        assert 'verify behavior' in text
         assert text == 'Because we need to verify behavior.'
 
-    def test_prompt_only_no_reasoning(self):
+    def test_no_reasoning_returns_empty(self):
         entry = _make_entry(reasoning=None)
         text = compose_embedding_text(entry, space='reasoning')
-        assert 'What is the test' in text
+        assert text == ''
 
     def test_empty_reasoning_and_prompt_returns_empty(self):
         entry = _make_entry(reasoning=None, prompt=None)
@@ -102,6 +101,25 @@ class TestDefaultSpaceUnchanged:
     def test_unknown_space_raises(self):
         with pytest.raises(ValueError, match='Unknown embedding space'):
             compose_embedding_text(_make_entry(), space='nonexistent')
+
+
+class TestNameSpace:
+    def test_name_only(self):
+        entry = _make_entry()
+        text = compose_embedding_text(entry, space='name')
+        assert text == 'test-entry'
+        assert 'description' not in text.lower()
+        assert 'Fact A' not in text
+
+    def test_empty_name_returns_empty(self):
+        entry = {'description': 'No name'}
+        assert compose_embedding_text(entry, space='name') == ''
+
+    def test_max_chars_truncation(self):
+        entry = _make_entry()
+        entry['name'] = 'x' * 200
+        text = compose_embedding_text(entry, space='name', max_chars=50)
+        assert len(text) <= 50
 
 
 class TestPromptSpace:
@@ -152,9 +170,9 @@ class TestDescriptionSpace:
 # --- Registry ---
 
 class TestRegistry:
-    def test_registry_has_five_spaces(self):
+    def test_registry_has_six_spaces(self):
         reg = get_registry()
-        assert set(reg.keys()) == {'default', 'observations', 'reasoning', 'description', 'prompt'}
+        assert set(reg.keys()) == {'default', 'name', 'description', 'observations', 'prompt', 'reasoning'}
 
     def test_all_spaces_immutable(self):
         for name, space in get_registry().items():

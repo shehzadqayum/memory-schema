@@ -294,15 +294,16 @@ Procedural examples: 0 accesses → standard decay; 5 accesses → exponent 0.4 
 
 ## Embedding Spaces
 
-Each entity is embedded in up to 5 independent vector spaces (1024 dims each, Voyage AI voyage-4-lite):
+Each entity is embedded in up to 6 independent vector spaces (1024 dims each, Voyage AI voyage-4-lite). Architecture: 1:1 field-to-space mapping, plus a default blend of all fields.
 
 | Space | Input fields | Coverage | Purpose |
 |-------|-------------|----------|---------|
 | `default` | name + description + observations + prompt + reasoning | 100% | Full semantic blend |
+| `name` | name only | 100% | Identity matching |
+| `description` | description only | 100% | Topic identity |
 | `observations` | observation text only | 100% | Fact-level matching |
-| `reasoning` | reasoning + prompt text | ~83% | Rationale matching |
-| `description` | one-line description only | 100% | Topic identity (high discriminative power) |
-| `prompt` | user prompt text only | ~62% | Intent matching |
+| `prompt` | prompt only | ~62% | Intent matching |
+| `reasoning` | reasoning only | ~83% | Rationale matching |
 
 Each space is truncated to 2,000 characters. Body text is **excluded** (it may contain unstructured markdown or code that degrades embedding quality). Entries missing a field produce no vector for that space (structural absence — the combiner skips absent spaces, never counts them as zero).
 
@@ -321,7 +322,7 @@ Each layer adds capability without being required. The system degrades gracefull
 | L0 | MEMORY.md | Always-in-context index | Never fails |
 | L1a | Markdown files | Persistence, git, human-readable | Never fails |
 | L1b | JSONL | Structured queries, backlinks, access tracking | Never fails |
-| L2a | Voyage embeddings | 5 spaces × 1024 dims, semantic similarity, associations | Degrades to L1 |
+| L2a | Voyage embeddings | 6 spaces × 1024 dims, semantic similarity, associations | Degrades to L1 |
 | L2b | Neo4j | Primary store, vector k-NN, graph traversal | Degrades to L2a |
 
 ### Fallback Chain
@@ -362,7 +363,7 @@ Stays under 200 lines (auto-load limit). The PostToolUse hook automatically appe
 Every write passes through a six-stage gate before indexing. Embedding is computed BEFORE the gate (stages 4-6 need the vector). The gate never silently drops — every entry receives a logged verdict.
 
 ```
-Parse → Embed (5 spaces) → Gate Pipeline → Index
+Parse → Embed (6 spaces) → Gate Pipeline → Index
                                 │
                   ┌─────────────┼─────────────┐
                   │             │             │

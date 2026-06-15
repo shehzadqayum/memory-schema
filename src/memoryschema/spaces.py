@@ -38,12 +38,14 @@ class SpaceDefinition:
 
 
 # Registry: default (blended) + field-level spaces
+# Registry: 1:1 field-to-space mapping + default blend
 _REGISTRY = {
     'default': SpaceDefinition('default', 'immutable', 'default', 'voyage'),
-    'observations': SpaceDefinition('observations', 'immutable', 'observations', 'voyage'),
-    'reasoning': SpaceDefinition('reasoning', 'immutable', 'reasoning', 'voyage'),
+    'name': SpaceDefinition('name', 'immutable', 'name', 'voyage'),
     'description': SpaceDefinition('description', 'immutable', 'description', 'voyage'),
+    'observations': SpaceDefinition('observations', 'immutable', 'observations', 'voyage'),
     'prompt': SpaceDefinition('prompt', 'immutable', 'prompt', 'voyage'),
+    'reasoning': SpaceDefinition('reasoning', 'immutable', 'reasoning', 'voyage'),
 }
 
 

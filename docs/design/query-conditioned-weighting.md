@@ -7,7 +7,7 @@
 The memory-schema system stores structured memory entities as XML-tagged markdown files. Each entity flows through a PostToolUse hook pipeline on write:
 
 ```
-Write memory/*.md → parse XML → embed (5 spaces) → gate (6 stages) → store (Neo4j/JSONL) → MEMORY.md
+Write memory/*.md → parse XML → embed (6 spaces) → gate (6 stages) → store (Neo4j/JSONL) → MEMORY.md
 ```
 
 ### Storage Layers
@@ -17,7 +17,7 @@ Write memory/*.md → parse XML → embed (5 spaces) → gate (6 stages) → sto
 | L0 | MEMORY.md | Always in prompt context | Budget-enforced (2000 tokens) |
 | L1a | memory/*.md files | Git-tracked | Never fails |
 | L1b | store.jsonl | Pure Python JSONL | Never fails |
-| L2a | Voyage AI embeddings | 5 spaces × 1024 dims | Degrades to L1 (text search) |
+| L2a | Voyage AI embeddings | 6 spaces × 1024 dims | Degrades to L1 (text search) |
 | L2b | Neo4j graph | Relations as edges | Degrades to L2a |
 
 ### Entity Schema (v4)
@@ -38,15 +38,16 @@ Write memory/*.md → parse XML → embed (5 spaces) → gate (6 stages) → sto
 
 ### Embedding Spaces
 
-Each entity is embedded in up to 5 independent vector spaces (1024 dims each, Voyage AI voyage-4-lite):
+Each entity is embedded in up to 6 independent vector spaces (1024 dims each, Voyage AI voyage-4-lite). Architecture: 1:1 field-to-space mapping, plus a default blend.
 
 | Space | Input fields | Coverage | Purpose |
 |-------|-------------|----------|---------|
 | `default` | name + description + observations + prompt + reasoning | 100% | Full semantic blend |
+| `name` | name only | 100% | Identity matching |
+| `description` | description only | 100% | Topic identity |
 | `observations` | observation text only | 100% | Fact-level matching |
-| `reasoning` | reasoning + prompt text | ~83% | Rationale matching |
-| `description` | one-line description only | 100% | Topic identity |
-| `prompt` | user prompt text only | ~62% | Intent matching |
+| `prompt` | prompt only | ~62% | Intent matching |
+| `reasoning` | reasoning only | ~83% | Rationale matching |
 
 Entries missing a field produce no vector for that space (structural absence). The combiner iterates only present spaces — absent spaces are never counted as zero.
 
@@ -104,10 +105,11 @@ query → classify(query) → weight_profile → weighted_combine(per_space_sims
 | Space | factual | rationale | intent | general |
 |-------|---------|-----------|--------|---------|
 | `default` | 2.0 | 1.5 | 1.0 | 2.0 |
+| `name` | 1.0 | 0.5 | 0.5 | 1.0 |
 | `description` | **3.0** | 1.0 | 1.0 | **2.0** |
 | `observations` | **2.0** | 0.5 | 0.5 | 1.0 |
-| `reasoning` | 0.5 | **3.0** | 1.0 | 0.5 |
 | `prompt` | 0.5 | 1.0 | **3.0** | 0.5 |
+| `reasoning` | 0.5 | **3.0** | 1.0 | 0.5 |
 
 The `general` profile is `desc+default` heavy — proven to beat single-space baseline.
 
