@@ -28,47 +28,17 @@ class TestGateVerdict:
         assert result.ok is False
         assert 'Missing name' in result.reasons[0]
 
-    def test_reject_ingested_no_source(self):
-        memory = {'name': 'ingested-no-src', 'description': 'Test',
-                  'provenance': 'ingested'}
-        result = gate_pipeline(memory)
-        assert result.verdict == GateVerdict.REJECT
-        assert 'source' in result.reasons[0].lower()
-
-    def test_accept_ingested_with_source(self):
-        memory = {'name': 'ingested-ok', 'description': 'Test',
-                  'provenance': 'ingested', 'source': 'http://example.com'}
-        result = gate_pipeline(memory)
-        assert result.verdict == GateVerdict.ACCEPT
-
-    def test_quarantine_provenance_mismatch(self, store):
-        store.upsert({'name': 'existing', 'schema': 3, 'description': 'First',
-                      'provenance': 'first-party'})
-        memory = {'name': 'existing', 'description': 'Second',
-                  'provenance': 'ingested', 'source': 'http://x.com'}
-        result = gate_pipeline(memory, store=store)
-        assert result.verdict == GateVerdict.QUARANTINE
-        assert 'mismatch' in result.reasons[0].lower()
-
-    def test_accept_same_provenance_upsert(self, store):
-        store.upsert({'name': 'existing', 'schema': 3, 'description': 'First',
-                      'provenance': 'first-party'})
-        memory = {'name': 'existing', 'description': 'Updated'}
-        result = gate_pipeline(memory, store=store)
-        assert result.verdict == GateVerdict.ACCEPT
-
-    def test_warning_no_provenance(self):
-        memory = {'name': 'no-prov', 'description': 'Test'}
-        result = gate_pipeline(memory)
-        assert result.verdict == GateVerdict.ACCEPT
-        assert any('defaulting' in w for w in result.warnings)
-        assert memory['provenance'] == 'first-party'
-
     def test_warning_missing_description(self):
         memory = {'name': 'no-desc'}
         result = gate_pipeline(memory)
         assert result.verdict == GateVerdict.ACCEPT
         assert any('description' in w.lower() for w in result.warnings)
+
+    def test_accept_upsert(self, store):
+        store.upsert({'name': 'existing', 'schema': 3, 'description': 'First'})
+        memory = {'name': 'existing', 'description': 'Updated'}
+        result = gate_pipeline(memory, store=store)
+        assert result.verdict == GateVerdict.ACCEPT
 
 
 class TestGateResult:
@@ -96,13 +66,12 @@ class TestAuditLogging:
         from memoryschema.audit import log_gate_decision
         audit_path = str(tmp_path / 'audit.jsonl')
         log_gate_decision(audit_path, 'test-entry', 'accept',
-                          ['passed all checks'], provenance='first-party')
+                          ['passed all checks'])
         with open(audit_path) as f:
             record = json.loads(f.readline())
         assert record['operation'] == 'gate_decision'
         assert record['name'] == 'test-entry'
         assert record['verdict'] == 'accept'
-        assert record['provenance'] == 'first-party'
 
     def test_log_gate_decision_reject(self, tmp_path):
         from memoryschema.audit import log_gate_decision

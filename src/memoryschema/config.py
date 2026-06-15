@@ -12,7 +12,6 @@ from pathlib import Path
 # Canonical constants — other modules import from here.
 VALID_TYPES = frozenset({'semantic', 'episodic', 'procedural'})
 VALID_STATUSES = frozenset({'active', 'superseded', 'archived', 'quarantined'})
-VALID_PROVENANCES = frozenset({'first-party', 'user', 'ingested', 'derived'})
 VALID_RELATION_TYPES = frozenset({
     'USES', 'MODIFIES', 'SUPERSEDES', 'DEPENDS_ON', 'INFORMS', 'CONTRADICTS',
     'MITIGATES',
@@ -35,18 +34,6 @@ VERIFICATION_RANKS = {
     'reported': 1,
     None: 2,  # unlabelled = neutral rank
 }
-
-# Trust hierarchy for SUPERSEDES authority guards.
-# Higher level can supersede same or lower; lower cannot supersede higher.
-# derived=3 because consolidation (reflect) creates derived entries that
-# legitimately supersede first-party episodic entries.
-TRUST_LEVELS = {
-    'user': 3,
-    'first-party': 3,
-    'derived': 3,
-    'ingested': 1,
-}
-
 
 @dataclass
 class MemoryConfig:

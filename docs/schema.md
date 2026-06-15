@@ -41,7 +41,7 @@ Full (all optional fields included):
   <memory:relations>
     <memory:relation target="other-memory" type="MODIFIES"/>
   </memory:relations>
-  <memory:source>session-hash-or-provenance</memory:source>
+  <memory:source>session-hash-or-attribution</memory:source>
   <memory:project>project-name</memory:project>
 </memory:entity>
 
@@ -71,10 +71,9 @@ Optional body text follows after the closing tag.
 | **prompt** | `<memory:prompt>` | The user input that triggered the response. |
 | **chain** | `<memory:chain>` | Reasoning chain context — what investigation this belongs to. |
 | **relations** | `<memory:relations>` | When the memory explicitly relates to other known memories. |
-| **source** | `<memory:source>` | To record provenance (session hash, commit, URL). |
+| **source** | `<memory:source>` | Attribution (session hash, commit, URL). |
 | **project** | `<memory:project>` | When the memory is project-scoped (omit for user-scope). |
 | **status** | attribute | `active` (default), `superseded`, `archived`, or `quarantined`. |
-| **provenance** | attribute | `first-party` (default), `user`, `ingested`, or `derived`. |
 
 ### Server-managed (never authored by Claude)
 
@@ -96,7 +95,7 @@ Optional body text follows after the closing tag.
 | --- | --- |
 | `1` | Initial tagged schema. |
 | `2` | Added `<memory:prompt>` and `<memory:reasoning>` as optional fields. Removed save/recall/result/consolidation MCP tags (unimplemented interfaces). Removed observation grammar (moved to project guidelines). Moved `<memory:observations>`, `type`, and `importance` from required to optional. Required fields reduced to: schema, name, description. All other fields optional. |
-| `3` | Added `status` and `provenance` attributes. Deprecated `PARENT_OF`, `CHILD_OF` relations (use `project` field). Added V11 (status), V12 (provenance), V13 (source-required-if-ingested), R6 (referential integrity), R7 (SUPERSEDES cycle detection). Full backward compatible with v1/v2. |
+| `3` | Added `status` attribute. Deprecated `PARENT_OF`, `CHILD_OF` relations (use `project` field). Added V11 (status), R6 (referential integrity), R7 (SUPERSEDES cycle detection). Full backward compatible with v1/v2. |
 | `4` | Added `basis` attribute on `<memory:observation>` (measured / inferred / reported). Added server-managed `verified_at`, `generator`, `embed_model`. Added `MITIGATES` relation type (7 active, 9 total). Added V14 (basis validation). Typed force records in audit trail. Numeric contradiction probe and L0 echo probe in write gate. Backward compatible with v1–v3. |
 
 ### Rules
@@ -211,7 +210,6 @@ Only ONE memory can be authorised at a time: the active chain, tracked in `memor
 |-------|-----------|----------|
 | `name` | Set (merge key) | Immutable |
 | `schema` | Set | Immutable |
-| `provenance` | Set | Immutable (prevents trust escalation) |
 | `project` | Set | Immutable |
 | `filepath` | Set | Immutable |
 | `created_at` | Set (auto) | Immutable |
@@ -246,8 +244,6 @@ Only ONE memory can be authorised at a time: the active chain, tracked in `memor
 | V9 | All open tags have matching close tags |
 | V10 | If present, `schema` attribute is a valid integer from 1 to current version |
 | V11 | If present, `status` is one of: active, superseded, archived, quarantined |
-| V12 | If present, `provenance` is one of: first-party, user, ingested, derived |
-| V13 | If `provenance="ingested"`, must have a `<memory:source>` element |
 | V14 | If present, `basis` on `<memory:observation>` is one of: measured, inferred, reported |
 
 ### Relations
@@ -372,8 +368,6 @@ Stays under 200 lines (auto-load limit). The PostToolUse hook automatically appe
 
 **Progressive disclosure:** After budget enforcement, `categorize_index()` reorganizes MEMORY.md entries into type-based sections (Knowledge, Procedures, Session History) for faster scanning.
 
-**L0 gating:** Ingested entries (`provenance="ingested"`) are never appended to MEMORY.md, preventing external content from entering the always-in-context index.
-
 ---
 
 ## Behavioral Specification
@@ -397,11 +391,9 @@ Parse → Embed (7 spaces) → Gate Pipeline → Index
 | Stage | Check | Failure verdict |
 |-------|-------|-----------------|
 | 1. Validation | Name required, description expected | REJECT |
-| 2. Provenance admission | Valid provenance, source required for ingested | REJECT |
-| 3. Guards | Provenance mismatch on upsert (existing ≠ new) | QUARANTINE |
-| 4. Consistency probe | Near-duplicate (>0.95 cosine sim, different description) | QUARANTINE |
-| 5. Numeric probe | Contradiction with existing entries (extract_claims matching) | QUARANTINE (log mode) |
-| 6. L0 echo probe | Restatement check (Jaccard overlap + measured conjunction) | QUARANTINE |
+| 2. Consistency probe | Near-duplicate (>0.95 cosine sim, different description) | QUARANTINE |
+| 3. Numeric probe | Contradiction with existing entries (extract_claims matching) | QUARANTINE (log mode) |
+| 4. L0 echo probe | Restatement check (Jaccard overlap + measured conjunction) | QUARANTINE |
 
 Every gate decision is recorded in `memory/audit.jsonl` with machine-readable verdict and reasons.
 **On Access:** Increment access_count, update last_accessed.
@@ -412,7 +404,7 @@ Every gate decision is recorded in `memory/audit.jsonl` with machine-readable ve
 2. Find connected components via BFS (min/max cluster size filtering)
 3. Synthesize summary: tries LLM via Anthropic SDK, falls back to mechanical merge (concatenate descriptions, dedup observations)
 4. Create SUPERSEDES edges from summary to cluster members
-5. Set summary importance to max of cluster, provenance to `derived`
+5. Set summary importance to max of cluster
 6. Archive original episodic entries (status → superseded)
 
 ### Lifecycle Events
@@ -449,7 +441,7 @@ Every gate decision is recorded in `memory/audit.jsonl` with machine-readable ve
 **On Mutate (Upsert):** When an existing entry is re-upserted (must be the authorised active chain):
 1. Authorisation check (name must match `memory/.active_chain`)
 2. Write gate evaluates the mutation
-2. Immutable fields preserved (name, schema, provenance, project, filepath, created_at)
+2. Immutable fields preserved (name, schema, project, filepath, created_at)
 3. Observations appended (exact duplicates skipped)
 4. Relations appended (same target+type deduplicated)
 5. SUPERSEDES/CONTRADICTS side effects processed
@@ -470,25 +462,7 @@ Every gate decision is recorded in `memory/audit.jsonl` with machine-readable ve
 
 ### SUPERSEDES Guards
 
-- **Trust guard:** The source entry's provenance trust level must be ≥ the target's. Trust levels: `user`=3, `first-party`=3, `derived`=3, `ingested`=1. An ingested entry cannot supersede a first-party or derived entry.
 - **Cycle detection (R7):** Adding a SUPERSEDES relation that would create a circular chain (A→B→C→A) is rejected with a ValueError.
-
-### Provenance Semantics
-
-- **Immutability:** Provenance is set on creation and cannot be changed by subsequent upserts. This prevents trust escalation (e.g., ingested content being re-upserted as first-party).
-- **Trust multiplier:** Provenance affects retrieval scoring. Applied as a multiplier on the final score: `first-party`=1.0, `user`=1.0, `derived`=0.9, `ingested`=0.7. An ingested entry scores 30% lower than an identical first-party entry.
-- **Trust level hierarchy** (for SUPERSEDES authority guards):
-
-  | Provenance | Trust level | Can supersede |
-  |------------|:-----------:|---------------|
-  | `user` | 3 | All |
-  | `first-party` | 3 | All |
-  | `derived` | 3 | All (consolidation creates derived summaries that supersede episodic entries) |
-  | `ingested` | 1 | Only other ingested entries |
-
-- **L0 invariant:** MEMORY.md (always-in-context index) never contains ingested entries. This is enforced by the PostToolUse hook at the L0 gating step, closing the injection channel for external content.
-- **Source required (V13):** Entries with `provenance="ingested"` must include a `<memory:source>` element identifying the origin URL or path.
-- **Untrusted presentation:** CLI recall output marks ingested entries with `[UNTRUSTED — ingested, provenance unverified]` delimiters. In JSON output, the `untrusted: true` flag is set.
 
 ### Upsert Immutability
 
@@ -569,5 +543,5 @@ Create a chain entity when:
 | XML escaping required | No CDATA support — keeps parser simple |
 | Strict mode optional | Quality checks (kebab-case name, description length, atomic observations) in strict only — defined in `validator.py`, not in this document. Graceful handling of imperfect output |
 | v1 backward compatible | v2 adds optional fields only — all v1 files remain valid |
-| v3 | Adds `status`, `provenance` attributes. Deprecates `PARENT_OF`, `CHILD_OF` relations. Adds V11, V12, V13, R6, R7 validation rules. |
+| v3 | Adds `status` attribute. Deprecates `PARENT_OF`, `CHILD_OF` relations. Adds V11, R6, R7 validation rules. |
 | v4 (current) | Adds `basis` on observations, `MITIGATES` relation, V14, server-managed `verified_at`/`generator`/`embed_model`, typed force records, numeric probe + L0 echo gate stages. |

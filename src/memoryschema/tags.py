@@ -3,7 +3,7 @@ Memory tag parser.
 
 Parses <memory:entity> tagged files into structured dicts.
 Pure Python, zero external dependencies (stdlib xml.etree only).
-Extracts v4 attributes: status, provenance, and per-observation
+Extracts v4 attributes: status, and per-observation
 basis (measured | inferred | reported) alongside all standard fields.
 
 Reuses XML parsing primitives from validator.py (DRY).
@@ -144,9 +144,6 @@ def parse_memory_content(content, filepath=None):
     # Status (v3, defaults to 'active' when omitted)
     status = root.get('status') or 'active'
 
-    # Provenance (v3, defaults to 'first-party' when omitted)
-    provenance = root.get('provenance') or 'first-party'
-
     # Importance
     importance = None
     importance_str = root.get('importance')
@@ -210,7 +207,6 @@ def parse_memory_content(content, filepath=None):
         'schema': schema,
         'type': type_val,
         'status': status,
-        'provenance': provenance,
         'importance': importance,
         'description': description,
         'observations': observations,

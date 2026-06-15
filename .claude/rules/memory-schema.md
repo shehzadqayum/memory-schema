@@ -41,7 +41,7 @@ Every memory entity MUST be a `<memory:entity>` XML block in a `.md` file.
   <memory:relations>
     <memory:relation target="other-memory" type="MODIFIES"/>
   </memory:relations>
-  <memory:source>session-hash-or-provenance</memory:source>
+  <memory:source>session-hash-or-attribution</memory:source>
   <memory:project>project-name</memory:project>
 </memory:entity>
 
@@ -63,10 +63,9 @@ Include when contextually appropriate. Omit if not relevant.
 | `prompt` | `<memory:prompt>` | The user input that triggered the response. |
 | `chain` | `<memory:chain>` | Reasoning chain context — what investigation this belongs to. |
 | `relations` | `<memory:relations>` | Explicit links to other known memories. |
-| `source` | `<memory:source>` | Provenance (session hash, commit, URL). |
+| `source` | `<memory:source>` | Attribution (session hash, commit, URL). |
 | `project` | `<memory:project>` | Project scoping. |
 | `status` | attribute | `active` (default), `superseded`, `archived`, `quarantined`. |
-| `provenance` | attribute | `first-party` (default), `user`, `ingested`, `derived`. |
 
 ---
 
@@ -118,7 +117,6 @@ When authorised, re-saving with an existing `name` performs a merge:
 | Field | Behavior |
 |-------|----------|
 | `name` | Immutable |
-| `provenance` | Immutable (set on create, prevents trust escalation) |
 | `project` | Immutable |
 | `status` | Replaced (server-managed: set by SUPERSEDES, archive, quarantine) |
 | `description` | Replaced if provided |
@@ -193,7 +191,7 @@ A **chain entity** is a live accumulating memory that grows with each response. 
 
 These rules are enforced by:
 - **Validator:** V1-V14 (structure), R1-R7 (relations), F1, F3 (filesystem)
-- **Write gate:** 6-stage pipeline (validation, provenance, guards, consistency, numeric probe, L0 echo)
+- **Write gate:** 4-stage pipeline (validation, consistency, numeric probe, L0 echo)
 - **PostToolUse hook:** Parses, embeds (7 spaces), gate-checks, indexes on every Write to `memory/*.md`
 - **Compact resilience:** Working memory entries auto-appended to MEMORY.md by the hook
 

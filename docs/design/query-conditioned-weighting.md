@@ -65,7 +65,7 @@ Where relevance is computed by the **combiner**:
 relevance = sum(per_space_similarities) / len(per_space_similarities)
 ```
 
-Type modifiers: semantic (recency floor 0.6), procedural (access-reinforced), episodic (standard decay). Trust multipliers: first-party=1.0, user=1.0, derived=0.9, ingested=0.7. Basis factor: measured=1.0, inferred=0.97, reported=0.93.
+Type modifiers: semantic (recency floor 0.6), procedural (access-reinforced), episodic (standard decay). Basis factor: measured=1.0, inferred=0.97, reported=0.93.
 
 ### The Problem
 

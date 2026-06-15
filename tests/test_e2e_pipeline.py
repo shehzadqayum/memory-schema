@@ -74,28 +74,6 @@ class TestWriteGateStoreRecall:
         # Store should be empty
         assert store.count() == 0
 
-    def test_quarantine_provenance_mismatch(self, store, config):
-        """Provenance mismatch -> QUARANTINE -> stored with quarantined status."""
-        # Seed a first-party entry
-        store.upsert({
-            'name': 'existing-fact',
-            'schema': 4,
-            'provenance': 'first-party',
-            'description': 'Original fact',
-        })
-
-        # Write an ingested entry with the same name (provenance mismatch)
-        memory = {
-            'name': 'existing-fact',
-            'schema': 4,
-            'provenance': 'ingested',
-            'source': 'external-corpus',
-            'description': 'Overwrite attempt from ingested source',
-        }
-
-        result = gate_pipeline(memory, store=store, config=config)
-        assert result.verdict == GateVerdict.QUARANTINE
-
     def test_accept_with_embedding_recall(self, store, config):
         """Full path with mocked embeddings: embed -> store -> recall by vector."""
         memory = {
@@ -209,46 +187,6 @@ class TestHookPipeline:
         stored = store.get('hook-test-entry')
         assert stored is not None
         assert stored['description'] == 'Entry written through hook pipeline'
-
-    def test_quarantine_on_provenance_conflict(self, tmp_path):
-        """Seed first-party, gate ingested with same name -> QUARANTINE.
-
-        Replicates the hook's quarantine path: set status=quarantined,
-        strip embedding, upsert.
-        """
-        store_path = str(tmp_path / 'store.jsonl')
-        config = MemoryConfig(project_root=str(tmp_path), store_path=store_path)
-        store = MemoryStore(store_path)
-
-        # Seed first-party entry (simulating prior hook write)
-        store.upsert({
-            'name': 'conflict-entry',
-            'schema': 4,
-            'provenance': 'first-party',
-            'description': 'Original first-party entry',
-        })
-
-        # Ingested entry with same name (provenance mismatch)
-        memory = {
-            'name': 'conflict-entry',
-            'schema': 4,
-            'provenance': 'ingested',
-            'source': 'external-corpus',
-            'description': 'Ingested overwrite attempt',
-            'embedding': [0.1] * 10,
-        }
-
-        result = gate_pipeline(memory, store=store, config=config)
-        assert result.verdict == GateVerdict.QUARANTINE
-
-        # Hook path: set quarantined status, strip embedding
-        memory['status'] = 'quarantined'
-        memory.pop('embedding', None)
-        store.upsert(memory)
-
-        stored = store.get('conflict-entry')
-        assert stored['status'] == 'quarantined'
-        assert stored.get('embedding') is None
 
     def test_memory_md_update_logic(self, tmp_path):
         """Replicate hook's MEMORY.md update: append, budget, categorize."""

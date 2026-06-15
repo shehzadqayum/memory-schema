@@ -20,7 +20,7 @@ from neo4j import GraphDatabase
 
 import json as _json
 
-from memoryschema.config import ALL_RELATION_TYPES as _RELATION_TYPES, TRUST_LEVELS, VERIFICATION_RANKS
+from memoryschema.config import ALL_RELATION_TYPES as _RELATION_TYPES, VERIFICATION_RANKS
 from memoryschema.tags import Observation, observation_text
 from memoryschema.hierarchy import project_matches_scope
 
@@ -108,8 +108,7 @@ class Neo4jMemoryStore:
             if key in memory_dict and memory_dict[key] is not None:
                 props[key] = memory_dict[key]
 
-        # Immutable props (applied on CREATE only — provenance cannot change)
-        provenance = memory_dict.get('provenance')
+        # Immutable props (applied on CREATE only)
 
         raw_observations = memory_dict.get('observations', [])
         # Serialize for Neo4j: labelled → JSON string, unlabelled → plain
@@ -129,7 +128,6 @@ class Neo4jMemoryStore:
                 MERGE (m:Memory {name: $name})
                 ON CREATE SET
                     m += $props,
-                    m.provenance = $provenance,
                     m.observations = $observations,
                     m.observations_text = $observations_text,
                     m.created_at = $now,
@@ -146,7 +144,7 @@ class Neo4jMemoryStore:
                         CASE WHEN x STARTS WITH '{"t":' THEN s
                         ELSE s + ' ' + x END)
                 RETURN m
-            """, name=name, props=props, provenance=provenance,
+            """, name=name, props=props,
                 observations=neo4j_obs,
                 observations_text=obs_text, now=now)
 
@@ -182,22 +180,8 @@ class Neo4jMemoryStore:
                     MERGE (s)-[r:{rel_type}]->(t)
                 """, source=name, target=target)
 
-                # SUPERSEDES → trust guard, cycle detection, then mark target
+                # SUPERSEDES → verification guard, cycle detection, then mark target
                 if rel_type == 'SUPERSEDES':
-                    # Trust guard
-                    guard = session.run("""
-                        MATCH (s:Memory {name: $source})
-                        OPTIONAL MATCH (t:Memory {name: $target})
-                        RETURN COALESCE(s.provenance, 'first-party') AS sp,
-                               COALESCE(t.provenance, 'first-party') AS tp
-                    """, source=name, target=target).single()
-                    if guard:
-                        st = TRUST_LEVELS.get(guard['sp'], 1)
-                        tt = TRUST_LEVELS.get(guard['tp'], 1)
-                        if st < tt:
-                            raise ValueError(
-                                f"Trust guard: {guard['sp']!r} cannot supersede "
-                                f"{guard['tp']!r} (insufficient authority)")
                     # Verification guard (v4): source rank ≥ target rank
                     source_rank = max(
                         (VERIFICATION_RANKS.get(
@@ -759,16 +743,6 @@ class Neo4jMemoryStore:
         backlinks = len(entry.get('backlinks', []))
         if backlinks > 0:
             score += 0.05 * math.log(1 + backlinks)
-
-        # Trust multiplier: ingested content ranks lower by default
-        provenance = entry.get('provenance', 'first-party')
-        trust_multipliers = {
-            'first-party': 1.0,
-            'user': 1.0,
-            'derived': 0.9,
-            'ingested': 0.7,
-        }
-        score *= trust_multipliers.get(provenance, 0.8)
 
         # Basis factor (v4): lowest-reliability labelled observation biases ranking
         basis_multipliers = {'measured': 1.0, 'inferred': 0.97, 'reported': 0.93}

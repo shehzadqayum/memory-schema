@@ -404,41 +404,12 @@ class TestStatusLifecycle:
         names = {r['name'] for r in results}
         assert 'mem-b' in names
 
-    def test_supersedes_trust_guard_blocks(self, store):
-        """Ingested entry cannot supersede first-party."""
-        store.upsert({'name': 'trusted', 'schema': 3, 'description': 'Trusted',
-                      'provenance': 'first-party'})
-        with pytest.raises(ValueError, match='Trust guard'):
-            store.upsert({'name': 'untrusted', 'schema': 3, 'description': 'Untrusted',
-                          'provenance': 'ingested',
-                          'relations': [{'target': 'trusted', 'type': 'SUPERSEDES'}]})
-
-    def test_supersedes_trust_guard_same_level(self, store):
-        """Same trust level allows supersede."""
-        store.upsert({'name': 'first', 'schema': 3, 'description': 'First',
-                      'provenance': 'first-party'})
+    def test_supersedes_marks_target(self, store):
+        """SUPERSEDES marks target as superseded."""
+        store.upsert({'name': 'first', 'schema': 3, 'description': 'First'})
         store.upsert({'name': 'second', 'schema': 3, 'description': 'Second',
-                      'provenance': 'first-party',
                       'relations': [{'target': 'first', 'type': 'SUPERSEDES'}]})
         assert store.get('first')['status'] == 'superseded'
-
-    def test_supersedes_higher_can_supersede_lower(self, store):
-        """User can supersede ingested."""
-        store.upsert({'name': 'ingested-mem', 'schema': 3, 'description': 'Ingested',
-                      'provenance': 'ingested'})
-        store.upsert({'name': 'user-mem', 'schema': 3, 'description': 'User',
-                      'provenance': 'user',
-                      'relations': [{'target': 'ingested-mem', 'type': 'SUPERSEDES'}]})
-        assert store.get('ingested-mem')['status'] == 'superseded'
-
-    def test_derived_can_supersede_first_party(self, store):
-        """Derived (from consolidation) can supersede first-party."""
-        store.upsert({'name': 'original', 'schema': 3, 'description': 'Original',
-                      'provenance': 'first-party'})
-        store.upsert({'name': 'summary', 'schema': 3, 'description': 'Summary',
-                      'provenance': 'derived',
-                      'relations': [{'target': 'original', 'type': 'SUPERSEDES'}]})
-        assert store.get('original')['status'] == 'superseded'
 
     def test_supersedes_cycle_detection(self, store):
         """SUPERSEDES cycle A→B→C→A should be rejected."""

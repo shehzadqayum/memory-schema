@@ -189,11 +189,9 @@ if not indexed:
 if not indexed:
     sys.exit(2)
 
-# Update MEMORY.md — L0 gating: ingested content never enters MEMORY.md
-# L0 is reserved for first-party/user/derived content (closes injection channel)
+# Update MEMORY.md
 name = memory.get('name', '')
-provenance = memory.get('provenance', 'first-party')
-if name and provenance != 'ingested':
+if name:
     try:
         memory_dir = os.path.dirname(filepath)
         index_path = os.path.join(memory_dir, 'MEMORY.md')

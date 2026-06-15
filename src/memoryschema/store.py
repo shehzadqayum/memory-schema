@@ -6,7 +6,7 @@ One JSON object per line. Atomic writes via temp file + os.replace.
 Optional numpy for vectorized scoring (graceful fallback).
 
 v3 features: status filtering (active/superseded/archived/quarantined),
-SUPERSEDES trust guards (TRUST_LEVELS provenance hierarchy),
+SUPERSEDES verification guards,
 cycle detection (R7), and include_inactive override for queries.
 
 Usage:
@@ -23,7 +23,7 @@ import tempfile
 from contextlib import contextmanager
 from datetime import datetime, timezone
 
-from memoryschema.config import TRUST_LEVELS, VERIFICATION_RANKS
+from memoryschema.config import VERIFICATION_RANKS
 from memoryschema.hierarchy import project_matches_filter, project_matches_scope
 from memoryschema.tags import Observation, serialize_observation, deserialize_observation, observation_text
 
@@ -195,13 +195,10 @@ class MemoryStore:
 
         now = _now_iso()
 
-        # Pre-validate SUPERSEDES relations (trust guard + cycle detection R7)
+        # Pre-validate SUPERSEDES relations (verification guard + cycle detection R7)
         new_rels = memory_dict.get('relations', [])
         if any(r.get('type') == 'SUPERSEDES' for r in new_rels):
             pre_map = {e['name']: e for e in entries if 'name' in e}
-            source_prov = (memory_dict.get('provenance')
-                           or (existing.get('provenance', 'first-party')
-                               if existing else 'first-party'))
             existing_pairs = set()
             if existing:
                 existing_pairs = {(r.get('target'), r.get('type'))
@@ -213,13 +210,6 @@ class MemoryStore:
                 if not target_name or (target_name, 'SUPERSEDES') in existing_pairs:
                     continue
                 if target_name in pre_map:
-                    target_prov = pre_map[target_name].get('provenance', 'first-party')
-                    source_trust = TRUST_LEVELS.get(source_prov, 1)
-                    target_trust = TRUST_LEVELS.get(target_prov, 1)
-                    if source_trust < target_trust:
-                        raise ValueError(
-                            f"Trust guard: {source_prov!r} cannot supersede "
-                            f"{target_prov!r} (insufficient authority)")
                     # Verification guard (v4): source rank ≥ target rank
                     source_obs = memory_dict.get('observations', [])
                     if existing:
@@ -304,7 +294,7 @@ class MemoryStore:
         # Capture prior state for audit
         prior_snapshot = dict(existing)
 
-        # Merge (schema, filepath, provenance, project are immutable after creation)
+        # Merge (schema, filepath, project are immutable after creation)
         for key in ('type', 'status', 'description', 'importance',
                      'body', 'source', 'prompt', 'reasoning', 'chain'):
             if key in memory_dict and memory_dict[key] is not None:
@@ -834,16 +824,6 @@ class MemoryStore:
         if backlinks > 0:
             score += 0.05 * math.log(1 + backlinks)
 
-        # Trust multiplier: ingested content ranks lower by default
-        provenance = entry.get('provenance', 'first-party')
-        trust_multipliers = {
-            'first-party': 1.0,
-            'user': 1.0,
-            'derived': 0.9,
-            'ingested': 0.7,
-        }
-        score *= trust_multipliers.get(provenance, 0.8)
-
         # Basis factor (v4): lowest-reliability labelled observation biases ranking
         basis_multipliers = {'measured': 1.0, 'inferred': 0.97, 'reported': 0.93}
         labelled_bases = [
@@ -1116,13 +1096,6 @@ class MemoryStore:
             except Exception:
                 pass  # Rerank unavailable — fall back to cascade scoring
 
-        # Add provenance and untrusted marker to each result
-        for r in results:
-            entry = entry_map.get(r['name'])
-            if entry:
-                prov = entry.get('provenance', 'first-party')
-                r['provenance'] = prov
-                r['untrusted'] = prov == 'ingested'
         return results[:limit]
 
 

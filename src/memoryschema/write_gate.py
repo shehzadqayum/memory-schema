@@ -2,20 +2,17 @@
 
 Two-verdict pipeline — every write gets an explicit verdict:
 
-  REJECT     — structural failure (missing fields, invalid provenance).
+  REJECT     — structural failure (missing fields).
                Entry is never saved. Logged with reason.
-  QUARANTINE — suspicious content (provenance mismatch, near-duplicate,
-               numeric contradiction, L0 echo).
+  QUARANTINE — suspicious content (near-duplicate, numeric contradiction, L0 echo).
                Entry saved with status='quarantined', unembedded, pending review.
   ACCEPT     — passes all checks, indexed normally.
 
 Pipeline stages:
   1. Validation    — schema structure (name required, description expected)
-  2. Provenance    — valid provenance, source required for ingested (V13)
-  3. Guards        — provenance mismatch detection on upsert
-  4. Consistency   — embedding similarity check (strict mode only)
-  5. Numeric probe — contradiction detection against active neighbours (v4)
-  6. L0 echo       — restatement of MEMORY.md content without new material (v4)
+  2. Consistency   — embedding similarity check (strict mode only)
+  3. Numeric probe — contradiction detection against active neighbours (v4)
+  4. L0 echo       — restatement of MEMORY.md content without new material (v4)
 
 Stages 5-6 require an embedding (for neighbour lookup in stage 5) and skip
 with an audit note when embeddings are unavailable. Reasons from all stages
@@ -26,8 +23,6 @@ Called by the PostToolUse hook and the CLI write command.
 """
 
 from enum import Enum
-
-from memoryschema.config import VALID_PROVENANCES
 
 
 class GateVerdict(str, Enum):
@@ -90,33 +85,7 @@ def gate_pipeline(memory, store=None, strict=False, config=None):
     if not description:
         warnings.append('Missing description')
 
-    # Stage 2: Provenance admission
-    provenance = memory.get('provenance')
-    if not provenance:
-        warnings.append('No provenance set — defaulting to first-party')
-        memory['provenance'] = 'first-party'
-    elif provenance not in VALID_PROVENANCES:
-        warnings.append(f'Invalid provenance "{provenance}" — defaulting to first-party')
-        memory['provenance'] = 'first-party'
-
-    if memory.get('provenance') == 'ingested' and not memory.get('source'):
-        return GateResult(GateVerdict.REJECT,
-                          [f'Ingested entry "{name}" requires source field'])
-
-    # Stage 3: Guards
-    if store is not None:
-        existing = store.get(name)
-        if existing:
-            existing_prov = existing.get('provenance', 'first-party')
-            new_prov = memory.get('provenance', 'first-party')
-            if existing_prov != new_prov:
-                return GateResult(
-                    GateVerdict.QUARANTINE,
-                    [f'Provenance mismatch on upsert: existing={existing_prov}, '
-                     f'new={new_prov} for "{name}"'],
-                    warnings)
-
-    # Stage 4: Consistency probe (strict mode)
+    # Stage 2: Consistency probe (strict mode)
     if strict and store is not None and memory.get('embedding'):
         try:
             probe_reason = _check_consistency(memory, store)

@@ -4,7 +4,7 @@ Memory schema validator.
 Validates <memory:> tagged files against the schema specification.
 
 Validation rules:
-  V1-V14: Structure (entity element, attributes, children, provenance gates, basis)
+  V1-V14: Structure (entity element, attributes, children, basis)
   R1-R7:  Relations (attributes, types, self-reference, duplicates, referential integrity, cycles)
   F1, F3: Filesystem (filename match, safe characters)
   Q1-Q2, Q6-Q9: Content quality (strict mode only)
@@ -16,7 +16,7 @@ import xml.etree.ElementTree as ET
 
 
 from memoryschema.config import (
-    VALID_TYPES, VALID_STATUSES, VALID_PROVENANCES, VALID_BASES,
+    VALID_TYPES, VALID_STATUSES, VALID_BASES,
     VALID_RELATION_TYPES, DEPRECATED_RELATION_TYPES, ALL_RELATION_TYPES,
     SCHEMA_VERSION,
 )
@@ -133,17 +133,6 @@ def validate(content, filepath=None, strict=False, known_names=None):
     status_val = root.get('status')
     if status_val and status_val not in VALID_STATUSES:
         errors.append(('V11', f'Invalid status "{status_val}", must be one of: {", ".join(sorted(VALID_STATUSES))}'))
-
-    # V12: provenance is valid (optional field, v3)
-    provenance_val = root.get('provenance')
-    if provenance_val and provenance_val not in VALID_PROVENANCES:
-        errors.append(('V12', f'Invalid provenance "{provenance_val}", must be one of: {", ".join(sorted(VALID_PROVENANCES))}'))
-
-    # V13: ingested provenance requires source element
-    if provenance_val == 'ingested':
-        source_elem = root.find('source')
-        if source_elem is None or not (source_elem.text and source_elem.text.strip()):
-            errors.append(('V13', 'Provenance "ingested" requires a <memory:source> element with origin URL or path'))
 
     # V14: basis on observations is valid (v4)
     observations_elems_early = root.findall('observations')
