@@ -7,12 +7,11 @@
 
 ### Session History
 
-- [provenance-explanation](provenance-explanation.md) — Provenance: declared origin of content — controls scoring, L0 access, SUPERSEDES authority, presentation
-- [provenance-source-evaluation](provenance-source-evaluation.md) — Evaluation: provenance and source overlap — provenance is overloaded (binary trust), source is underused
-- [source-field-removed](source-field-removed.md) — Source field removed from framework — architecture is provenance and source agnostic
 - [hierarchy-docs-plan](hierarchy-docs-plan.md) — Plan for hierarchy/inheritance reference doc + 7 documentation alignment fixes
 - [remedial-rev2-implemented](remedial-rev2-implemented.md) — Remedial Rev 2 fixes: M1-M3 medium + L1-L4 low all implemented, 627 tests passing
 - [remedial-rev3-closed](remedial-rev3-closed.md) — Remedial Rev 3: L2 test breakdown regenerated (627/35), L3 already closed — all remedial items resolved
+- [current-state-post-remedial](current-state-post-remedial.md) — Post-remedial system state: 105 entries, 7 spaces, 4-stage gate, content-agnostic, all docs synchronized
+- [variance-explanation](variance-explanation.md) — How variance works: divergence from default at embed time becomes the weight at query time
 - [five-space-eval-results](five-space-eval-results.md) — 5-space eval: nDCG 0.555, recall 0.511 — continues downward trend with equal-weight combiner
 - [deployment-verified](deployment-verified.md) — End-to-end deployment verification of memory-schema system
 - [query-conditioned-design-doc](query-conditioned-design-doc.md) — Full design document written for query-conditioned weighting at docs/design/query-conditioned-weighting.md
@@ -28,6 +27,7 @@
 - [architecture-schematic](architecture-schematic.md) — Full architecture schematic: entity schema, write pipeline, scoring, relations, chains, storage layers
 - [architecture-evaluation](architecture-evaluation.md) — Architecture is improving: additive complexity (spaces, combiner, chains) followed by subtractive simplification (trust removal)
 - [remedial-rev2-evaluation](remedial-rev2-evaluation.md) — Remedial Rev 2 evaluation: all critical/high closed, M1-M3 medium open, L1-L4 low open, 3 confirms ratified
+- [complete-schematic](complete-schematic.md) — Complete system schematic: entity, write pipeline, retrieval, relations, chains, storage, field mapping
 - [session-5-close](session-5-close.md) — Session 5 complete — full package audit, 15 items, 13 code fixes + 2 doc items
 - [session-6-close](session-6-close.md) — Session 6 complete — hierarchy/inheritance reference doc + 7 documentation alignment fixes
 - [working-memory-importance-change](working-memory-importance-change.md) — Changed working memory importance from tiered 7-10 to fixed 10 for all entries
