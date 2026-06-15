@@ -43,11 +43,11 @@ External content — documents, posts, articles. Batch imported. Importance and 
 
 - `<memory:observation>` holds the source text
 - No `<memory:prompt>` or `<memory:reasoning>` (content was imported, not generated)
-- Importance computed from source signals (engagement, authorship)
+- Importance set by the importing agent based on relevance to the project
 
-### Why They Don't Compete
+### Scope Interaction
 
-Working memory and corpus memory occupy different regions of the embedding space. Queries about trading concepts find corpus entries. Queries about system decisions find working memory. The embeddings naturally separate them.
+Working memory and corpus memory are embedded by the same model into the same space. They tend to occupy different regions when their content differs (e.g., trading concepts vs system decisions), but there is no enforcing mechanism — entries sharing a topic will compete on relevance regardless of scope. The `project` field provides explicit scoping when separation is needed.
 
 ## How Retrieval Works
 

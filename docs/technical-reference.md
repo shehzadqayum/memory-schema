@@ -268,7 +268,7 @@ from memoryschema import Neo4jMemoryStore, embed_text, embed_batch, rerank
 
 ### Coverage
 
-569 tests across 33 files. 21/21 doctor checks. Target: 100% module coverage.
+627 tests across 34 files + 2 integration. 21/21 doctor checks. Target: 100% module coverage.
 
 | Category | Test files | Tests |
 |----------|-----------|------:|

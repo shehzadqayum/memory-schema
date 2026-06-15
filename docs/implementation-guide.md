@@ -144,7 +144,7 @@ pip install memory-schema[all,dev]
 pytest tests/ -v --cov=memoryschema
 ```
 
-569 tests, 33 files. External dependencies are mocked — no Docker or API keys needed to run tests.
+627 tests, 34 files. External dependencies are mocked — no Docker or API keys needed to run tests. 2 additional integration tests (Neo4j) run with `pytest -m integration`.
 
 ### Write tests for custom ingest scripts
 
@@ -152,7 +152,7 @@ pytest tests/ -v --cov=memoryschema
 from memoryschema import MemoryStore, parse_memory_content, validate
 
 def test_my_entity():
-    content = '<memory:entity schema="3" name="test"><memory:description>Test</memory:description></memory:entity>'
+    content = '<memory:entity schema="4" name="test"><memory:description>Test</memory:description></memory:entity>'
     result = parse_memory_content(content)
     assert result['name'] == 'test'
     errors = validate(content)

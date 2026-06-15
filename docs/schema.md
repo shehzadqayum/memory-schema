@@ -287,7 +287,7 @@ When embedding unavailable: relevance weight redistributed (40% to recency, 60% 
 | Bonus | Value | Condition |
 | --- | --- | --- |
 | Hub bonus | `+0.05 * ln(1 + backlinks)` | Entry has backlinks (log-scale, diminishing returns) |
-| Text match | `+0.1` substring (Neo4j) or BM25 up to `+0.3` (JSONL) | Query text relevance boost |
+| Text match | `+0.1` substring (Neo4j) or BM25 up to `+0.3` (JSONL) | Query text relevance boost. **Accepted limitation:** the two backends apply different lexical matching; identical queries may rank differently across the degradation chain. |
 
 ### Type Factor
 
@@ -457,7 +457,7 @@ Every gate decision is recorded in `memory/audit.jsonl` with machine-readable ve
 | quarantined → active | Review approval | Embedded and included in recall/search | `memoryschema quarantine release NAME` |
 | quarantined → deleted | Review rejection | Permanently removed from all stores | `memoryschema quarantine reject NAME --confirm` |
 
-### SUPERSEDES Guards
+### SUPERSEDES Integrity
 
 - **Cycle detection (R7):** Adding a SUPERSEDES relation that would create a circular chain (A→B→C→A) is rejected with a ValueError.
 
