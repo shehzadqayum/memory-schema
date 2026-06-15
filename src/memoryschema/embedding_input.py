@@ -36,6 +36,8 @@ def compose_embedding_text(entry, space='default', max_chars=2000):
             parts.append(entry['prompt'])
         if entry.get('reasoning'):
             parts.append(entry['reasoning'])
+        if entry.get('chain'):
+            parts.append(entry['chain'])
         text = ' '.join(parts).strip()
         return text[:max_chars]
 
@@ -69,5 +71,11 @@ def compose_embedding_text(entry, space='default', max_chars=2000):
         if not reasoning:
             return ''
         return reasoning[:max_chars]
+
+    if space == 'chain':
+        chain = entry.get('chain', '') or ''
+        if not chain:
+            return ''
+        return chain[:max_chars]
 
     raise ValueError(f"Unknown embedding space: {space!r}")

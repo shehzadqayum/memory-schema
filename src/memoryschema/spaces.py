@@ -1,19 +1,15 @@
-"""Embedding space registry and combiner.
+"""Embedding space registry and variance-weighted combiner.
 
-The registry is a declared catalogue of embedding spaces. Each space
-defines what text gets embedded (input-selector) and how (embedder).
-The combiner takes per-space similarities and returns one score.
+The registry is a declared catalogue of embedding spaces — one per
+entity field plus a default blend. The combiner uses per-entry
+divergence profiles to weight spaces automatically: distinctive fields
+get amplified, redundant fields get suppressed. No base weights, no
+query classification, no heuristics.
 
-Phase M0: ships with one space ('default') and an identity combiner.
-Behavior is identical to the pre-registry system. Future phases add
-field-specific spaces (observations, reasoning) gated on experiments.
-
-Design constraints:
-- A memory has n embedding spaces. Each is immutable (embed-and-freeze)
-  or mutable (anchor-plus-replay). M0-M2 build immutable only.
-- Mutable grounds only in immutable (no mutable-on-mutable).
-- The combiner is coverage-aware: iterates only present spaces, never
-  reads an absent space as zero or disagreement.
+Architecture:
+- 1:1 field-to-space mapping: name, description, observations, prompt, reasoning
+- Default space: all fields blended
+- Combiner: variance-weighted — divergence from default IS the weight
 """
 
 from memoryschema.embedding_input import compose_embedding_text
@@ -37,7 +33,6 @@ class SpaceDefinition:
         return compose_embedding_text(entry, space=self.input_selector)
 
 
-# Registry: default (blended) + field-level spaces
 # Registry: 1:1 field-to-space mapping + default blend
 _REGISTRY = {
     'default': SpaceDefinition('default', 'immutable', 'default', 'voyage'),
@@ -46,6 +41,7 @@ _REGISTRY = {
     'observations': SpaceDefinition('observations', 'immutable', 'observations', 'voyage'),
     'prompt': SpaceDefinition('prompt', 'immutable', 'prompt', 'voyage'),
     'reasoning': SpaceDefinition('reasoning', 'immutable', 'reasoning', 'voyage'),
+    'chain': SpaceDefinition('chain', 'immutable', 'chain', 'voyage'),
 }
 
 
@@ -61,28 +57,17 @@ def get_space(name):
 
 # --- Combiner ---
 
-# M1 experiment: equal weighting across present spaces (no query-type
-# classification). This is the unlearned heuristic — measure whether
-# field separation alone helps before adding query-conditioned weights.
-# None = equal weighting over present spaces (coverage-aware).
-EXPERIMENT_WEIGHTS = None
-
-
-def combine_similarities(per_space_sims, weights=EXPERIMENT_WEIGHTS):
+def combine_similarities(per_space_sims, divergence_profile=None):
     """Combine per-space similarities into a single score.
 
-    Coverage-aware: iterates only spaces present in per_space_sims.
-    Never reads an absent space as zero — corpus memories lacking
-    prompt/reasoning spaces are structural, not exceptional.
-
-    M1 experiment: weights=None (equal weighting). If the field-space
-    experiment does not beat the single-space baseline, this combiner
-    does not ship to default scoring.
+    Variance-weighted: uses per-entry divergence profile to weight spaces.
+    Distinctive fields (high divergence from default) get amplified when
+    the query matches them. Redundant fields (low divergence) get suppressed.
 
     Args:
-        per_space_sims: dict mapping space_name → similarity score.
-        weights: optional dict mapping space_name → weight. If None,
-            uses equal weighting over present spaces.
+        per_space_sims: dict mapping space_name → cosine similarity score.
+        divergence_profile: dict mapping space_name → divergence from default
+            (precomputed at embed time). If None, falls back to equal weighting.
 
     Returns:
         Combined similarity score (float).
@@ -90,21 +75,27 @@ def combine_similarities(per_space_sims, weights=EXPERIMENT_WEIGHTS):
     if not per_space_sims:
         return 0.0
 
-    if weights is None:
-        # Identity: if only 'default' is present, return it directly
-        if 'default' in per_space_sims and len(per_space_sims) == 1:
-            return per_space_sims['default']
-        # Equal weighting over present spaces
-        return sum(per_space_sims.values()) / len(per_space_sims)
+    # Single space: return directly
+    if len(per_space_sims) == 1:
+        return next(iter(per_space_sims.values()))
 
-    # Weighted combination over present spaces only
-    total_weight = 0.0
-    weighted_sum = 0.0
-    for space, sim in per_space_sims.items():
-        w = weights.get(space, 1.0)
-        weighted_sum += sim * w
-        total_weight += w
+    if divergence_profile:
+        # Variance-weighted: score = Σ(sim × divergence) / Σ(divergence)
+        weighted_sum = 0.0
+        total_weight = 0.0
+        for space, sim in per_space_sims.items():
+            if space == 'default':
+                # Default always gets weight 1.0 (it's the reference, not a field)
+                weighted_sum += sim * 1.0
+                total_weight += 1.0
+            else:
+                div = divergence_profile.get(space, 0.0)
+                if div > 0:
+                    weighted_sum += sim * div
+                    total_weight += div
+        if total_weight == 0.0:
+            return 0.0
+        return weighted_sum / total_weight
 
-    if total_weight == 0.0:
-        return 0.0
-    return weighted_sum / total_weight
+    # Fallback: equal weighting over present spaces
+    return sum(per_space_sims.values()) / len(per_space_sims)

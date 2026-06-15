@@ -37,6 +37,7 @@ Full (all optional fields included):
   </memory:observations>
   <memory:prompt>The user's input that triggered this memory</memory:prompt>
   <memory:reasoning>Narrative thinking — why this approach, what alternatives, what connections</memory:reasoning>
+  <memory:chain>Reasoning chain context — what investigation this belongs to</memory:chain>
   <memory:relations>
     <memory:relation target="other-memory" type="MODIFIES"/>
   </memory:relations>
@@ -68,6 +69,7 @@ Optional body text follows after the closing tag.
 | **observations** | `<memory:observations>` | Atomic facts. Include when there are discrete facts to record. |
 | **reasoning** | `<memory:reasoning>` | Narrative thinking — why, alternatives, connections. |
 | **prompt** | `<memory:prompt>` | The user input that triggered the response. |
+| **chain** | `<memory:chain>` | Reasoning chain context — what investigation this belongs to. |
 | **relations** | `<memory:relations>` | When the memory explicitly relates to other known memories. |
 | **source** | `<memory:source>` | To record provenance (session hash, commit, URL). |
 | **project** | `<memory:project>` | When the memory is project-scoped (omit for user-scope). |
@@ -204,6 +206,7 @@ Re-saving with an existing `name` performs a merge, not a replacement.
 | `observations` | Set | Appended (exact duplicates skipped) |
 | `reasoning` | Set | Replaced if provided |
 | `prompt` | Set | Replaced if provided |
+| `chain` | Set | Replaced if provided |
 | `relations` | Set | Appended (deduped by target+type) |
 | `body` | Set | Replaced if provided |
 | `source` | Set | Replaced if provided |
@@ -294,20 +297,23 @@ Procedural examples: 0 accesses → standard decay; 5 accesses → exponent 0.4 
 
 ## Embedding Spaces
 
-Each entity is embedded in up to 6 independent vector spaces (1024 dims each, Voyage AI voyage-4-lite). Architecture: 1:1 field-to-space mapping, plus a default blend of all fields.
+Each entity is embedded in up to 7 independent vector spaces (1024 dims each, Voyage AI voyage-4-lite). Architecture: 1:1 field-to-space mapping, plus a default blend of all fields.
 
 | Space | Input fields | Coverage | Purpose |
 |-------|-------------|----------|---------|
-| `default` | name + description + observations + prompt + reasoning | 100% | Full semantic blend |
+| `default` | name + description + observations + prompt + reasoning + chain | 100% | Full semantic blend |
 | `name` | name only | 100% | Identity matching |
 | `description` | description only | 100% | Topic identity |
 | `observations` | observation text only | 100% | Fact-level matching |
 | `prompt` | prompt only | ~62% | Intent matching |
 | `reasoning` | reasoning only | ~83% | Rationale matching |
+| `chain` | chain context only | varies | Reasoning chain grouping |
 
 Each space is truncated to 2,000 characters. Body text is **excluded** (it may contain unstructured markdown or code that degrades embedding quality). Entries missing a field produce no vector for that space (structural absence — the combiner skips absent spaces, never counts them as zero).
 
 The canonical composition function is `compose_embedding_text(entry, space='default')` in `embedding_input.py`. All callers must use this function.
+
+**Variance-weighted combiner:** Each space's cosine similarity with the query is multiplied by the space's divergence from default (precomputed at embed time as `divergence_profile`). Distinctive fields (high divergence) get amplified when the query matches them. Redundant fields (low divergence) get suppressed. No base weights, no query classification — the data determines the weights.
 
 Reasoning has a soft length ceiling of 500 words (strict-mode quality check Q8).
 
@@ -322,7 +328,7 @@ Each layer adds capability without being required. The system degrades gracefull
 | L0 | MEMORY.md | Always-in-context index | Never fails |
 | L1a | Markdown files | Persistence, git, human-readable | Never fails |
 | L1b | JSONL | Structured queries, backlinks, access tracking | Never fails |
-| L2a | Voyage embeddings | 6 spaces × 1024 dims, semantic similarity, associations | Degrades to L1 |
+| L2a | Voyage embeddings | 7 spaces × 1024 dims, semantic similarity, associations | Degrades to L1 |
 | L2b | Neo4j | Primary store, vector k-NN, graph traversal | Degrades to L2a |
 
 ### Fallback Chain
@@ -363,7 +369,7 @@ Stays under 200 lines (auto-load limit). The PostToolUse hook automatically appe
 Every write passes through a six-stage gate before indexing. Embedding is computed BEFORE the gate (stages 4-6 need the vector). The gate never silently drops — every entry receives a logged verdict.
 
 ```
-Parse → Embed (6 spaces) → Gate Pipeline → Index
+Parse → Embed (7 spaces) → Gate Pipeline → Index
                                 │
                   ┌─────────────┼─────────────┐
                   │             │             │

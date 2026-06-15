@@ -48,6 +48,7 @@ The thinking, not just the conclusion. A future session should be able to recons
 - `<memory:prompt>` — what was asked (set on chain creation)
 - `<memory:reasoning>` — why this approach, what alternatives, what connections (updated each step)
 - `<memory:observation>` — "Step N: <specific facts and actions>"
+- `<memory:chain>` — reasoning chain context: what investigation this memory belongs to (same text for all memories in the same chain — enables clustering via chain-space similarity)
 
 ## Importance
 

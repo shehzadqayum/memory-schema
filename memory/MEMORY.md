@@ -12,29 +12,29 @@
 - [l0-budget-design](l0-budget-design.md) — MEMORY.md L0 budget: 2000 tokens max, evicts lowest-scoring entries, groups by type
 - [multi-space-cross-similarity](multi-space-cross-similarity.md) — Cross-space embedding similarity: observations↔reasoning diverge most at ~0.66
 - [description-space-added](description-space-added.md) — Added description embedding space — 4 spaces now active per entry (4096 total dims)
-- [chain-type-attribute-status](chain-type-attribute-status.md) — Type attribute and fields partially resolved — chain pattern formalized but type guidance not updated for chain model
 - [space-evaluation-prompt-description](space-evaluation-prompt-description.md) — Evaluation: description space worth adding (high discriminative power), prompt space not (redundant with reasoning)
 - [scoring-formula](scoring-formula.md) — Retrieval scoring: recency × w_r + importance × w_i + cosine_sim × w_v with type/trust/basis modifiers
 - [gate-pipeline-stages](gate-pipeline-stages.md) — Write gate: 6-stage pipeline producing ACCEPT/REJECT/QUARANTINE verdicts
 - [chain-not-formalized](chain-not-formalized.md) — Chain entity pattern is working but not documented in schema rules, design docs, or working memory guidelines
+- [chain-type-attribute-status](chain-type-attribute-status.md) — Type attribute and fields partially resolved — chain pattern formalized but type guidance not updated for chain model
 - [chain-hook-embedding-investigation](chain-hook-embedding-investigation.md) — Chain: hook embedding appeared broken but was actually a bash quoting issue — 4-step debugging sequence
-- [five-space-eval-results](five-space-eval-results.md) — 5-space eval: nDCG 0.555, recall 0.511 — continues downward trend with equal-weight combiner
 - [hierarchy-docs-plan](hierarchy-docs-plan.md) — Plan for hierarchy/inheritance reference doc + 7 documentation alignment fixes
+- [five-space-eval-results](five-space-eval-results.md) — 5-space eval: nDCG 0.555, recall 0.511 — continues downward trend with equal-weight combiner
 - [storage-layer-architecture](storage-layer-architecture.md) — Five storage layers with graceful degradation: L0 MEMORY.md → L1 files/JSONL → L2 embeddings/Neo4j
 - [query-conditioned-design-doc](query-conditioned-design-doc.md) — Full design document written for query-conditioned weighting at docs/design/query-conditioned-weighting.md
 - [chain-of-reasoning-discussion](chain-of-reasoning-discussion.md) — User wants to define a chain of reasoning using the memory framework — connecting memories through typed relations
 - [chain-why-equal-weight-fails](chain-why-equal-weight-fails.md) — Chain: equal-weight multi-space averaging dilutes retrieval — proven through 4 experiments
 - [chain-memory-quality-evolution](chain-memory-quality-evolution.md) — Chain: corpus evolved from session-metadata-heavy to knowledge-rich through deliberate type classification
+- [nested-agents-discussion](nested-agents-discussion.md) — Architectural discussion on nested agents using project folders as agent boundaries
 - [four-space-eval-results](four-space-eval-results.md) — 4-space eval: nDCG 0.557 worse than single-space 0.608 — equal-weight averaging dilutes signal
 - [chain-implementing-live-chains](chain-implementing-live-chains.md) — Chain: implementing live accumulating chain entities — formalizing the pattern in schema and rules
-- [nested-agents-discussion](nested-agents-discussion.md) — Architectural discussion on nested agents using project folders as agent boundaries
 - [chain-pattern-formalized](chain-pattern-formalized.md) — Chain entity pattern formalized in schema spec, rules, and working guidelines
 - [package-audit-plan](package-audit-plan.md) — Full package audit plan — 13 findings across CRITICAL/HIGH/MEDIUM/LOW
-- [query-conditioned-weighting-design](query-conditioned-weighting-design.md) — Query-conditioned weighting design: classify query by keywords, select space weight profile per type
 - [chain-definition](chain-definition.md) — A chain of reasoning is a sequence of memory events with a defined start (trigger) and end (conclusion)
 - [centralize-env-vars](centralize-env-vars.md) — Plan to centralize os.environ reads into config.py — resolving session 1 residual
 - [fix-env-precedence](fix-env-precedence.md) — Plan to fix env var precedence inversion, redundant import, and add hierarchy integration tests
 - [docs-update-plan](docs-update-plan.md) — Plan to update all documentation for hierarchy and inheritance features
+- [query-conditioned-weighting-design](query-conditioned-weighting-design.md) — Query-conditioned weighting design: classify query by keywords, select space weight profile per type
 - [v3-remediation-plan](v3-remediation-plan.md) — Memory System v3 — 28-issue remediation across 7 phases: docs, lifecycle, scoring, trust, hierarchy, retrieval, evaluation
 - [chain-live-accumulation-design](chain-live-accumulation-design.md) — Live chain entity: created if absent, updated every response, released at end of cycle
 - [chain-entity-design](chain-entity-design.md) — Chain entity design: a meta-memory listing ordered steps as observations with USES relations to evidence
@@ -49,7 +49,6 @@
 - [session-memory-switch](session-memory-switch.md) — Switched from built-in Claude Code memory to memory-schema system
 
 ### Session History
-- [design-doc-committed](design-doc-committed.md) — Committed query-conditioned weighting design doc and 5-space eval as 38858b6
 - [deployment-verified](deployment-verified.md) — End-to-end deployment verification of memory-schema system
 - [session-5-close](session-5-close.md) — Session 5 complete — full package audit, 15 items, 13 code fixes + 2 doc items
 - [session-6-close](session-6-close.md) — Session 6 complete — hierarchy/inheritance reference doc + 7 documentation alignment fixes

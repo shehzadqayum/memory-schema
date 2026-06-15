@@ -306,7 +306,7 @@ class MemoryStore:
 
         # Merge (schema, filepath, provenance, project are immutable after creation)
         for key in ('type', 'status', 'description', 'importance',
-                     'body', 'source', 'prompt', 'reasoning'):
+                     'body', 'source', 'prompt', 'reasoning', 'chain'):
             if key in memory_dict and memory_dict[key] is not None:
                 existing[key] = memory_dict[key]
 
@@ -479,6 +479,7 @@ class MemoryStore:
                     entry.get('body', '') or '',
                     entry.get('prompt', '') or '',
                     entry.get('reasoning', '') or '',
+                    entry.get('chain', '') or '',
                 ]).lower()
                 if q not in searchable:
                     continue
@@ -701,6 +702,7 @@ class MemoryStore:
             ' '.join(entry.get('observations', [])),
             entry.get('prompt', '') or '',
             entry.get('reasoning', '') or '',
+            entry.get('chain', '') or '',
         ]).lower()
 
     @staticmethod
@@ -740,7 +742,8 @@ class MemoryStore:
     def _multi_space_relevance(entry, query_embedding):
         """Compute combined relevance across all available embedding spaces.
 
-        Uses per-space cosine similarities combined through the space combiner.
+        Variance-weighted: uses per-entry divergence profile to weight spaces.
+        Distinctive fields get amplified, redundant fields suppressed.
         Falls back to single embedding for legacy entries without embeddings dict.
         """
         from memoryschema.spaces import combine_similarities as _combine_sims
@@ -759,7 +762,10 @@ class MemoryStore:
 
         if not per_space_sims:
             return 0.0
-        return _combine_sims(per_space_sims)
+
+        # Use precomputed divergence profile if available
+        divergence = entry.get('divergence_profile')
+        return _combine_sims(per_space_sims, divergence_profile=divergence)
 
     def _score_entry(self, entry, query_embedding=None, mode='semantic',
                      precomputed_relevance=None):
@@ -921,7 +927,8 @@ class MemoryStore:
                         for space_name, idx_sim_map in space_sims.items():
                             if idx in idx_sim_map:
                                 per_space[space_name] = idx_sim_map[idx]
-                        combined = _combine_sims(per_space) if per_space else 0.0
+                        divergence = entry.get('divergence_profile')
+                        combined = _combine_sims(per_space, divergence_profile=divergence) if per_space else 0.0
                         score = self._score_entry(
                             entry, precomputed_relevance=combined)
                         if q_lower:

@@ -7,7 +7,7 @@
 The memory-schema system stores structured memory entities as XML-tagged markdown files. Each entity flows through a PostToolUse hook pipeline on write:
 
 ```
-Write memory/*.md → parse XML → embed (6 spaces) → gate (6 stages) → store (Neo4j/JSONL) → MEMORY.md
+Write memory/*.md → parse XML → embed (7 spaces) → gate (6 stages) → store (Neo4j/JSONL) → MEMORY.md
 ```
 
 ### Storage Layers
@@ -17,7 +17,7 @@ Write memory/*.md → parse XML → embed (6 spaces) → gate (6 stages) → sto
 | L0 | MEMORY.md | Always in prompt context | Budget-enforced (2000 tokens) |
 | L1a | memory/*.md files | Git-tracked | Never fails |
 | L1b | store.jsonl | Pure Python JSONL | Never fails |
-| L2a | Voyage AI embeddings | 6 spaces × 1024 dims | Degrades to L1 (text search) |
+| L2a | Voyage AI embeddings | 7 spaces × 1024 dims | Degrades to L1 (text search) |
 | L2b | Neo4j graph | Relations as edges | Degrades to L2a |
 
 ### Entity Schema (v4)
@@ -38,18 +38,19 @@ Write memory/*.md → parse XML → embed (6 spaces) → gate (6 stages) → sto
 
 ### Embedding Spaces
 
-Each entity is embedded in up to 6 independent vector spaces (1024 dims each, Voyage AI voyage-4-lite). Architecture: 1:1 field-to-space mapping, plus a default blend.
+Each entity is embedded in up to 7 independent vector spaces (1024 dims each, Voyage AI voyage-4-lite). Architecture: 1:1 field-to-space mapping, plus a default blend.
 
 | Space | Input fields | Coverage | Purpose |
 |-------|-------------|----------|---------|
-| `default` | name + description + observations + prompt + reasoning | 100% | Full semantic blend |
+| `default` | name + description + observations + prompt + reasoning + chain | 100% | Full semantic blend |
 | `name` | name only | 100% | Identity matching |
 | `description` | description only | 100% | Topic identity |
 | `observations` | observation text only | 100% | Fact-level matching |
 | `prompt` | prompt only | ~62% | Intent matching |
 | `reasoning` | reasoning only | ~83% | Rationale matching |
+| `chain` | chain context only | varies | Reasoning chain grouping |
 
-Entries missing a field produce no vector for that space (structural absence). The combiner iterates only present spaces — absent spaces are never counted as zero.
+Entries missing a field produce no vector for that space (structural absence). The combiner is variance-weighted: each space's similarity is multiplied by its divergence from default (precomputed at embed time). No base weights or query classification needed.
 
 ### Current Scoring
 

@@ -92,10 +92,21 @@ if voyage_key:
         memory['embedding'] = default_vec
         memory['embeddings'] = {'default': default_vec}
         # Field spaces: 1:1 mapping per field (skip if empty)
-        for space in ('name', 'description', 'observations', 'prompt', 'reasoning'):
+        for space in ('name', 'description', 'observations', 'prompt', 'reasoning', 'chain'):
             field_text = compose_embedding_text(memory, space=space)
             if field_text:
                 memory['embeddings'][space] = embed_text(field_text, config=hook_config)
+        # Compute divergence profile: cosine distance of each field space from default
+        div_profile = {}
+        for space, vec in memory['embeddings'].items():
+            if space != 'default' and vec and default_vec:
+                dot = sum(a * b for a, b in zip(default_vec, vec))
+                na = sum(a * a for a in default_vec) ** 0.5
+                nb = sum(b * b for b in vec) ** 0.5
+                sim = dot / (na * nb) if na > 0 and nb > 0 else 0.0
+                div_profile[space] = round(1.0 - sim, 4)
+        if div_profile:
+            memory['divergence_profile'] = div_profile
     except Exception:
         pass  # Embedding failure does not block — stages 4-6 skip gracefully
 

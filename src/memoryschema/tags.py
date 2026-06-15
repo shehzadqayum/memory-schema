@@ -177,6 +177,10 @@ def parse_memory_content(content, filepath=None):
     reasoning_elem = root.find('reasoning')
     reasoning = reasoning_elem.text if reasoning_elem is not None and reasoning_elem.text else None
 
+    # Chain
+    chain_elem = root.find('chain')
+    chain = chain_elem.text if chain_elem is not None and chain_elem.text else None
+
     # Relations
     relations = []
     rels_elem = root.find('relations')
@@ -212,6 +216,7 @@ def parse_memory_content(content, filepath=None):
         'observations': observations,
         'prompt': prompt,
         'reasoning': reasoning,
+        'chain': chain,
         'relations': relations,
         'body': body,
         'source': source,

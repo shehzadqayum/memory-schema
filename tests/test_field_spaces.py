@@ -13,7 +13,7 @@ import json
 import pytest
 from memoryschema.embedding_input import compose_embedding_text
 from memoryschema.spaces import (
-    get_registry, get_space, combine_similarities, EXPERIMENT_WEIGHTS,
+    get_registry, get_space, combine_similarities,
 )
 from memoryschema.store import MemoryStore, _cosine_similarity
 
@@ -27,6 +27,7 @@ def _make_entry(**overrides):
         'observations': ['Fact A', 'Fact B'],
         'prompt': 'What is the test?',
         'reasoning': 'Because we need to verify behavior.',
+        'chain': 'investigating test behavior and verification patterns',
     }
     base.update(overrides)
     return base
@@ -97,6 +98,7 @@ class TestDefaultSpaceUnchanged:
         assert 'Fact A' in text
         assert 'What is the test' in text
         assert 'verify behavior' in text
+        assert 'investigating test behavior' in text
 
     def test_unknown_space_raises(self):
         with pytest.raises(ValueError, match='Unknown embedding space'):
@@ -145,6 +147,29 @@ class TestPromptSpace:
         assert len(text) <= 50
 
 
+class TestChainSpace:
+    def test_chain_only(self):
+        entry = _make_entry()
+        text = compose_embedding_text(entry, space='chain')
+        assert 'investigating test behavior' in text
+        assert 'Fact A' not in text
+        assert 'verify behavior' not in text
+        assert 'description' not in text.lower()
+
+    def test_empty_chain_returns_empty(self):
+        entry = _make_entry(chain=None)
+        assert compose_embedding_text(entry, space='chain') == ''
+
+    def test_no_chain_key_returns_empty(self):
+        entry = {'name': 'no-chain', 'description': 'No chain'}
+        assert compose_embedding_text(entry, space='chain') == ''
+
+    def test_max_chars_truncation(self):
+        entry = _make_entry(chain='x' * 200)
+        text = compose_embedding_text(entry, space='chain', max_chars=50)
+        assert len(text) <= 50
+
+
 class TestDescriptionSpace:
     def test_description_only(self):
         entry = _make_entry()
@@ -170,9 +195,9 @@ class TestDescriptionSpace:
 # --- Registry ---
 
 class TestRegistry:
-    def test_registry_has_six_spaces(self):
+    def test_registry_has_seven_spaces(self):
         reg = get_registry()
-        assert set(reg.keys()) == {'default', 'name', 'description', 'observations', 'prompt', 'reasoning'}
+        assert set(reg.keys()) == {'default', 'name', 'description', 'observations', 'prompt', 'reasoning', 'chain'}
 
     def test_all_spaces_immutable(self):
         for name, space in get_registry().items():
@@ -196,34 +221,47 @@ class TestRegistry:
 # --- Combiner with multi-space ---
 
 class TestCombinerMultiSpace:
-    def test_single_default_identity(self):
+    def test_single_space_identity(self):
         assert combine_similarities({'default': 0.8}) == 0.8
 
-    def test_three_spaces_equal_weight(self):
+    def test_fallback_equal_weight_no_divergence(self):
+        """Without divergence profile, falls back to equal weighting."""
         sims = {'default': 0.9, 'observations': 0.6, 'reasoning': 0.3}
         result = combine_similarities(sims)
         assert abs(result - 0.6) < 1e-9
-
-    def test_two_spaces_coverage_aware(self):
-        sims = {'default': 0.8, 'observations': 0.4}
-        result = combine_similarities(sims)
-        assert abs(result - 0.6) < 1e-9
-
-    def test_absent_space_not_counted(self):
-        """Entry without reasoning → only default + observations contribute."""
-        sims = {'default': 0.9, 'observations': 0.6}
-        result = combine_similarities(sims)
-        # Average of 0.9 and 0.6 = 0.75, NOT (0.9+0.6+0)/3
-        assert abs(result - 0.75) < 1e-9
 
     def test_empty_sims_returns_zero(self):
         assert combine_similarities({}) == 0.0
 
-    def test_weighted_combiner(self):
-        sims = {'default': 0.9, 'observations': 0.6, 'reasoning': 0.3}
-        weights = {'default': 1.0, 'observations': 1.0, 'reasoning': 1.0}
-        result = combine_similarities(sims, weights=weights)
-        assert abs(result - 0.6) < 1e-9
+    def test_variance_weighted_with_divergence(self):
+        """High-divergence space gets more weight when query matches it."""
+        sims = {'default': 0.5, 'observations': 0.3, 'prompt': 0.9}
+        # prompt has high divergence (0.4), observations low (0.08)
+        div = {'observations': 0.08, 'prompt': 0.4}
+        result = combine_similarities(sims, divergence_profile=div)
+        # default gets weight 1.0, obs gets 0.08, prompt gets 0.4
+        # = (0.5*1.0 + 0.3*0.08 + 0.9*0.4) / (1.0 + 0.08 + 0.4)
+        expected = (0.5 + 0.024 + 0.36) / 1.48
+        assert abs(result - expected) < 0.01
+
+    def test_divergence_suppresses_redundant_space(self):
+        """Low-divergence space (nearly identical to default) gets minimal weight."""
+        sims = {'default': 0.8, 'observations': 0.8}
+        div = {'observations': 0.01}  # nearly zero divergence
+        result = combine_similarities(sims, divergence_profile=div)
+        # observations weight is 0.01, default is 1.0 → result ≈ default
+        assert abs(result - 0.8) < 0.01
+
+    def test_divergence_amplifies_distinctive_space(self):
+        """High-divergence space with high query match pulls score up."""
+        sims = {'default': 0.4, 'prompt': 0.9}
+        div = {'prompt': 0.5}
+        result = combine_similarities(sims, divergence_profile=div)
+        # = (0.4*1.0 + 0.9*0.5) / (1.0 + 0.5) = 0.85 / 1.5 = 0.567
+        expected = 0.85 / 1.5
+        assert abs(result - expected) < 0.01
+        # Higher than default alone (0.4) because prompt pulls it up
+        assert result > 0.4
 
 
 # --- Multi-space scoring in MemoryStore (M1.2) ---
@@ -370,10 +408,6 @@ class TestExperimentCombiner:
     """Verify the M1 experiment configuration: equal weighting, no query-type
     classification, coverage-aware. These tests exercise the full scoring path
     to confirm the combiner is wired correctly."""
-
-    def test_experiment_weights_is_none(self):
-        """M1 experiment uses equal weighting (None = coverage-aware average)."""
-        assert EXPERIMENT_WEIGHTS is None
 
     def test_three_space_equal_weight_through_scoring(self, store):
         """Full path: entry with 3 spaces → combiner averages all 3."""

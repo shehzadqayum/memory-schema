@@ -37,6 +37,7 @@ Every memory entity MUST be a `<memory:entity>` XML block in a `.md` file.
   </memory:observations>
   <memory:prompt>The user's input that triggered this memory</memory:prompt>
   <memory:reasoning>Narrative thinking — why, alternatives, connections</memory:reasoning>
+  <memory:chain>Reasoning chain context — what investigation this belongs to</memory:chain>
   <memory:relations>
     <memory:relation target="other-memory" type="MODIFIES"/>
   </memory:relations>
@@ -60,6 +61,7 @@ Include when contextually appropriate. Omit if not relevant.
 | `observations` | `<memory:observations>` | Atomic facts. Must contain at least one `<memory:observation>`. |
 | `reasoning` | `<memory:reasoning>` | Narrative thinking — why, alternatives, connections. |
 | `prompt` | `<memory:prompt>` | The user input that triggered the response. |
+| `chain` | `<memory:chain>` | Reasoning chain context — what investigation this belongs to. |
 | `relations` | `<memory:relations>` | Explicit links to other known memories. |
 | `source` | `<memory:source>` | Provenance (session hash, commit, URL). |
 | `project` | `<memory:project>` | Project scoping. |
@@ -131,7 +133,7 @@ Re-saving with an existing `name` performs a merge, not a replacement.
 score = recency(0.995^hours) × w_r + importance/10 × w_i + relevance × w_v
 ```
 
-Relevance is computed from multi-space embeddings (6 spaces: default + 1:1 per field). The combiner averages cosine similarities across present spaces (coverage-aware — absent spaces not counted as zero).
+Relevance is computed from multi-space embeddings (7 spaces: default + name + description + observations + prompt + reasoning + chain). The combiner is variance-weighted: each space's similarity is multiplied by its divergence from default (precomputed at embed time). Distinctive fields get amplified, redundant fields suppressed. Falls back to equal weighting when no divergence profile is available.
 
 | Query type | Recency | Importance | Relevance |
 |------------|---------|------------|-----------|
@@ -153,7 +155,7 @@ Bonuses: hub `+0.05 * ln(1 + backlinks)`, text match `+0.1` substring (Neo4j) or
 | L0 | MEMORY.md | Never fails (always in context) |
 | L1a | Markdown files | Never fails (git-tracked) |
 | L1b | JSONL | Never fails (stdlib Python) |
-| L2a | Voyage embeddings (6 spaces × 1024 dims) | Degrades to L1 |
+| L2a | Voyage embeddings (7 spaces × 1024 dims) | Degrades to L1 |
 | L2b | Neo4j | Degrades to L2a |
 
 ---
@@ -188,7 +190,7 @@ A **chain entity** is a live accumulating memory that grows with each response. 
 These rules are enforced by:
 - **Validator:** V1-V14 (structure), R1-R7 (relations), F1, F3 (filesystem)
 - **Write gate:** 6-stage pipeline (validation, provenance, guards, consistency, numeric probe, L0 echo)
-- **PostToolUse hook:** Parses, embeds (6 spaces), gate-checks, indexes on every Write to `memory/*.md`
+- **PostToolUse hook:** Parses, embeds (7 spaces), gate-checks, indexes on every Write to `memory/*.md`
 - **Compact resilience:** Working memory entries auto-appended to MEMORY.md by the hook
 
 The schema defines structure. How strictly it is applied depends on the scope guidelines (importance-correlated enforcement).
