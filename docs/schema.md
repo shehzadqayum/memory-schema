@@ -64,7 +64,7 @@ Optional body text follows after the closing tag.
 | Field | Tag | When to include |
 | --- | --- | --- |
 | **importance** | attribute | Integer 1-10. Defaults to 5 if omitted. |
-| **confidence** | attribute | Integer 1-10. Author's confidence in this memory. |
+| **confidence** | attribute | Integer 1-10. Author's confidence in this memory. Optional; when omitted, no effect. Write-time metadata — does not affect retrieval scoring. V12 enforces range. |
 | **type** | attribute | Free-form string. No predefined values enforced. LLM determines best usage. |
 | **observations** | `<memory:observations>` | Atomic facts. Include when there are discrete facts to record. |
 | **reasoning** | `<memory:reasoning>` | Narrative thinking — why, alternatives, connections. |
@@ -242,6 +242,7 @@ Only ONE memory can be authorised at a time: the active chain, tracked in `memor
 | V9 | All open tags have matching close tags |
 | V10 | If present, `schema` attribute is a valid integer from 1 to current version |
 | V11 | If present, `status` is one of: active, superseded, archived, quarantined |
+| V12 | If present, `confidence` is an integer from 1 to 10 |
 
 ### Relations
 
@@ -407,12 +408,11 @@ Every gate decision is recorded in `memory/audit.jsonl` with machine-readable ve
 ### Lifecycle Events
 
 **On Supersede:** When a SUPERSEDES relation is created:
-1. Trust guard checked (source trust ≥ target trust)
-2. Cycle detection checked (R7)
-3. Target entry status set to `superseded`
-4. Target removed from MEMORY.md (on explicit CLI write; hook manages L0)
-5. Target remains traversable in recall BFS but excluded from results
-6. Audit logged
+1. Cycle detection checked (R7)
+2. Target entry status set to `superseded`
+3. Target removed from MEMORY.md (on explicit CLI write; hook manages L0)
+4. Target remains traversable in recall BFS but excluded from results
+5. Audit logged
 
 **On Archive:** When `memoryschema archive NAME` is invoked:
 1. Entry status set to `archived` in store

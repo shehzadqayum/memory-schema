@@ -139,7 +139,7 @@ score = recency(0.995^hours) × w_r + importance/10 × w_i + cosine_similarity �
 
 Type factor: semantic `max(recency, 0.6)`, episodic standard decay, procedural `recency^(1/(1+0.3*min(accesses,10)))`.
 
-Confidence factor: `confidence/10` multiplier on score. Default neutral (1.0) when not set.
+`confidence` is write-time metadata only — captured for calibration analysis, does not affect retrieval scoring.
 
 Bonuses: hub `+0.05 * ln(1 + backlinks)`, text match `+0.1` substring (Neo4j) or BM25 up to `+0.3` (JSONL).
 

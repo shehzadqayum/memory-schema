@@ -709,10 +709,7 @@ class Neo4jMemoryStore:
         if backlinks > 0:
             score += 0.05 * math.log(1 + backlinks)
 
-        # Confidence factor: author's declared confidence (1-10), default neutral
-        confidence = entry.get('confidence')
-        if confidence is not None:
-            score *= (confidence / 10.0)
+        # Confidence is write-time metadata only — not a scoring input.
 
         # MITIGATES dampening
         mitigates_count = sum(

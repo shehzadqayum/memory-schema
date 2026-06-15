@@ -52,6 +52,7 @@ Each layer adds capability without being required. The system degrades gracefull
 
 **Required:** schema, name, description.
 **Optional:** importance (default 5), confidence (1-10), type (free-form), observations, reasoning, prompt, chain, relations, project.
+**Server-managed:** status, embedding, embeddings, divergence_profile, created_at, last_accessed, access_count, backlinks, associations.
 
 ---
 
@@ -77,7 +78,7 @@ score = recency(0.995^hours) × 0.2 + importance/10 × 0.3 + cosine_similarity �
 - `episodic`: standard `0.995^hours` — events age naturally
 - `procedural`: `recency^(1/(1 + 0.3*min(access_count, 10)))` — access-reinforced
 
-**Confidence factor** (applied after weighted sum): `confidence/10` multiplier. Default neutral (1.0) when not set.
+**`confidence`** is write-time metadata only — captured for calibration analysis but does not affect retrieval scoring.
 
 **Bonuses** (added after weighted sum, before clamping to 1.0):
 - Hub bonus: `+0.05 * ln(1 + backlinks)` — log-scale, diminishing returns
@@ -190,7 +191,7 @@ from memoryschema import Neo4jMemoryStore, embed_text, embed_batch, rerank
 | `memoryschema.inheritance` | TOML config chain + rules resolution — see [hierarchy-and-inheritance.md](hierarchy-and-inheritance.md) for full API |
 | `memoryschema.audit` | Append-only mutation log with field-level change tracking |
 | `memoryschema.l0_budget` | MEMORY.md token budget enforcement with score-based eviction |
-| `memoryschema.write_gate` | Two-verdict write gate: ACCEPT/REJECT/QUARANTINE pipeline |
+| `memoryschema.write_gate` | Three-verdict write gate: ACCEPT/REJECT/QUARANTINE pipeline |
 | `memoryschema.numeric_probe` | Numeric contradiction detection: extract_claims, compare |
 | `memoryschema.cli.eval_cmd` | Evaluation harness: recall@k, MRR, nDCG metrics |
 | `memoryschema.cli.reflect_cmd` | Episodic clustering and semantic summary synthesis |

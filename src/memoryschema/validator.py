@@ -129,6 +129,16 @@ def validate(content, filepath=None, strict=False, known_names=None):
         except ValueError:
             errors.append(('V5', f'Importance "{importance_str}" is not a valid integer'))
 
+    # V12: confidence is integer 1-10 (optional field)
+    confidence_str = root.get('confidence')
+    if confidence_str is not None:
+        try:
+            confidence = int(confidence_str)
+            if confidence < 1 or confidence > 10:
+                errors.append(('V12', f'Confidence {confidence} out of range, must be 1-10'))
+        except ValueError:
+            errors.append(('V12', f'Confidence "{confidence_str}" is not a valid integer'))
+
     # V11: status is valid (optional field, v3)
     status_val = root.get('status')
     if status_val and status_val not in VALID_STATUSES:

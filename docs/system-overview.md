@@ -9,7 +9,7 @@ Everything else — the store, embeddings, hooks, scripts — is infrastructure 
 
 ## The Memory Entity
 
-A memory is a single, atomic unit of storage. It has a name, a description, and optionally any combination of observations, reasoning, prompt, relations, and source. Every memory uses the same structure:
+A memory is a single, atomic unit of storage. It has a name, a description, and optionally any combination of observations, reasoning, prompt, chain, and relations. Every memory uses the same structure:
 
 ```xml
 <memory:entity schema="4" name="unique-name" type="semantic" importance="7">
@@ -39,7 +39,7 @@ Session reasoning — what was asked, what was decided, why. Selective enforceme
 
 ### Corpus Memory
 
-External content — documents, posts, articles. Batch imported. Importance and confidence reflect author assessment.
+External content — documents, posts, articles. Batch imported. Importance and confidence reflect the importing agent's assessment (not the external author's).
 
 - `<memory:observation>` holds the source text
 - No `<memory:prompt>` or `<memory:reasoning>` (content was imported, not generated)

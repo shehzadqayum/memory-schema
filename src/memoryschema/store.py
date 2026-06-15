@@ -771,11 +771,9 @@ class MemoryStore:
         if backlinks > 0:
             score += 0.05 * math.log(1 + backlinks)
 
-        # Confidence factor: author's declared confidence (1-10), default neutral
-        confidence = entry.get('confidence')
-        if confidence is not None:
-            score *= (confidence / 10.0)
-        # No confidence → neutral (1.0), no effect
+        # Confidence is write-time metadata only — not a scoring input.
+        # Preserved in the entry for calibration analysis (checking declared
+        # confidence against downstream fate) without contaminating retrieval.
 
         # MITIGATES dampening: entries with inbound MITIGATES score slightly lower
         mitigates_count = sum(

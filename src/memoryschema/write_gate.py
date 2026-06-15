@@ -1,6 +1,6 @@
 """Pre-indexing write gate for memory mutations.
 
-Two-verdict pipeline — every write gets an explicit verdict:
+Three-verdict pipeline — every write gets an explicit verdict:
 
   REJECT     — structural failure (missing fields).
                Entry is never saved. Logged with reason.

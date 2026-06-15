@@ -56,7 +56,7 @@ Include when contextually appropriate. Omit if not relevant.
 | Field | Tag | When to include |
 |-------|-----|-----------------|
 | `importance` | attribute | Integer 1-10. Defaults to 5 if omitted. |
-| `confidence` | attribute | Integer 1-10. Author's confidence in this memory. |
+| `confidence` | attribute | Integer 1-10. Write-time metadata only (V12). Does not affect scoring. |
 | `type` | attribute | Free-form string. No predefined values enforced. |
 | `observations` | `<memory:observations>` | Atomic facts. Must contain at least one `<memory:observation>`. |
 | `reasoning` | `<memory:reasoning>` | Narrative thinking — why, alternatives, connections. |
@@ -187,7 +187,7 @@ A **chain entity** is a live accumulating memory that grows with each response. 
 ## Enforcement
 
 These rules are enforced by:
-- **Validator:** V1-V11 (structure), R1-R7 (relations), F1, F3 (filesystem)
+- **Validator:** V1-V12 (structure), R1-R7 (relations), F1, F3 (filesystem)
 - **Write gate:** 4-stage pipeline (validation, consistency, numeric probe, L0 echo)
 - **PostToolUse hook:** Parses, embeds (7 spaces), gate-checks, indexes on every Write to `memory/*.md`
 - **Compact resilience:** Working memory entries auto-appended to MEMORY.md by the hook
