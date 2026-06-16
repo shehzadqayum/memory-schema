@@ -247,6 +247,41 @@ All query commands support `--json` for agent consumption. All destructive comma
 
 ---
 
+## Claude Code Plugin
+
+The package includes a Claude Code plugin at `.claude-plugin/` that provides hooks, rules, and skills — no MCP server required.
+
+### What the plugin adds
+
+| Component | What it does |
+|-----------|-------------|
+| **Hook** | PostToolUse Write — auto-indexes memory files (7-space embed, gate, store) |
+| **Rules** | Schema rules + working memory guidelines (loaded into prompt) |
+| **Skills** | `/recall`, `/chain-start`, `/chain-status`, `/chain-release`, `/memory-status` |
+
+### Plugin installation
+
+```bash
+# 1. Install the Python package (prerequisite)
+pip install memory-schema[all]
+
+# 2. The plugin is at .claude-plugin/ in this repo
+#    Point Claude Code to it for hooks, rules, and skills
+```
+
+The plugin is a wrapper — it contains configuration and instructions, not source code. All logic lives in the pip-installed `memoryschema` package.
+
+### Hybrid memory scope
+
+- **Project store**: `memory/` in the project root (isolated per project)
+- **User store**: `~/.claude/memory/` (cross-project knowledge, fallback)
+
+The hook writes to the project store when available, falls back to user-level. The `/recall` skill searches both stores.
+
+See `.claude-plugin/README.md` for full plugin documentation.
+
+---
+
 ## Architecture
 
 **Source of truth:** `docs/schema.md` — the memory schema document.
