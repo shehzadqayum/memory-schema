@@ -7,10 +7,6 @@
 
 ### Session History
 
-- [five-space-eval-results](five-space-eval-results.md) — 5-space eval: nDCG 0.555, recall 0.511 — continues downward trend with equal-weight combiner
-- [query-conditioned-design-doc](query-conditioned-design-doc.md) — Full design document written for query-conditioned weighting at docs/design/query-conditioned-weighting.md
-- [deployment-verified](deployment-verified.md) — End-to-end deployment verification of memory-schema system
-- [chain-of-reasoning-discussion](chain-of-reasoning-discussion.md) — User wants to define a chain of reasoning using the memory framework — connecting memories through typed relations
 - [chain-why-equal-weight-fails](chain-why-equal-weight-fails.md) — Chain: equal-weight multi-space averaging dilutes retrieval — proven through 4 experiments
 - [chain-memory-quality-evolution](chain-memory-quality-evolution.md) — Chain: corpus evolved from session-metadata-heavy to knowledge-rich through deliberate type classification
 - [chain-pattern-verified](chain-pattern-verified.md) — Chain entity pattern verified: chains surface as top result, cascade follows USES to evidence
@@ -27,8 +23,10 @@
 - [nested-agents-discussion](nested-agents-discussion.md) — Architectural discussion on nested agents using project folders as agent boundaries
 - [session-5-close](session-5-close.md) — Session 5 complete — full package audit, 15 items, 13 code fixes + 2 doc items
 - [session-6-close](session-6-close.md) — Session 6 complete — hierarchy/inheritance reference doc + 7 documentation alignment fixes
+- [five-applications-demonstrated](five-applications-demonstrated.md) — 5 multi-space applications demonstrated on real data: faceted search, disagreement, intent matching, profiling, contradiction
 - [working-memory-importance-change](working-memory-importance-change.md) — Changed working memory importance from tiered 7-10 to fixed 10 for all entries
 - [repo-created](repo-created.md) — GitHub repository created for memory-schema package
+- [plugin-no-mcp](plugin-no-mcp.md) — Plugin without MCP: hooks + rules + skills — packaging what we already have, not building new
 - [four-space-eval-results](four-space-eval-results.md) — 4-space eval: nDCG 0.557 worse than single-space 0.608 — equal-weight averaging dilutes signal
 - [chain-pattern-formalized](chain-pattern-formalized.md) — Chain entity pattern formalized in schema spec, rules, and working guidelines
 - [chain-definition](chain-definition.md) — A chain of reasoning is a sequence of memory events with a defined start (trigger) and end (conclusion)
@@ -57,9 +55,7 @@
 - [session-2-close](session-2-close.md) — Session 2 complete — centralized env var reads, resolved session 1 residual
 - [session-3-close](session-3-close.md) — Session 3 complete — fixed env var precedence, redundant import, added hierarchy integration tests
 - [session-4-close](session-4-close.md) — Session 4 complete — full documentation alignment, 8 items across 12 files
+- [seven-space-applications](seven-space-applications.md) — 7 applications of multi-space architecture: faceted search, disagreement detection, intent matching, chain discovery, profiling, contradiction detection, extensible properties
 - [query-conditioned-weighting-design](query-conditioned-weighting-design.md) — Query-conditioned weighting design: classify query by keywords, select space weight profile per type
 - [chain-entity-design](chain-entity-design.md) — Chain entity design: a meta-memory listing ordered steps as observations with USES relations to evidence
-- [memory-systems-comparison](memory-systems-comparison.md) — How this system compares: standard RAG core + novel multi-space/variance/chains/immutability on top
-- [seven-spaces-explained](seven-spaces-explained.md) — Why 7 spaces: each field embedded independently so queries can match intent, facts, topic, or rationale separately
-- [seven-space-applications](seven-space-applications.md) — 7 applications of multi-space architecture: faceted search, disagreement detection, intent matching, chain discovery, profiling, contradiction detection, extensible properties
-- [five-applications-demonstrated](five-applications-demonstrated.md) — 5 multi-space applications demonstrated on real data: faceted search, disagreement, intent matching, profiling, contradiction
+- [user-level-plugin-scope](user-level-plugin-scope.md) — User-level plugin: 3 models — per-project data, shared user memory, or hybrid (recommend hybrid)
