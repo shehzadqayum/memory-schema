@@ -12,6 +12,9 @@
 - Recall dual-store search: project store first, user-level fallback for cross-project knowledge
 - Plugin README with architecture, prerequisites, installation, quick start
 - Project README updated with Claude Code Plugin section
+- `memoryschema plugin deploy` — deploy skills, rules, hook to `~/.claude/` with manifest
+- `memoryschema plugin uninstall` — clean removal using manifest (supports `--keep-data`)
+- `memoryschema plugin status` — deployment health check
 
 ### Changed (Content-Agnostic Architecture)
 - Removed provenance system (VALID_PROVENANCES, TRUST_LEVELS, trust multiplier, L0 gating, SUPERSEDES trust guard)

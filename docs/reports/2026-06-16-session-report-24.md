@@ -35,10 +35,35 @@ None.
 - [S2] implementation residuals: None (no Residuals sections in any commit)
 - Plan completeness: 4/4 phases complete, all verification criteria met
 
+## Addendum — Plugin Deploy CLI (post-session-close)
+
+User requested user-level deployment with uninstall capability. Added after [S4] as ad-hoc work.
+
+### Commits (addendum)
+
+| Hash | Tag | Description |
+| ---- | --- | ----------- |
+| (pending) | [S2] | Plugin deploy/uninstall/status CLI + user-level deployment |
+
+### Audit (addendum)
+
+| Item | Description | Result |
+| ---- | ----------- | ------ |
+| Deploy CLI | `memoryschema plugin deploy/uninstall/status` | PASS |
+| Deployment | 5 skills + 2 rules + memory dir at ~/.claude/ | PASS |
+| Manifest | JSON at ~/.claude/memory-schema-manifest.json | PASS |
+| Uninstall dry-run | Lists all files to remove | PASS |
+| Hook | Pre-existing hook recorded, not duplicated | PASS |
+
+### Residuals (addendum)
+
+- `plugin_cmd.py` has no test coverage — deferred (low impact: CLI wrapper, tested manually)
+
 ## Current State
 
 - **Branch:** main
-- **Latest commit:** `7971ca6`
+- **Latest commit:** `eaac51c` ([S4])
+- **Uncommitted:** plugin_cmd.py (new), main.py (modified)
 - **Tests:** 627 passing across 35 files
-- **Deployed:** not deployed (plugin packaging, no runtime change)
-- **Pending work:** none from this plan — all phases complete
+- **Deployed:** plugin deployed to ~/.claude/ (7 files, manifest written)
+- **Pending work:** commit addendum, test coverage for plugin_cmd

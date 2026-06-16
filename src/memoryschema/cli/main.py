@@ -288,3 +288,6 @@ cli.add_command(reflect_cmd, name="reflect")
 
 from memoryschema.cli.chain_cmd import chain as chain_group
 cli.add_command(chain_group)
+
+from memoryschema.cli.plugin_cmd import plugin as plugin_group
+cli.add_command(plugin_group)
