@@ -393,3 +393,6 @@
 2026-06-14 00:17:18	session-close	END	completed	Session 23 — 6e04215 — hook embedding fix, 655 tests, 0 residuals
 2026-06-15 08:05:50	session-open	START	—	—
 2026-06-15 08:07:07	session-open	END	completed	Session 24 briefing — 8 meta commits, query-conditioned weighting next
+2026-06-16 09:57:46	session-open	START	—	—
+2026-06-16 10:44:50	session-open	END	completed	Session 24 — 27 meta commits, architecture evolution, plugin design
+2026-06-16 13:10:21	plan-commit	START	—	—
