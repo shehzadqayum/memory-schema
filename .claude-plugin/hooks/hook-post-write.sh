@@ -1,0 +1,1 @@
+../../src/memoryschema/hooks/hook-post-write.sh

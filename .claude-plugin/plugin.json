@@ -1,0 +1,7 @@
+{
+  "name": "memory-schema",
+  "version": "0.1.0",
+  "description": "Content-agnostic memory system with 7-space embedding and variance-weighted retrieval",
+  "author": {"name": "memory-schema"},
+  "license": "MIT"
+}
