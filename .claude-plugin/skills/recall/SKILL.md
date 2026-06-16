@@ -16,16 +16,28 @@ Skip recall only for purely mechanical operations (git commits, file staging) wh
 
 ## Procedure
 
-1. Run the recall command via Bash:
+### 1. Search project store (primary)
 
 ```bash
 memoryschema recall "<query>" --limit 3
 ```
 
-2. Use the returned memories as context for your response:
-   - If a memory directly answers the question, cite it
-   - If memories provide background, use them to inform the answer
-   - If no relevant memories are found, proceed without
+### 2. Search user-level store (cross-project knowledge)
+
+If the current project has its own `memory/` directory (not `~/.claude/memory/`), also search the user-level store for cross-project knowledge:
+
+```bash
+memoryschema --root ~/.claude recall "<query>" --limit 3
+```
+
+Skip this step if the project root IS `~/.claude` (same store — no need to search twice).
+
+### 3. Merge results
+
+- Project results take priority (shown first)
+- User-level results provide cross-project context
+- Deduplicate by name if the same entry appears in both
+- Use the combined context to inform the response
 
 ## Options
 
@@ -37,7 +49,12 @@ memoryschema recall "<query>" --limit 3
 ## Examples
 
 ```bash
+# Project-level search
 memoryschema recall "how does the hook pipeline work" --limit 3
+
+# User-level cross-project search
+memoryschema --root ~/.claude recall "debugging patterns" --limit 3
+
+# Scoped to a project hierarchy
 memoryschema recall "auth flow" --project ict.auth --limit 5
-memoryschema recall "chain entity lifecycle" --json
 ```

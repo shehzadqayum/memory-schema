@@ -47,7 +47,12 @@ for i, part in enumerate(parts):
         project_root = '/'.join(parts[:i])
         break
 if project_root is None:
-    project_root = os.path.dirname(filepath)
+    # Hybrid scope fallback: use user-level memory directory
+    project_root = os.path.expanduser('~/.claude')
+
+# Ensure memory directory exists (user-level fallback may not have it yet)
+memory_dir_path = os.path.join(project_root, 'memory')
+os.makedirs(memory_dir_path, exist_ok=True)
 
 # Derive store path
 store_path = os.path.join(project_root, 'memory', 'store.jsonl')
