@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+### Added (Claude Code Plugin)
+- `.claude-plugin/` directory with plugin manifest (`plugin.json`)
+- PostToolUse Write hook registration (`hooks/hooks.json`) using `${CLAUDE_PLUGIN_ROOT}` path
+- Hook symlink to `src/memoryschema/hooks/hook-post-write.sh` (development mode)
+- Rules: `memory-schema.md` and `memory-working.md` copied to plugin
+- Skills: `/recall`, `/chain-start`, `/chain-status`, `/chain-release`, `/memory-status`
+- Hybrid memory scope: hook falls back to `~/.claude/memory/` when no project root derivable
+- Recall dual-store search: project store first, user-level fallback for cross-project knowledge
+- Plugin README with architecture, prerequisites, installation, quick start
+- Project README updated with Claude Code Plugin section
+
 ### Changed (Content-Agnostic Architecture)
 - Removed provenance system (VALID_PROVENANCES, TRUST_LEVELS, trust multiplier, L0 gating, SUPERSEDES trust guard)
 - Removed basis system (Observation subclass, VALID_BASES, VERIFICATION_RANKS, basis factor, verified_at, V14, Q9)

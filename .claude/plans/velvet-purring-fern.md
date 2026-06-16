@@ -31,7 +31,7 @@ memory/MEMORY.md, store.jsonl, *.md  ◀──written by hook
 
 None.
 
-## Phase 1 — Plugin manifest and structure
+## Phase 1 — Plugin manifest and structure ✓ fe45eca
 
 ### 1.1 Create plugin directory and manifest
 Create `.claude-plugin/plugin.json`:
@@ -82,7 +82,7 @@ Copy `.claude/rules/memory-working.md` → `.claude-plugin/rules/memory-working.
 
 **Verification:** Plugin directory structure matches Claude Code plugin spec.
 
-## Phase 2 — Skills
+## Phase 2 — Skills ✓ cdd9e05
 
 ### 2.1 Create recall skill
 `.claude-plugin/skills/recall/SKILL.md`:
@@ -107,7 +107,7 @@ Copy `.claude/rules/memory-working.md` → `.claude-plugin/rules/memory-working.
 
 **Verification:** Skills discoverable via `/recall`, `/chain-start`, etc.
 
-## Phase 3 — Hybrid memory scope
+## Phase 3 — Hybrid memory scope ✓ 8c35244
 
 ### 3.1 Update hook for hybrid data path
 Modify hook-post-write.sh to:
@@ -127,7 +127,7 @@ Modify the recall skill to:
 
 **Verification:** Write a memory in a project → appears in project store. Write without a project → appears in ~/.claude/memory/. Recall finds entries from both stores.
 
-## Phase 4 — Documentation and installation
+## Phase 4 — Documentation and installation ✓ 7971ca6
 
 ### 4.1 Plugin README
 Create `.claude-plugin/README.md` with:
