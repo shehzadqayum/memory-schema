@@ -21,6 +21,7 @@ SKILL_FILES = [
     ("skills/chain-status/SKILL.md", "skills/chain-status/SKILL.md"),
     ("skills/chain-release/SKILL.md", "skills/chain-release/SKILL.md"),
     ("skills/memory-status/SKILL.md", "skills/memory-status/SKILL.md"),
+    ("skills/bootstrap/SKILL.md", "skills/bootstrap/SKILL.md"),
 ]
 
 RULE_FILES = [
