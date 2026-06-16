@@ -410,3 +410,5 @@
 2026-06-16 14:40:57	session-close	START	—	—
 2026-06-16 14:48:45	session-close	END	completed	Session 24 — eaac51c — plugin packaging 4/4, 0 residuals
 2026-06-16 16:16:04	checkpoint	START	—	—
+2026-06-16 16:18:32	checkpoint	END	completed	Session 24 addendum — plugin deploy CLI + user-level deployment, 1 residual (test coverage)
+2026-06-16 16:20:31	session-close	START	—	—
