@@ -257,7 +257,7 @@ The package includes a Claude Code plugin at `.claude-plugin/` that provides hoo
 |-----------|-------------|
 | **Hook** | PostToolUse Write — auto-indexes memory files (7-space embed, gate, store) |
 | **Rules** | Schema rules + working memory guidelines (loaded into prompt) |
-| **Skills** | `/recall`, `/chain-start`, `/chain-status`, `/chain-release`, `/memory-status` |
+| **Skills** | `/recall`, `/chain-start`, `/chain-status`, `/chain-release`, `/memory-status`, `/bootstrap` |
 
 ### Plugin installation
 

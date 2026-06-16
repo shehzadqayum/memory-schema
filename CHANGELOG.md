@@ -15,6 +15,7 @@
 - `memoryschema plugin deploy` — deploy skills, rules, hook to `~/.claude/` with manifest
 - `memoryschema plugin uninstall` — clean removal using manifest (supports `--keep-data`)
 - `memoryschema plugin status` — deployment health check
+- `/bootstrap` skill — scan project docs and source after init, create knowledge map as interconnected memory entities (7-phase procedure, 8-22 entities, hub-and-spoke relation graph)
 
 ### Changed (Content-Agnostic Architecture)
 - Removed provenance system (VALID_PROVENANCES, TRUST_LEVELS, trust multiplier, L0 gating, SUPERSEDES trust guard)

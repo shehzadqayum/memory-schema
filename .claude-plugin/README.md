@@ -60,6 +60,7 @@ Fires on every Write to `memory/*.md`. The hook:
 | `/chain-status` | Show the active chain |
 | `/chain-release` | Release the active chain (make read-only) |
 | `/memory-status` | Show store backend, node count, embedding coverage |
+| `/bootstrap` | Scan project docs and source, create knowledge map as memory entities |
 
 ## Architecture
 
