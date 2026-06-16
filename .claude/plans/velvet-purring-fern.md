@@ -1,158 +1,119 @@
-# Package Memory System as Claude Code Plugin
+# Bootstrap Skill — Project Knowledge Map Generator
 
 ## Context
 
-The memory system is fully functional (113 entries, 7 spaces, 627 tests, content-agnostic) but integrated ad-hoc: hook in settings.json, rules in .claude/rules/, recall via Bash CLI. Packaging as a Claude Code plugin makes it installable, portable, and discoverable. No MCP server — hooks + rules + skills only.
+After `memoryschema init`, the memory store is empty. The user wants a `/bootstrap` skill that systematically reads a project's documentation and source code, then creates interconnected memory entities forming a knowledge graph. This gives the memory system a head start — future sessions have project context from the first recall.
 
-## Architecture: Plugin is a wrapper, not a copy
+The skill is a procedure document (SKILL.md) that instructs Claude what to do. Claude follows the steps, reads files, and writes `memory/*.md` files. The PostToolUse Write hook handles indexing automatically (parse → embed 7 spaces → gate → store).
 
-The plugin contains ONLY configuration and instructions — not Python source code:
+## Prior Residuals (from [S4] 59b653b)
 
+- `plugin_cmd.py` has no test coverage (low impact — deferred)
+
+## Phase 1 — Create the bootstrap skill
+
+### 1.1 Create SKILL.md
+
+Create `.claude-plugin/skills/bootstrap/SKILL.md` with a 7-phase procedure:
+
+**Phase 0 — Preflight:**
+- Verify `memoryschema status` works (confirms init was run)
+- Release any active chain, then `memoryschema chain start "chain-bootstrap"`
+- Detect project name from `memoryschema.toml` (fallback: directory name)
+- Recall existing bootstrap entities (idempotent re-run check)
+
+**Phase 1 — Project Overview:**
+- Read README, package manifest (pyproject.toml / package.json / Cargo.toml / go.mod / etc.)
+- Write `memory/bootstrap-project-overview.md` (importance 8)
+- Update chain entity
+
+**Phase 2 — Directory Structure:**
+- Scan source files (`find` with common extensions, capped at 200 results)
+- Identify source dirs, test dirs, doc dirs
+- Write `memory/bootstrap-directory-structure.md` (importance 7)
+- Determine project size tier: small (<5 dirs), medium (5-15), large (>15)
+
+**Phase 3 — Tech Stack:**
+- Parse dependencies from manifest found in Phase 1
+- Identify runtime vs dev deps, key frameworks
+- Write `memory/bootstrap-tech-stack.md` (importance 7)
+
+**Phase 4 — Configuration:**
+- Read .env.example, config files, Docker files, Makefile
+- Identify required env vars and build steps
+- Write `memory/bootstrap-configuration.md` (importance 6)
+
+**Phase 5 — Module Deep Dive** (scaled to project size):
+- Small: read every source file's first 50 lines, one entity per directory
+- Medium: read entry point / index files only, one entity per top-level dir
+- Large: top 15 most significant modules only, rest noted in architecture entity
+- Write `memory/bootstrap-module-<name>.md` per module (importance 6-7)
+- Each has `DEPENDS_ON bootstrap-project-overview` + `USES` for inter-module deps
+
+**Phase 6 — Architecture and API Surface:**
+- Synthesize patterns: error handling, naming conventions, architectural patterns
+- Identify public API: endpoints, CLI commands, exported functions
+- Write `memory/bootstrap-architecture-patterns.md` (importance 8)
+- Write `memory/bootstrap-api-surface.md` (importance 7)
+
+**Phase 7 — Release and Report:**
+- Append "Conclusion:" observation to chain, release with `memoryschema chain release`
+- Run `memoryschema status` to show final count
+- Present summary: entities created, relation graph, total coverage
+
+**Entity budget:** 8-22 entities total (1 chain + 7 structural + up to 15 modules). Cap prevents noise in small stores.
+
+**Entity naming:** All use `bootstrap-` prefix (chain uses `chain-bootstrap`). Deterministic names enable idempotent re-runs via upsert.
+
+**Relation graph:**
 ```
-Plugin (.claude-plugin/)               Python package (pip-installed)
-─────────────────────────              ────────────────────────────────
-hooks/hooks.json  ──calls──▶           hook-post-write.sh ──imports──▶ memoryschema.*
-hooks/hook-post-write.sh               (uses from memoryschema.tags, .store, etc.)
-rules/*.md        ──loaded──▶ prompt
-skills/*.md       ──invoke──▶          memoryschema CLI (recall, chain, status)
+bootstrap-project-overview  (hub)
+  ← DEPENDS_ON  bootstrap-directory-structure
+  ← DEPENDS_ON  bootstrap-tech-stack
+  ← DEPENDS_ON  bootstrap-configuration
+  ← DEPENDS_ON  bootstrap-architecture-patterns
+  ← DEPENDS_ON  bootstrap-api-surface
+  ← DEPENDS_ON  bootstrap-module-*
 
-Data (per project or user-level)
-────────────────────────────────
-memory/MEMORY.md, store.jsonl, *.md  ◀──written by hook
+bootstrap-module-auth  ─USES→  bootstrap-module-database
+bootstrap-api-surface  ─USES→  bootstrap-module-api
+bootstrap-architecture-patterns  ─INFORMS→  bootstrap-module-*
+chain-bootstrap  ─USES→  all bootstrap entities
 ```
-
-**Prerequisite:** `pip install memory-schema` must be in the Python environment. The plugin references the installed package — it does not bundle or copy the source. The hook script calls `python3 -c "from memoryschema.* import ..."` which resolves to the pip-installed location.
-
-**For development (editable install):** `pip install -e .` points to this repo's `src/memoryschema/`. The plugin's `.claude-plugin/` directory lives alongside `src/` in the same repo.
-
-**For distribution:** Users install the pip package first, then install the plugin. The plugin discovers the package via the Python import system — no hardcoded paths.
-
-## Prior Residuals (from [S4] 6e04215)
-
-None.
-
-## Phase 1 — Plugin manifest and structure ✓ fe45eca
-
-### 1.1 Create plugin directory and manifest
-Create `.claude-plugin/plugin.json`:
-```json
-{
-  "name": "memory-schema",
-  "version": "0.1.0",
-  "description": "Content-agnostic memory system with 7-space embedding and variance-weighted retrieval",
-  "author": {"name": "memory-schema"},
-  "license": "MIT"
-}
-```
-
-### 1.2 Create hooks/hooks.json
-Register the PostToolUse Write hook. The hook script is the ONLY file that needs to exist in the plugin — it's a thin shell wrapper that imports from the pip-installed `memoryschema` package:
-
-```json
-{
-  "hooks": {
-    "PostToolUse": [{
-      "matcher": "Write",
-      "hooks": [{
-        "type": "command",
-        "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/hook-post-write.sh",
-        "timeout": 15
-      }]
-    }]
-  }
-}
-```
-
-The hook script (`hook-post-write.sh`) contains embedded Python that does `from memoryschema.tags import parse_memory_file`, `from memoryschema.store import MemoryStore`, etc. — all resolved via the pip-installed package, not local file paths.
-
-**Option A (symlink):** Symlink `.claude-plugin/hooks/hook-post-write.sh` → `src/memoryschema/hooks/hook-post-write.sh` (avoids duplication during development).
-**Option B (copy):** Copy the file (simpler for distribution, but requires keeping in sync).
-
-Recommend Option A for development, Option B for release packaging.
-
-### 1.3 Copy rules
-Copy `.claude/rules/memory-schema.md` → `.claude-plugin/rules/memory-schema.md`
-Copy `.claude/rules/memory-working.md` → `.claude-plugin/rules/memory-working.md`
 
 ### Key files
-- `.claude-plugin/plugin.json` (new)
-- `.claude-plugin/hooks/hooks.json` (new)
-- `.claude-plugin/hooks/hook-post-write.sh` (copy from src/memoryschema/hooks/)
-- `.claude-plugin/rules/*.md` (copy from .claude/rules/)
+- `.claude-plugin/skills/bootstrap/SKILL.md` (new)
 
-**Verification:** Plugin directory structure matches Claude Code plugin spec.
+## Phase 2 — Register and deploy
 
-## Phase 2 — Skills ✓ cdd9e05
+### 2.1 Add to plugin deploy
+Add `("skills/bootstrap/SKILL.md", "skills/bootstrap/SKILL.md")` to `SKILL_FILES` in `src/memoryschema/cli/plugin_cmd.py` (line 18).
 
-### 2.1 Create recall skill
-`.claude-plugin/skills/recall/SKILL.md`:
-- Model-invoked (Claude uses it automatically when user asks a question)
-- Runs `memoryschema recall "<query>" --limit 3`
-- Returns results as context for the response
-
-### 2.2 Create chain management skills
-- `.claude-plugin/skills/chain-start/SKILL.md` — wraps `memoryschema chain start <name>`
-- `.claude-plugin/skills/chain-status/SKILL.md` — wraps `memoryschema chain status`
-- `.claude-plugin/skills/chain-release/SKILL.md` — wraps `memoryschema chain release`
-
-### 2.3 Create status skill
-`.claude-plugin/skills/memory-status/SKILL.md` — wraps `memoryschema status`
+### 2.2 Deploy to user level
+Run `memoryschema plugin deploy --force` to copy the new skill to `~/.claude/skills/bootstrap/SKILL.md`.
 
 ### Key files
-- `.claude-plugin/skills/recall/SKILL.md` (new)
-- `.claude-plugin/skills/chain-start/SKILL.md` (new)
-- `.claude-plugin/skills/chain-status/SKILL.md` (new)
-- `.claude-plugin/skills/chain-release/SKILL.md` (new)
-- `.claude-plugin/skills/memory-status/SKILL.md` (new)
+- `src/memoryschema/cli/plugin_cmd.py` (modify line 18)
 
-**Verification:** Skills discoverable via `/recall`, `/chain-start`, etc.
+## Phase 3 — Documentation
 
-## Phase 3 — Hybrid memory scope ✓ 8c35244
+### 3.1 Update plugin README
+Add `/bootstrap` to the skills table in `.claude-plugin/README.md` (line 56).
 
-### 3.1 Update hook for hybrid data path
-Modify hook-post-write.sh to:
-- Write to project's `memory/` if it exists
-- Fall back to `~/.claude/memory/` if no project memory dir
-- Derive project root from file path (existing logic) or use `~/.claude/` as fallback
+### 3.2 Update project README
+Add `/bootstrap` to the Claude Code Plugin skills table in `README.md`.
 
-### 3.2 Update recall for dual-store search
-Modify the recall skill to:
-- Search project store first
-- Then search user-level store (`~/.claude/memory/store.jsonl`)
-- Merge and re-rank results
+### 3.3 CHANGELOG
+Add entry under `[Unreleased] > Added (Claude Code Plugin)`.
 
 ### Key files
-- `.claude-plugin/hooks/hook-post-write.sh` (modify)
-- `.claude-plugin/skills/recall/SKILL.md` (modify)
+- `.claude-plugin/README.md` (modify)
+- `README.md` (modify)
+- `CHANGELOG.md` (modify)
 
-**Verification:** Write a memory in a project → appears in project store. Write without a project → appears in ~/.claude/memory/. Recall finds entries from both stores.
+## Verification
 
-## Phase 4 — Documentation and installation ✓ 7971ca6
-
-### 4.1 Plugin README
-Create `.claude-plugin/README.md` with:
-- What it does
-- Prerequisites: `pip install memory-schema` (the plugin is a wrapper, not the code)
-- Installation: `/plugin install memory-schema` or local dev install
-- Environment: `VOYAGE_API_KEY` for embeddings (optional — system degrades to text search)
-- Quick start: write a memory, recall it, start a chain
-- Architecture note: plugin = hooks + rules + skills, code = pip package
-
-### 4.2 Update project README
-Add plugin installation section to the main README.md.
-
-### Key files
-- `.claude-plugin/README.md` (new)
-- `README.md` (update)
-
-**Verification:** Plugin installable, hook fires on write, recall works, chain lifecycle works.
-
-## Verification Criteria
-
-| # | Criterion | Phase | Status type |
-|---|-----------|-------|-------------|
-| 1 | Plugin manifest valid, directory structure correct | 1 | Tested |
-| 2 | Hook fires on Write to memory/*.md (same as current) | 1 | Operative |
-| 3 | Skills discoverable and executable (/recall, /chain-start, etc.) | 2 | Operative |
-| 4 | Hybrid scope: project store + user-level fallback | 3 | Operative |
-| 5 | README documents installation and quick start | 4 | Tested |
+1. **Skill exists:** `cat ~/.claude/skills/bootstrap/SKILL.md | head -5` shows the skill header
+2. **Skill discoverable:** Claude sees `/bootstrap` in the skills list after deploy
+3. **Tests pass:** `python3 -m pytest tests/ -x -q` — 627 passing (no test changes, skill is a doc file)
+4. **Manual test:** Run `memoryschema init` in a test project, then invoke `/bootstrap` and verify entities are created in `memory/` and indexed in `store.jsonl`
