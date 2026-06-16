@@ -10,7 +10,7 @@ The skill is a procedure document (SKILL.md) that instructs Claude what to do. C
 
 - `plugin_cmd.py` has no test coverage (low impact — deferred)
 
-## Phase 1 — Create the bootstrap skill
+## Phase 1 — Create the bootstrap skill ✓ 91c8dec
 
 ### 1.1 Create SKILL.md
 
@@ -84,7 +84,7 @@ chain-bootstrap  ─USES→  all bootstrap entities
 ### Key files
 - `.claude-plugin/skills/bootstrap/SKILL.md` (new)
 
-## Phase 2 — Register and deploy
+## Phase 2 — Register and deploy ✓ b30db5d
 
 ### 2.1 Add to plugin deploy
 Add `("skills/bootstrap/SKILL.md", "skills/bootstrap/SKILL.md")` to `SKILL_FILES` in `src/memoryschema/cli/plugin_cmd.py` (line 18).
@@ -95,7 +95,7 @@ Run `memoryschema plugin deploy --force` to copy the new skill to `~/.claude/ski
 ### Key files
 - `src/memoryschema/cli/plugin_cmd.py` (modify line 18)
 
-## Phase 3 — Documentation
+## Phase 3 — Documentation ✓ 9673d7a
 
 ### 3.1 Update plugin README
 Add `/bootstrap` to the skills table in `.claude-plugin/README.md` (line 56).
