@@ -300,14 +300,21 @@ def run_checks(config):
         return True, f"registered (timeout: {hook_detail['stop_timeout']}s)", None
     checks.append(_check("stop_hook", check_stop_hook))
 
-    # 18. Tests
+    # 18. Tests (run package tests, not consumer project tests)
     def check_tests():
         try:
+            import memoryschema
+            pkg_root = Path(memoryschema.__file__).parent.parent.parent
+            pkg_tests = pkg_root / "tests"
+
+            if not pkg_tests.exists():
+                return True, "skipped (package tests not found)", None
+
             t0 = time.time()
             result = subprocess.run(
-                [sys.executable, "-m", "pytest", "tests/", "-q", "--tb=line"],
+                [sys.executable, "-m", "pytest", str(pkg_tests), "-q", "--tb=line"],
                 capture_output=True, text=True, timeout=120,
-                cwd=str(config.project_root))
+                cwd=str(pkg_root))
             elapsed = time.time() - t0
             # Summary is in stderr for pytest with capture_output
             combined = (result.stdout or "") + (result.stderr or "")
