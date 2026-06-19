@@ -31,12 +31,20 @@ After release, all memories are read-only until a new chain is started. The acti
 
 ### How to update
 
-Write the SAME `memory/<chain-name>.md` file on every response. The upsert semantics handle accumulation (only works because the chain is authorised):
+**Edit** (not Write) the SAME `memory/<chain-name>.md` file on every response.
+NEVER use Write on an existing chain file — it replaces the entire file, risking observation loss.
+
+Three targeted Edits per update:
+1. **Append** new `<memory:observation>` before `</memory:observations>`
+2. **Replace** `<memory:description>` content
+3. **Replace** `<memory:reasoning>` content
+
+The upsert semantics at the index layer handle accumulation (only works because the chain is authorised):
 - Observations are APPENDED (each step adds to the list)
 - Description is REPLACED (summary evolves)
 - Reasoning is REPLACED (narrative updated with latest thinking)
 - Relations are MERGED (USES links to evidence accumulate)
-- Embedding is re-computed on every write (stays current as chain grows)
+- Embedding is re-computed on every Write or Edit (stays current as chain grows)
 
 ### What each step captures
 

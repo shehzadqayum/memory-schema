@@ -189,7 +189,7 @@ A **chain entity** is a live accumulating memory that grows with each response. 
 These rules are enforced by:
 - **Validator:** V1-V12 (structure), R1-R7 (relations), F1, F3 (filesystem)
 - **Write gate:** 4-stage pipeline (validation, consistency, numeric probe, L0 echo)
-- **PostToolUse hook:** Parses, embeds (7 spaces), gate-checks, indexes on every Write to `memory/*.md`
+- **PostToolUse hook:** Parses, embeds (7 spaces), gate-checks, indexes on every Write or Edit to `memory/*.md`
 - **Compact resilience:** Working memory entries auto-appended to MEMORY.md by the hook
 
 The schema defines structure. How strictly it is applied depends on the scope guidelines (importance-correlated enforcement).

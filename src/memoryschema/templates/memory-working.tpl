@@ -45,6 +45,12 @@ Scope (which project sees a memory) is handled by the `project` field, not impor
 
 Write to `memory/<name>.md` where `<name>` is kebab-case and describes the content.
 
+## Chain updates
+
+When updating a chain entity, use the **Edit** tool (not Write). Write replaces the
+entire file — if a previous observation is omitted, it is lost from the authoritative
+`.md` source. Edit preserves existing content and targets only the changed sections.
+
 ## Write decline instrumentation
 
 When the selective-write policy above is weighed and the decision is **not** to write, record a decline:

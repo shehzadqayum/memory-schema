@@ -360,7 +360,7 @@ Layer 0 — always in context. One line per entry:
 - [Name](filename.md) -- one-line description
 ```
 
-Stays under 200 lines (auto-load limit). The PostToolUse hook automatically appends working memory entries to MEMORY.md on write, ensuring they remain visible after `/compact` events (compact resilience).
+Stays under 200 lines (auto-load limit). The PostToolUse hook automatically appends working memory entries to MEMORY.md on Write or Edit, ensuring they remain visible after `/compact` events (compact resilience).
 
 **L0 budget enforcement:** When MEMORY.md exceeds the token budget (default: 2000 tokens, configurable via `l0_token_budget`), the lowest-scoring entries are evicted. Token estimation uses chars/4 approximation. If no store is available for scoring, eviction falls back to FIFO (oldest first).
 
@@ -513,11 +513,11 @@ A **chain entity** is a memory that represents a sequence of reasoning steps fro
 Chain entities are **live accumulating** — they grow with each response in a session:
 
 1. **Create** — `memoryschema chain start <name>` authorises the entity for writes. First response creates `memory/<name>.md` with Step 1.
-2. **Update** — the authorised chain accepts upserts. Observations append (each step adds). Description and reasoning are replaced (evolving summary). Relations merge (USES links accumulate). All other memories remain unauthorised (read-only).
+2. **Update** — the authorised chain accepts upserts. Use the Edit tool (not Write) to update chain files — three targeted edits per response: append observation, replace description, replace reasoning. Write overwrites the entire `.md` file, risking observation loss. Observations append (each step adds). Description and reasoning are replaced (evolving summary). Relations merge (USES links accumulate). All other memories remain unauthorised (read-only).
 3. **Release** — `memoryschema chain release` transitions the chain to unauthorised (read-only, permanent). Append a "Conclusion:" observation before releasing.
 4. **New chain** — if the topic changes, release the current chain and start a new one. Only one chain can be authorised at a time.
 
-The embedding is re-computed on every upsert (the hook fires on every write), so the chain's vector representation stays current as it grows.
+The embedding is re-computed on every upsert (the hook fires on every Write or Edit), so the chain's vector representation stays current as it grows.
 
 ### When to Create
 
