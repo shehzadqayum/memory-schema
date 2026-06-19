@@ -10,7 +10,7 @@ After Fix 1 (portable Python path), `validate_hook_python()` in `_hooks_util.py`
 
 ---
 
-## Phase 1 — Update validate_hook_python to check command args
+## Phase 1 — Update validate_hook_python to check command args ✓ e72d575
 
 ### 1.1 `src/memoryschema/cli/_hooks_util.py` — `validate_hook_python()`
 
@@ -42,7 +42,7 @@ pytest tests/ -x -q     # Full suite green
 
 ---
 
-## Phase 2 — Documentation alignment
+## Phase 2 — Documentation alignment ✓ e72d575
 
 ### 2.1 `CHANGELOG.md`
 
@@ -63,3 +63,9 @@ pytest tests/ -x -q
 | `src/memoryschema/cli/_hooks_util.py` | Add hook_command fallback to validate_hook_python | 1.1 |
 | `src/memoryschema/cli/hook_cmd.py` | Pass command string to validate_hook_python in hook check | 1.2 |
 | `CHANGELOG.md` | Fixed entry | 2.1 |
+
+## Status: COMPLETE
+
+All 2 phases delivered, 2/2 PASS. 707 tests passing.
+hook check now reports 8/8 with python_interpreter extracting path from command args.
+Session report: `docs/reports/2026-06-19-session-report-35.md`
