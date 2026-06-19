@@ -8,16 +8,34 @@ from unittest.mock import patch
 from click.testing import CliRunner
 import pytest
 
+from memoryschema.cli.main import cli
 from memoryschema.cli.plugin_cmd import (
     _add_hook,
     _hook_already_registered,
     _remove_hook,
+    SKILL_FILES,
+    RULE_FILES,
 )
 
 
 @pytest.fixture
 def runner():
     return CliRunner()
+
+
+@pytest.fixture
+def plugin_dir(tmp_path):
+    """Create a minimal .claude-plugin/ directory with all expected files."""
+    plugin = tmp_path / ".claude-plugin"
+    for src_rel, _ in SKILL_FILES:
+        f = plugin / src_rel
+        f.parent.mkdir(parents=True, exist_ok=True)
+        f.write_text(f"# {src_rel}\n")
+    for src_rel, _ in RULE_FILES:
+        f = plugin / src_rel
+        f.parent.mkdir(parents=True, exist_ok=True)
+        f.write_text(f"# {src_rel}\n")
+    return plugin
 
 
 # ---------------------------------------------------------------------------
@@ -263,3 +281,98 @@ class TestReadWriteManifest:
         assert content.endswith("\n")
         data = json.loads(content)
         assert data["version"] == "2.0"
+
+
+# ---------------------------------------------------------------------------
+# 2. Deploy command tests
+# ---------------------------------------------------------------------------
+
+class TestDeploy:
+    def _deploy(self, runner, tmp_path, plugin_dir, force=False, hook_path="/pkg/memoryschema/hook.sh", stop_path="/pkg/memoryschema/stop.sh"):
+        """Helper to invoke deploy with all paths mocked."""
+        claude_dir = tmp_path / ".claude"
+        claude_dir.mkdir(exist_ok=True)
+        args = ["plugin", "deploy"]
+        if force:
+            args.append("--force")
+        with patch("memoryschema.cli.plugin_cmd.CLAUDE_DIR", claude_dir), \
+             patch("memoryschema.cli.plugin_cmd.MANIFEST_PATH", claude_dir / "memory-schema-manifest.json"), \
+             patch("memoryschema.cli.plugin_cmd._find_plugin_dir", return_value=plugin_dir), \
+             patch("memoryschema.cli.plugin_cmd._find_hook_script", return_value=hook_path), \
+             patch("memoryschema.cli.plugin_cmd._find_stop_hook_script", return_value=stop_path):
+            result = runner.invoke(cli, args, catch_exceptions=False)
+        return result, claude_dir
+
+    def test_basic_deploy(self, runner, tmp_path, plugin_dir):
+        result, claude_dir = self._deploy(runner, tmp_path, plugin_dir)
+        assert result.exit_code == 0
+        # Skills deployed
+        for _, dst_rel in SKILL_FILES:
+            assert (claude_dir / dst_rel).exists()
+        # Rules deployed
+        for _, dst_rel in RULE_FILES:
+            assert (claude_dir / dst_rel).exists()
+        # Memory dir created
+        assert (claude_dir / "memory").is_dir()
+        # Manifest written
+        manifest_path = claude_dir / "memory-schema-manifest.json"
+        assert manifest_path.exists()
+        manifest = json.loads(manifest_path.read_text())
+        assert manifest["package"] == "memory-schema"
+        assert "deployed_at" in manifest
+        assert len(manifest["files_created"]) > 0
+        # Hook registered in settings
+        settings = json.loads((claude_dir / "settings.json").read_text())
+        assert any(
+            e.get("matcher") == "Write|Edit"
+            for e in settings.get("hooks", {}).get("PostToolUse", [])
+        )
+
+    def test_deploy_creates_stop_hook(self, runner, tmp_path, plugin_dir):
+        result, claude_dir = self._deploy(runner, tmp_path, plugin_dir)
+        assert result.exit_code == 0
+        settings = json.loads((claude_dir / "settings.json").read_text())
+        stop_hooks = settings.get("hooks", {}).get("Stop", [])
+        assert len(stop_hooks) == 1
+        assert "stop.sh" in stop_hooks[0]["hooks"][0]["command"]
+
+    def test_deploy_force_overwrites(self, runner, tmp_path, plugin_dir):
+        # First deploy
+        self._deploy(runner, tmp_path, plugin_dir)
+        # Second deploy with --force
+        result, claude_dir = self._deploy(runner, tmp_path, plugin_dir, force=True)
+        assert result.exit_code == 0
+        assert "Overwrite" in result.output
+        manifest = json.loads((claude_dir / "memory-schema-manifest.json").read_text())
+        assert len(manifest["files_overwritten"]) > 0
+
+    def test_deploy_without_force_skips(self, runner, tmp_path, plugin_dir):
+        # First deploy
+        self._deploy(runner, tmp_path, plugin_dir)
+        # Second deploy without --force
+        result, claude_dir = self._deploy(runner, tmp_path, plugin_dir, force=False)
+        assert result.exit_code == 0
+        assert "Exists (skip)" in result.output
+
+    def test_deploy_idempotent_hook(self, runner, tmp_path, plugin_dir):
+        # First deploy registers hook
+        self._deploy(runner, tmp_path, plugin_dir)
+        # Second deploy detects existing hook
+        result, claude_dir = self._deploy(runner, tmp_path, plugin_dir, force=True)
+        assert "already registered" in result.output
+        manifest = json.loads((claude_dir / "memory-schema-manifest.json").read_text())
+        assert manifest["hook_was_existing"] is True
+
+    def test_deploy_plugin_dir_not_found(self, runner, tmp_path):
+        claude_dir = tmp_path / ".claude"
+        claude_dir.mkdir()
+        with patch("memoryschema.cli.plugin_cmd.CLAUDE_DIR", claude_dir), \
+             patch("memoryschema.cli.plugin_cmd.MANIFEST_PATH", claude_dir / "manifest.json"), \
+             patch("memoryschema.cli.plugin_cmd._find_plugin_dir", return_value=None):
+            result = runner.invoke(cli, ["plugin", "deploy"])
+        assert result.exit_code != 0
+
+    def test_deploy_hook_script_missing(self, runner, tmp_path, plugin_dir):
+        result, claude_dir = self._deploy(runner, tmp_path, plugin_dir, hook_path=None)
+        assert result.exit_code == 0
+        assert "script not found" in result.output.lower() or "register manually" in result.output.lower()
