@@ -1,7 +1,9 @@
 #!/bin/bash
 # PostToolUse hook for memory file indexing.
 #
-# Triggered by Claude Code after every Write tool call.
+# Triggered by Claude Code after every Write or Edit tool call.
+# NOTE: Despite the filename, this hook handles both Write and Edit calls.
+# The name is preserved for backward compatibility.
 # Uses the memoryschema package (pip install memory-schema).
 # One hook handles ALL projects — derives project root from file path.
 #
@@ -11,23 +13,29 @@
 
 set -uo pipefail
 
+# Use the Python where memoryschema is installed
+PYTHON="${MEMORYSCHEMA_PYTHON:-/Volumes/RAID0/Users/shehzad/.pyenv/versions/3.12.3/bin/python3}"
+
 # Read JSON from stdin
 INPUT=$(cat)
 
 # Extract tool name and file path
-TOOL_NAME=$(echo "$INPUT" | python3 -c "import sys,json; print(json.load(sys.stdin).get('tool_name',''))" 2>/dev/null)
+TOOL_NAME=$(echo "$INPUT" | "$PYTHON" -c "import sys,json; print(json.load(sys.stdin).get('tool_name',''))" 2>/dev/null)
 
-# Only process Write tool calls
-if [ "$TOOL_NAME" != "Write" ]; then
+# Only process Write and Edit tool calls
+if [ "$TOOL_NAME" != "Write" ] && [ "$TOOL_NAME" != "Edit" ]; then
     exit 0
 fi
 
-FILE_PATH=$(echo "$INPUT" | python3 -c "import sys,json; print(json.load(sys.stdin).get('tool_input',{}).get('file_path',''))" 2>/dev/null)
+FILE_PATH=$(echo "$INPUT" | "$PYTHON" -c "import sys,json; print(json.load(sys.stdin).get('tool_input',{}).get('file_path',''))" 2>/dev/null)
 
 # Only process memory files (path contains /memory/ and ends with .md)
 if [[ "$FILE_PATH" != *"/memory/"* ]] || [[ "$FILE_PATH" != *.md ]]; then
     exit 0
 fi
+
+# Touch sentinel so Stop hook knows a memory file was updated this response
+touch /tmp/claude-memory-chain-updated 2>/dev/null || true
 
 # Skip MEMORY.md index file
 if [[ "$(basename "$FILE_PATH")" == "MEMORY.md" ]]; then
@@ -35,7 +43,7 @@ if [[ "$(basename "$FILE_PATH")" == "MEMORY.md" ]]; then
 fi
 
 # Run the Python indexing pipeline using memoryschema package
-python3 -c "
+"$PYTHON" -c "
 import sys, os
 
 # Derive project root from file path (parent of memory/)

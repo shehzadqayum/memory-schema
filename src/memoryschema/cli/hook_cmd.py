@@ -74,7 +74,7 @@ def install(config, timeout, per_project):
     # Check if already registered
     hook_cmd = f"bash {hook_path}"
     for entry in post_tool:
-        if entry.get("matcher") == "Write":
+        if entry.get("matcher") in ("Write", "Write|Edit"):
             for h in entry.get("hooks", []):
                 if hook_path in h.get("command", ""):
                     click.echo(f"Hook already registered at {settings_file}")
@@ -82,7 +82,7 @@ def install(config, timeout, per_project):
 
     # Add new hook entry
     post_tool.append({
-        "matcher": "Write",
+        "matcher": "Write|Edit",
         "hooks": [{
             "type": "command",
             "command": hook_cmd,
@@ -121,7 +121,7 @@ def uninstall():
     new_post_tool = []
     removed = False
     for entry in post_tool:
-        if entry.get("matcher") == "Write":
+        if entry.get("matcher") in ("Write", "Write|Edit"):
             new_hooks = [h for h in entry.get("hooks", [])
                         if hook_path and hook_path not in h.get("command", "")]
             if len(new_hooks) < len(entry.get("hooks", [])):
@@ -163,7 +163,7 @@ def hook_status():
     post_tool = settings.get("hooks", {}).get("PostToolUse", [])
     registered = False
     for entry in post_tool:
-        if entry.get("matcher") == "Write":
+        if entry.get("matcher") in ("Write", "Write|Edit"):
             for h in entry.get("hooks", []):
                 if hook_path and hook_path in h.get("command", ""):
                     registered = True

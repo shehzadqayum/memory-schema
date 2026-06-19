@@ -261,7 +261,7 @@ def run_checks(config):
             settings = json_mod.load(f)
         post_tool = settings.get("hooks", {}).get("PostToolUse", [])
         for entry in post_tool:
-            if entry.get("matcher") == "Write":
+            if entry.get("matcher") in ("Write", "Write|Edit"):
                 for h in entry.get("hooks", []):
                     if "hook-post-write.sh" in h.get("command", ""):
                         timeout = h.get("timeout", "?")

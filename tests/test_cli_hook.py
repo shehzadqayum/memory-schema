@@ -36,6 +36,35 @@ class TestHookStatus:
         assert "registered" in result.output.lower() or "yes" in result.output.lower()
 
 
+    def test_status_detects_legacy_write_matcher(self, runner, tmp_path):
+        """Backward compat: status finds hooks with old 'Write' matcher."""
+        settings = tmp_path / "settings.json"
+        settings.write_text(json.dumps({
+            "hooks": {"PostToolUse": [{"matcher": "Write", "hooks": [
+                {"type": "command", "command": "bash /path/hook-post-write.sh", "timeout": 10}
+            ]}]}
+        }))
+        with patch("memoryschema.cli.hook_cmd._settings_path", return_value=settings):
+            with patch("memoryschema.cli.hook_cmd._hook_script_path", return_value="/path/hook-post-write.sh"):
+                result = runner.invoke(cli, ["hook", "status"])
+        assert result.exit_code == 0
+        assert "registered" in result.output.lower() or "yes" in result.output.lower()
+
+    def test_status_with_new_matcher(self, runner, tmp_path):
+        """Status finds hooks with new 'Write|Edit' matcher."""
+        settings = tmp_path / "settings.json"
+        settings.write_text(json.dumps({
+            "hooks": {"PostToolUse": [{"matcher": "Write|Edit", "hooks": [
+                {"type": "command", "command": "bash /path/hook-post-write.sh", "timeout": 10}
+            ]}]}
+        }))
+        with patch("memoryschema.cli.hook_cmd._settings_path", return_value=settings):
+            with patch("memoryschema.cli.hook_cmd._hook_script_path", return_value="/path/hook-post-write.sh"):
+                result = runner.invoke(cli, ["hook", "status"])
+        assert result.exit_code == 0
+        assert "registered" in result.output.lower() or "yes" in result.output.lower()
+
+
 class TestHookInstall:
     def test_install_creates_entry(self, runner, tmp_path):
         settings = tmp_path / "settings.json"
@@ -48,6 +77,7 @@ class TestHookInstall:
         assert "Registered" in result.output
         data = json.loads(settings.read_text())
         assert len(data["hooks"]["PostToolUse"]) == 1
+        assert data["hooks"]["PostToolUse"][0]["matcher"] == "Write|Edit"
 
     def test_install_idempotent(self, runner, tmp_path):
         settings = tmp_path / "settings.json"
@@ -65,6 +95,21 @@ class TestHookInstall:
 
 class TestHookUninstall:
     def test_uninstall(self, runner, tmp_path):
+        settings = tmp_path / "settings.json"
+        settings.write_text(json.dumps({
+            "hooks": {"PostToolUse": [{"matcher": "Write", "hooks": [
+                {"type": "command", "command": "bash /pkg/hook-post-write.sh", "timeout": 10}
+            ]}]}
+        }))
+        with patch("memoryschema.cli.hook_cmd._settings_path", return_value=settings):
+            with patch("memoryschema.cli.hook_cmd._hook_script_path", return_value="/pkg/hook-post-write.sh"):
+                result = runner.invoke(cli, ["hook", "uninstall"])
+        assert result.exit_code == 0
+        assert "unregistered" in result.output.lower()
+
+
+    def test_uninstall_legacy_write_matcher(self, runner, tmp_path):
+        """Backward compat: uninstall removes hooks with old 'Write' matcher."""
         settings = tmp_path / "settings.json"
         settings.write_text(json.dumps({
             "hooks": {"PostToolUse": [{"matcher": "Write", "hooks": [

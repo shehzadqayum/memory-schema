@@ -87,10 +87,10 @@ def _write_settings(data):
 
 
 def _hook_already_registered(settings, hook_command_fragment="memoryschema"):
-    """Check if a memory-schema hook is already in PostToolUse Write."""
+    """Check if a memory-schema hook is already in PostToolUse Write|Edit."""
     hooks = settings.get("hooks", {})
     for entry in hooks.get("PostToolUse", []):
-        if entry.get("matcher") == "Write":
+        if entry.get("matcher") in ("Write", "Write|Edit"):
             for h in entry.get("hooks", []):
                 cmd = h.get("command", "")
                 if hook_command_fragment in cmd:
@@ -99,13 +99,13 @@ def _hook_already_registered(settings, hook_command_fragment="memoryschema"):
 
 
 def _add_hook(settings, hook_command):
-    """Add the memory-schema PostToolUse Write hook to settings."""
+    """Add the memory-schema PostToolUse Write|Edit hook to settings."""
     if "hooks" not in settings:
         settings["hooks"] = {}
     if "PostToolUse" not in settings["hooks"]:
         settings["hooks"]["PostToolUse"] = []
     settings["hooks"]["PostToolUse"].append({
-        "matcher": "Write",
+        "matcher": "Write|Edit",
         "hooks": [{
             "type": "command",
             "command": hook_command,
@@ -122,7 +122,7 @@ def _remove_hook(settings, hook_command_fragment="memoryschema"):
     filtered = []
     removed = []
     for entry in post_tool:
-        if entry.get("matcher") == "Write":
+        if entry.get("matcher") in ("Write", "Write|Edit"):
             keep_hooks = []
             for h in entry.get("hooks", []):
                 if hook_command_fragment in h.get("command", ""):
