@@ -70,9 +70,9 @@ def install(config, timeout, per_project):
         click.echo(f"Hook already registered at {settings_file}")
         return
 
-    # Register both hooks
+    # Register both hooks (embed current Python so hook uses the right interpreter)
     stop_path = find_stop_hook_script_path()
-    hook_cmd = f"bash {hook_path}"
+    hook_cmd = f"bash {hook_path} {sys.executable}"
     stop_cmd = f"bash {stop_path}" if stop_path and os.path.exists(stop_path) else None
     register_hooks(settings, hook_cmd, stop_cmd)
 

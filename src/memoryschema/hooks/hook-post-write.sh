@@ -18,8 +18,25 @@
 
 set -uo pipefail
 
-# Use the Python where memoryschema is installed
-PYTHON="${MEMORYSCHEMA_PYTHON:-/Volumes/RAID0/Users/shehzad/.pyenv/versions/3.12.3/bin/python3}"
+# Resolve Python: argument > env var > auto-detect > bare python3
+if [ -n "${1:-}" ] && [ -x "${1:-}" ]; then
+    PYTHON="$1"
+elif [ -n "${MEMORYSCHEMA_PYTHON:-}" ]; then
+    PYTHON="$MEMORYSCHEMA_PYTHON"
+else
+    PYTHON=""
+    for candidate in python3 python; do
+        if command -v "$candidate" >/dev/null 2>&1 && \
+           "$candidate" -c "import memoryschema" >/dev/null 2>&1; then
+            PYTHON="$candidate"
+            break
+        fi
+    done
+    if [ -z "$PYTHON" ]; then
+        echo "hook: cannot find Python with memoryschema installed" >&2
+        exit 0  # Don't block writes
+    fi
+fi
 
 # Read JSON from stdin
 INPUT=$(cat)

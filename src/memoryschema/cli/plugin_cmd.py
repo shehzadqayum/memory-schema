@@ -2,6 +2,7 @@
 
 import json
 import shutil
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -168,7 +169,7 @@ def deploy(config, force):
     hook_script = find_hook_script_path()
     stop_hook_script = find_stop_hook_script_path()
     if hook_script:
-        hook_command = f"bash {hook_script}"
+        hook_command = f"bash {hook_script} {sys.executable}"
         stop_hook_command = f"bash {stop_hook_script}" if stop_hook_script else None
         settings_path = CLAUDE_DIR / "settings.json"
         settings = read_settings(settings_path)
