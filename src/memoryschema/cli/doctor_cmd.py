@@ -312,7 +312,8 @@ def run_checks(config):
 
             t0 = time.time()
             result = subprocess.run(
-                [sys.executable, "-m", "pytest", str(pkg_tests), "-q", "--tb=line"],
+                [sys.executable, "-m", "pytest", str(pkg_tests), "-q", "--tb=line",
+                 "--ignore=" + str(pkg_tests / "test_cli_doctor.py")],
                 capture_output=True, text=True, timeout=120,
                 cwd=str(pkg_root))
             elapsed = time.time() - t0
