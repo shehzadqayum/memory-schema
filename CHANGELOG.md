@@ -6,6 +6,7 @@
 - Hook Python path: replaced hardcoded user-specific path with portable resolution chain (argument > env var > auto-detect > bare python3). `hook install` and `plugin deploy` embed `sys.executable` in the hook command.
 - Doctor test check: now targets the memory-schema package's own tests instead of the consumer project's tests when invoked from another project. Excludes `test_cli_doctor.py` from the subprocess pytest to prevent infinite recursion.
 - Docker detection: `neo4j deploy` and `neo4j status` use `shutil.which` with fallbacks to common locations instead of bare `docker` command that fails in pyenv/poetry environments
+- Neo4j test mocks: updated `test_cli_neo4j.py` to mock `_find_docker()` instead of bare `subprocess.run` after Docker detection refactor
 
 ### Changed (Templates)
 - Synced `memory-working.tpl` and `memory-schema.rules.tpl` from deployed global rules — templates now include chain lifecycle, Edit-not-Write, reasoning accumulation, Write|Edit enforcement, Stop hook docs

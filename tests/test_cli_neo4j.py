@@ -17,9 +17,11 @@ def runner():
 class TestNeo4jStatus:
     def test_status_json_docker_available(self, runner, tmp_path):
         ps_result = MagicMock(stdout="Up 2 hours", returncode=0)
-        with patch("subprocess.run", side_effect=[MagicMock(), ps_result]):
-            with patch("memoryschema.neo4j_store.Neo4jMemoryStore", side_effect=Exception("no")):
-                result = runner.invoke(cli, ["--root", str(tmp_path), "neo4j", "status", "--json"])
+        info_result = MagicMock(returncode=0)
+        with patch("memoryschema.cli.neo4j_cmd._find_docker", return_value="/usr/local/bin/docker"):
+            with patch("subprocess.run", side_effect=[info_result, ps_result]):
+                with patch("memoryschema.neo4j_store.Neo4jMemoryStore", side_effect=Exception("no")):
+                    result = runner.invoke(cli, ["--root", str(tmp_path), "neo4j", "status", "--json"])
         assert result.exit_code == 0
         data = json.loads(result.output)
         assert "container" in data
@@ -28,7 +30,7 @@ class TestNeo4jStatus:
         assert data["connected"] is False
 
     def test_status_json_docker_unavailable(self, runner, tmp_path):
-        with patch("subprocess.run", side_effect=FileNotFoundError):
+        with patch("memoryschema.cli.neo4j_cmd._find_docker", return_value=None):
             result = runner.invoke(cli, ["--root", str(tmp_path), "neo4j", "status", "--json"])
         assert result.exit_code == 0
         data = json.loads(result.output)
@@ -37,14 +39,16 @@ class TestNeo4jStatus:
 
     def test_status_text_container_not_created(self, runner, tmp_path):
         ps_result = MagicMock(stdout="", returncode=0)
-        with patch("subprocess.run", side_effect=[MagicMock(), ps_result]):
-            result = runner.invoke(cli, ["--root", str(tmp_path), "neo4j", "status"])
+        info_result = MagicMock(returncode=0)
+        with patch("memoryschema.cli.neo4j_cmd._find_docker", return_value="/usr/local/bin/docker"):
+            with patch("subprocess.run", side_effect=[info_result, ps_result]):
+                result = runner.invoke(cli, ["--root", str(tmp_path), "neo4j", "status"])
         assert result.exit_code == 0
         assert "Docker:    installed" in result.output
         assert "not created" in result.output
 
     def test_status_text_docker_not_found(self, runner, tmp_path):
-        with patch("subprocess.run", side_effect=FileNotFoundError):
+        with patch("memoryschema.cli.neo4j_cmd._find_docker", return_value=None):
             result = runner.invoke(cli, ["--root", str(tmp_path), "neo4j", "status"])
         assert result.exit_code == 0
         assert "Docker:    not found" in result.output
