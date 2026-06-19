@@ -459,3 +459,19 @@
 2026-06-19 10:20:58	checkpoint	START	—	—
 2026-06-19 10:23:36	checkpoint	END	completed	Session 27: 4/4 PASS, 675 tests, R1 resolved, ledger empty
 2026-06-19 10:24:10	session-close	START	—	—
+2026-06-19 10:25:20	session-close	END	completed	Session 27 closed: 1efd5cb, 7 commits, 675 tests, ledger empty
+2026-06-19 11:04:31	session-open	START	—	—
+2026-06-19 11:05:20	session-open	END	completed	Session 28 briefing, S4 at 1efd5cb (2026-06-19), ledger empty, hook-stop.sh modified
+2026-06-19 11:18:48	plan-commit	START	—	—
+2026-06-19 11:20:02	plan-commit	END	completed	S1 committed and pushed: 6c7745f, no prior residuals
+2026-06-19 11:21:18	implement	START	—	—
+2026-06-19 11:28:25	implement	END	completed	Phase 1: Stop hook fix + Hook Output Formats docs — b174727, 675 tests
+2026-06-19 11:38:00	implement	START	—	—
+2026-06-19 11:40:49	implement	END	completed	Phase 2: _hooks_util.py extracted — 6a76e9a, 675 tests
+2026-06-19 11:41:08	implement	START	—	—
+2026-06-19 11:44:17	implement	END	completed	Phase 3: hook_cmd.py refactored — 7be53b7, -91 lines, 675 tests
+2026-06-19 11:44:33	implement	START	—	—
+2026-06-19 11:57:58	implement	END	completed	Phase 4: plugin_cmd.py refactored — 4830f1d, -128 lines, 675 tests
+2026-06-19 11:58:49	implement	START	—	—
+2026-06-19 12:05:28	implement	END	completed	Phase 5: doctor/main constants + test consolidation — 274a57c, 677 tests, all items complete
+2026-06-19 12:06:26	checkpoint	START	—	—

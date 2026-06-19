@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+### Added (Hook Consolidation)
+- `src/memoryschema/cli/_hooks_util.py` — shared hook management module with `HOOK_MATCHER`/`LEGACY_MATCHERS` constants and 8 utility functions (path resolution, settings I/O, hook registration/removal)
+- `tests/test_hooks_util.py` — 25 tests for shared hook utilities
+- Hook Output Formats section in `docs/technical-reference.md` — documents valid JSON fields per event type
+
+### Changed (Hook Consolidation)
+- `hook_cmd.py` refactored to import from `_hooks_util` (removed 3 inline functions, net -91 lines)
+- `plugin_cmd.py` refactored to import from `_hooks_util` (removed 7 inline functions, net -128 lines)
+- `doctor_cmd.py` and `main.py` use `LEGACY_MATCHERS`/`HOOK_MATCHER` constants instead of magic literals
+- Settings backup (`write_settings(backup=True)`) now applied consistently in both hook and plugin commands
+
 ### Added (Test Coverage)
 - `tests/test_cli_plugin.py` — 42 tests for `plugin_cmd.py` (deploy, uninstall, status commands + 10 helper functions). Resolves residual carried since session 24.
 

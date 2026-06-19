@@ -14,7 +14,7 @@ Three issues with the hook management code:
 
 ---
 
-## Phase 1 — Bug fix + document hook output formats
+## Phase 1 — Bug fix + document hook output formats ✓ b174727
 
 Single commit covering the Stop hook fix and output format documentation.
 
@@ -49,7 +49,7 @@ grep "Hook Output Formats" docs/technical-reference.md
 
 ---
 
-## Phase 2 — Extract shared hook utilities
+## Phase 2 — Extract shared hook utilities ✓ 6a76e9a
 
 **New file:** `src/memoryschema/cli/_hooks_util.py`
 
@@ -84,7 +84,7 @@ python3 -c "from memoryschema.cli._hooks_util import HOOK_MATCHER; print(HOOK_MA
 
 ---
 
-## Phase 3 — Refactor hook_cmd.py to use shared utilities
+## Phase 3 — Refactor hook_cmd.py to use shared utilities ✓ 7be53b7
 
 Replace inline logic with imports from `_hooks_util`:
 
@@ -103,7 +103,7 @@ pytest tests/ -x -q                 # Full regression
 
 ---
 
-## Phase 4 — Refactor plugin_cmd.py to use shared utilities
+## Phase 4 — Refactor plugin_cmd.py to use shared utilities ✓ 4830f1d
 
 Replace inline logic with imports from `_hooks_util`:
 
@@ -122,7 +122,7 @@ pytest tests/ -x -q                  # Full regression
 
 ---
 
-## Phase 5 — Refactor doctor_cmd.py + consolidate tests
+## Phase 5 — Refactor doctor_cmd.py + consolidate tests ✓ 274a57c
 
 ### 5.1 doctor_cmd.py
 
@@ -173,3 +173,9 @@ memoryschema doctor                            # All checks pass
 python3 -c "from memoryschema.cli._hooks_util import HOOK_MATCHER; print(HOOK_MATCHER)"
 grep -rn "Write|Edit" src/memoryschema/cli/    # Only in _hooks_util.py constant
 ```
+
+## Status: COMPLETE
+
+All 5 phases delivered, 5/5 PASS. 677 tests passing (+2 new).
+Net code reduction: ~219 lines removed (duplication eliminated).
+Session report: `docs/reports/2026-06-19-session-report-28.md`
