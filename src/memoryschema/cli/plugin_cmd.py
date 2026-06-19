@@ -65,6 +65,21 @@ def _find_hook_script():
     return None
 
 
+def _find_stop_hook_script():
+    """Find the hook-stop.sh script path."""
+    try:
+        from importlib.resources import files as pkg_files
+        hook_path = Path(str(pkg_files("memoryschema.hooks") / "hook-stop.sh"))
+        if hook_path.exists():
+            return str(hook_path)
+    except Exception:
+        pass
+    candidate = Path(__file__).resolve().parent.parent / "hooks" / "hook-stop.sh"
+    if candidate.exists():
+        return str(candidate)
+    return None
+
+
 def _read_settings():
     """Read ~/.claude/settings.json."""
     settings_path = CLAUDE_DIR / "settings.json"
@@ -98,8 +113,8 @@ def _hook_already_registered(settings, hook_command_fragment="memoryschema"):
     return False, None
 
 
-def _add_hook(settings, hook_command):
-    """Add the memory-schema PostToolUse Write|Edit hook to settings."""
+def _add_hook(settings, hook_command, stop_hook_command=None):
+    """Add the memory-schema PostToolUse Write|Edit and Stop hooks to settings."""
     if "hooks" not in settings:
         settings["hooks"] = {}
     if "PostToolUse" not in settings["hooks"]:
@@ -112,15 +127,27 @@ def _add_hook(settings, hook_command):
             "timeout": 10,
         }],
     })
+    if stop_hook_command:
+        if "Stop" not in settings["hooks"]:
+            settings["hooks"]["Stop"] = []
+        settings["hooks"]["Stop"].append({
+            "hooks": [{
+                "type": "command",
+                "command": stop_hook_command,
+                "timeout": 5,
+            }],
+        })
     return settings
 
 
 def _remove_hook(settings, hook_command_fragment="memoryschema"):
-    """Remove memory-schema PostToolUse Write hook entries from settings."""
+    """Remove memory-schema PostToolUse and Stop hook entries from settings."""
     hooks = settings.get("hooks", {})
+    removed = []
+
+    # Remove PostToolUse entries
     post_tool = hooks.get("PostToolUse", [])
     filtered = []
-    removed = []
     for entry in post_tool:
         if entry.get("matcher") in ("Write", "Write|Edit"):
             keep_hooks = []
@@ -136,6 +163,23 @@ def _remove_hook(settings, hook_command_fragment="memoryschema"):
             filtered.append(entry)
     if "PostToolUse" in hooks:
         settings["hooks"]["PostToolUse"] = filtered
+
+    # Remove Stop hook entries
+    stop_hooks = hooks.get("Stop", [])
+    stop_filtered = []
+    for entry in stop_hooks:
+        keep_hooks = []
+        for h in entry.get("hooks", []):
+            if "hook-stop.sh" in h.get("command", ""):
+                removed.append(h.get("command", ""))
+            else:
+                keep_hooks.append(h)
+        if keep_hooks:
+            entry["hooks"] = keep_hooks
+            stop_filtered.append(entry)
+    if "Stop" in hooks:
+        settings["hooks"]["Stop"] = stop_filtered
+
     return settings, removed
 
 
@@ -248,10 +292,12 @@ def deploy(config, force):
         dirs_created.append("memory")
         click.echo(f"  Created:   {memory_dir}/")
 
-    # 4. Register hook in settings.json
+    # 4. Register hooks in settings.json
     hook_script = _find_hook_script()
+    stop_hook_script = _find_stop_hook_script()
     if hook_script:
         hook_command = f"bash {hook_script}"
+        stop_hook_command = f"bash {stop_hook_script}" if stop_hook_script else None
         settings = _read_settings()
         registered, existing_cmd = _hook_already_registered(settings)
         if registered:
@@ -259,12 +305,14 @@ def deploy(config, force):
             manifest["hook_registered"] = existing_cmd
             manifest["hook_was_existing"] = True
         else:
-            settings = _add_hook(settings, hook_command)
+            settings = _add_hook(settings, hook_command, stop_hook_command)
             _write_settings(settings)
             manifest["hook_registered"] = hook_command
             manifest["hook_was_existing"] = False
             manifest["settings_backup"] = str(CLAUDE_DIR / "settings.json.memory-schema-backup")
             click.echo(f"  Hook:      registered ({hook_command})")
+            if stop_hook_command:
+                click.echo(f"  Stop hook: registered ({stop_hook_command})")
     else:
         click.echo("  Hook:      script not found — register manually with: memoryschema hook install", err=True)
 

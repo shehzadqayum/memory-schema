@@ -50,6 +50,27 @@ class TestHookStatus:
         assert result.exit_code == 0
         assert "registered" in result.output.lower() or "yes" in result.output.lower()
 
+    def test_status_shows_stop_hook(self, runner, tmp_path):
+        """Status reports Stop hook registration state."""
+        settings = tmp_path / "settings.json"
+        settings.write_text(json.dumps({
+            "hooks": {
+                "PostToolUse": [{"matcher": "Write|Edit", "hooks": [
+                    {"type": "command", "command": "bash /path/hook-post-write.sh", "timeout": 10}
+                ]}],
+                "Stop": [{"hooks": [
+                    {"type": "command", "command": "bash /path/hook-stop.sh", "timeout": 5}
+                ]}]
+            }
+        }))
+        with patch("memoryschema.cli.hook_cmd._settings_path", return_value=settings):
+            with patch("memoryschema.cli.hook_cmd._hook_script_path", return_value="/path/hook-post-write.sh"):
+                with patch("memoryschema.cli.hook_cmd._stop_hook_script_path", return_value="/path/hook-stop.sh"):
+                    result = runner.invoke(cli, ["hook", "status"])
+        assert result.exit_code == 0
+        assert "posttooluse: yes" in result.output.lower()
+        assert "stop: yes" in result.output.lower()
+
     def test_status_with_new_matcher(self, runner, tmp_path):
         """Status finds hooks with new 'Write|Edit' matcher."""
         settings = tmp_path / "settings.json"
@@ -71,13 +92,29 @@ class TestHookInstall:
         settings.write_text("{}")
         with patch("memoryschema.cli.hook_cmd._settings_path", return_value=settings):
             with patch("memoryschema.cli.hook_cmd._hook_script_path", return_value="/pkg/hook-post-write.sh"):
-                with patch("os.path.exists", return_value=True):
-                    result = runner.invoke(cli, ["hook", "install"])
+                with patch("memoryschema.cli.hook_cmd._stop_hook_script_path", return_value="/pkg/hook-stop.sh"):
+                    with patch("os.path.exists", return_value=True):
+                        result = runner.invoke(cli, ["hook", "install"])
         assert result.exit_code == 0
         assert "Registered" in result.output
         data = json.loads(settings.read_text())
         assert len(data["hooks"]["PostToolUse"]) == 1
         assert data["hooks"]["PostToolUse"][0]["matcher"] == "Write|Edit"
+
+    def test_install_creates_stop_entry(self, runner, tmp_path):
+        """Install creates both PostToolUse and Stop hook entries."""
+        settings = tmp_path / "settings.json"
+        settings.write_text("{}")
+        with patch("memoryschema.cli.hook_cmd._settings_path", return_value=settings):
+            with patch("memoryschema.cli.hook_cmd._hook_script_path", return_value="/pkg/hook-post-write.sh"):
+                with patch("memoryschema.cli.hook_cmd._stop_hook_script_path", return_value="/pkg/hook-stop.sh"):
+                    with patch("os.path.exists", return_value=True):
+                        result = runner.invoke(cli, ["hook", "install"])
+        assert result.exit_code == 0
+        data = json.loads(settings.read_text())
+        assert "Stop" in data["hooks"]
+        assert len(data["hooks"]["Stop"]) == 1
+        assert "hook-stop.sh" in data["hooks"]["Stop"][0]["hooks"][0]["command"]
 
     def test_install_idempotent(self, runner, tmp_path):
         settings = tmp_path / "settings.json"
@@ -107,6 +144,30 @@ class TestHookUninstall:
         assert result.exit_code == 0
         assert "unregistered" in result.output.lower()
 
+
+    def test_uninstall_removes_stop_entry(self, runner, tmp_path):
+        """Uninstall removes both PostToolUse and Stop hook entries."""
+        settings = tmp_path / "settings.json"
+        settings.write_text(json.dumps({
+            "hooks": {
+                "PostToolUse": [{"matcher": "Write|Edit", "hooks": [
+                    {"type": "command", "command": "bash /pkg/hook-post-write.sh", "timeout": 10}
+                ]}],
+                "Stop": [{"hooks": [
+                    {"type": "command", "command": "bash /pkg/hook-stop.sh", "timeout": 5}
+                ]}]
+            }
+        }))
+        with patch("memoryschema.cli.hook_cmd._settings_path", return_value=settings):
+            with patch("memoryschema.cli.hook_cmd._hook_script_path", return_value="/pkg/hook-post-write.sh"):
+                with patch("memoryschema.cli.hook_cmd._stop_hook_script_path", return_value="/pkg/hook-stop.sh"):
+                    result = runner.invoke(cli, ["hook", "uninstall"])
+        assert result.exit_code == 0
+        assert "posttooluse" in result.output.lower() or "unregistered" in result.output.lower()
+        assert "stop" in result.output.lower()
+        data = json.loads(settings.read_text())
+        assert len(data["hooks"]["PostToolUse"]) == 0
+        assert len(data["hooks"]["Stop"]) == 0
 
     def test_uninstall_legacy_write_matcher(self, runner, tmp_path):
         """Backward compat: uninstall removes hooks with old 'Write' matcher."""

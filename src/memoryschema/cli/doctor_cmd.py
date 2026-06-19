@@ -283,6 +283,22 @@ def run_checks(config):
             return False, "cannot locate hook", "Reinstall: pip install memory-schema"
     checks.append(_check("hook_script", check_hook_script))
 
+    # 17b. Stop hook registered
+    def check_stop_hook():
+        settings_path = Path.home() / ".claude" / "settings.json"
+        if not settings_path.exists():
+            return False, "~/.claude/settings.json not found", "Run: memoryschema hook install"
+        with open(settings_path) as f:
+            settings = json_mod.load(f)
+        stop_hooks = settings.get("hooks", {}).get("Stop", [])
+        for entry in stop_hooks:
+            for h in entry.get("hooks", []):
+                if "hook-stop.sh" in h.get("command", ""):
+                    timeout = h.get("timeout", "?")
+                    return True, f"registered (timeout: {timeout}s)", None
+        return False, "not registered", "Run: memoryschema hook install"
+    checks.append(_check("stop_hook", check_stop_hook))
+
     # 18. Tests
     def check_tests():
         try:

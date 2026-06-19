@@ -1,4 +1,4 @@
-"""PostToolUse hook management."""
+"""PostToolUse and Stop hook management."""
 
 import json
 import os
@@ -22,16 +22,24 @@ def _settings_path(per_project=False, project_root=None):
 
 
 def _hook_script_path():
-    """Resolve the installed hook script path."""
+    """Resolve the installed PostToolUse hook script path."""
     try:
         return str(files("memoryschema.hooks") / "hook-post-write.sh")
     except Exception:
         return None
 
 
+def _stop_hook_script_path():
+    """Resolve the installed Stop hook script path."""
+    try:
+        return str(files("memoryschema.hooks") / "hook-stop.sh")
+    except Exception:
+        return None
+
+
 @click.group()
 def hook():
-    """Manage PostToolUse Write hook for Claude Code.
+    """Manage PostToolUse and Stop hooks for Claude Code.
 
     Commands: install, uninstall, status, test.
     """
@@ -90,14 +98,36 @@ def install(config, timeout, per_project):
         }]
     })
 
+    # Register Stop hook for chain update reminders
+    stop_path = _stop_hook_script_path()
+    if stop_path and os.path.exists(stop_path):
+        stop_hooks = hooks.setdefault("Stop", [])
+        stop_already = False
+        for entry in stop_hooks:
+            for h in entry.get("hooks", []):
+                if stop_path in h.get("command", ""):
+                    stop_already = True
+                    break
+        if not stop_already:
+            stop_hooks.append({
+                "hooks": [{
+                    "type": "command",
+                    "command": f"bash {stop_path}",
+                    "timeout": 5,
+                }]
+            })
+
     settings_file.parent.mkdir(parents=True, exist_ok=True)
     with open(settings_file, 'w') as f:
         json.dump(settings, f, indent=2)
 
-    click.echo(f"Registered PostToolUse Write hook.")
+    click.echo(f"Registered PostToolUse Write|Edit hook.")
     click.echo(f"  Settings: {settings_file}")
     click.echo(f"  Script:   {hook_path}")
     click.echo(f"  Timeout:  {timeout}s")
+    if stop_path and os.path.exists(stop_path):
+        click.echo(f"Registered Stop hook.")
+        click.echo(f"  Script:   {stop_path}")
 
 
 @hook.command()
@@ -132,11 +162,32 @@ def uninstall():
         else:
             new_post_tool.append(entry)
 
-    if removed:
+    # Also remove Stop hook entries
+    stop_path = _stop_hook_script_path()
+    stop_hooks = settings.get("hooks", {}).get("Stop", [])
+    new_stop = []
+    stop_removed = False
+    for entry in stop_hooks:
+        keep_hooks = [h for h in entry.get("hooks", [])
+                      if stop_path and stop_path not in h.get("command", "")]
+        if len(keep_hooks) < len(entry.get("hooks", [])):
+            stop_removed = True
+        if keep_hooks:
+            entry["hooks"] = keep_hooks
+            new_stop.append(entry)
+        elif not entry.get("hooks"):
+            new_stop.append(entry)
+
+    if removed or stop_removed:
         settings["hooks"]["PostToolUse"] = new_post_tool
+        if stop_removed:
+            settings["hooks"]["Stop"] = new_stop
         with open(settings_file, 'w') as f:
             json.dump(settings, f, indent=2)
-        click.echo("Hook unregistered.")
+        if removed:
+            click.echo("PostToolUse hook unregistered.")
+        if stop_removed:
+            click.echo("Stop hook unregistered.")
     else:
         click.echo("Hook not found in settings.")
 
@@ -160,19 +211,37 @@ def hook_status():
     with open(settings_file) as f:
         settings = json.load(f)
 
+    # Check PostToolUse hook
     post_tool = settings.get("hooks", {}).get("PostToolUse", [])
-    registered = False
+    post_registered = False
     for entry in post_tool:
         if entry.get("matcher") in ("Write", "Write|Edit"):
             for h in entry.get("hooks", []):
                 if hook_path and hook_path in h.get("command", ""):
-                    registered = True
-                    click.echo(f"Registered: yes")
-                    click.echo(f"  Timeout: {h.get('timeout', '?')}s")
-                    return
+                    post_registered = True
+                    click.echo(f"PostToolUse: yes (timeout: {h.get('timeout', '?')}s)")
+                    break
+            if post_registered:
+                break
+    if not post_registered:
+        click.echo(f"PostToolUse: no")
+        click.echo(f"  Fix: Run 'memoryschema hook install'")
 
-    click.echo(f"Registered: no")
-    click.echo(f"Fix: Run 'memoryschema hook install'")
+    # Check Stop hook
+    stop_path = _stop_hook_script_path()
+    stop_hooks = settings.get("hooks", {}).get("Stop", [])
+    stop_registered = False
+    for entry in stop_hooks:
+        for h in entry.get("hooks", []):
+            if stop_path and stop_path in h.get("command", ""):
+                stop_registered = True
+                click.echo(f"Stop: yes (timeout: {h.get('timeout', '?')}s)")
+                break
+        if stop_registered:
+            break
+    if not stop_registered:
+        click.echo(f"Stop: no")
+        click.echo(f"  Fix: Run 'memoryschema hook install'")
 
 
 @hook.command()
