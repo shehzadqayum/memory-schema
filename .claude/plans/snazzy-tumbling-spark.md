@@ -10,7 +10,7 @@ The template files in `src/memoryschema/templates/` are stale snapshots from an 
 
 ---
 
-## Phase 1 — Replace templates with current global rules content
+## Phase 1 — Replace templates with current global rules content ✓ 36ea88f
 
 ### 1.1 `src/memoryschema/templates/memory-working.tpl`
 
@@ -30,7 +30,7 @@ pytest tests/ -x -q  # All tests pass
 
 ---
 
-## Phase 2 — Documentation alignment audit
+## Phase 2 — Documentation alignment audit ✓ 36ea88f
 
 Verify all docs reflect that templates are now current. Same pattern as sessions 29/30.
 
@@ -64,3 +64,9 @@ pytest tests/ -x -q  # Still green
 | `CHANGELOG.md` | Changed entry for template sync | 2.1 |
 | `docs/technical-reference.md` | Verify/update template references | 2.2 |
 | `README.md` | Verify/update init description | 2.3 |
+
+## Status: COMPLETE
+
+All 2 phases delivered, 2/2 PASS. 707 tests passing.
+Templates verified identical to plugin rules via diff.
+Session report: `docs/reports/2026-06-19-session-report-31.md`
