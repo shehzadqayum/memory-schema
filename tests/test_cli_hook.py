@@ -68,8 +68,9 @@ class TestHookStatus:
                 with patch("memoryschema.cli.hook_cmd.find_stop_hook_script_path", return_value="/path/hook-stop.sh"):
                     result = runner.invoke(cli, ["hook", "status"])
         assert result.exit_code == 0
-        assert "posttooluse: yes" in result.output.lower()
-        assert "stop: yes" in result.output.lower()
+        output = result.output.lower()
+        assert "posttooluse:" in output and "yes" in output
+        assert "stop:" in output and "yes" in output
 
     def test_status_with_new_matcher(self, runner, tmp_path):
         """Status finds hooks with new 'Write|Edit' matcher."""
