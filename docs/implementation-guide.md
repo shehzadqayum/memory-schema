@@ -71,6 +71,8 @@ This adds the PostToolUse and Stop hooks to `~/.claude/settings.json` (global). 
 
 **Note:** The hook installs globally, not per-project. On multi-project machines, the hook runs for all projects. This is safe — the hook derives the project root from the file path and only processes files under `memory/`.
 
+**Upgrading existing installations:** If you installed hooks before the Write|Edit or Stop hook changes, run `memoryschema hook upgrade` to update. Use `memoryschema hook scan` to check all projects.
+
 ## Step 6: Verify
 
 ```bash
@@ -144,7 +146,7 @@ pip install memory-schema[all,dev]
 pytest tests/ -v --cov=memoryschema
 ```
 
-677 tests across 36 files. External dependencies are mocked — no Docker or API keys needed to run tests. 2 additional Neo4j integration tests run with `pytest -m integration`.
+707 tests across 36 files. External dependencies are mocked — no Docker or API keys needed to run tests. 2 additional Neo4j integration tests run with `pytest -m integration`.
 
 ### Write tests for custom ingest scripts
 

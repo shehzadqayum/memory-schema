@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+### Added (Hook Management System)
+- `memoryschema hook upgrade` — upgrade stale installations (Write→Write|Edit, add Stop hook) with `--dry-run` and `--per-project` flags
+- `memoryschema hook check` — 8 diagnostic checks (script existence, executability, Python interpreter, dry-run both hooks, sentinel writable) with `--json` output
+- `memoryschema hook scan` — cross-project hook installation discovery with version table and `--json` output
+- `HOOK_VERSION` constant for version tracking (v0=not installed, v1=Write only, v2=Write|Edit+Stop)
+- `get_hook_registration_detail()` — core inspection function for staleness, script health, upgrade needs
+- `upgrade_hooks()` — in-place upgrade of stale hook registrations
+- `find_project_settings()` — scan directories for .claude/settings.json files
+- `validate_hook_python()` — check Python interpreter referenced by hook scripts
+- `dry_run_post_tool_use_hook()` / `dry_run_stop_hook()` — non-destructive hook testing
+
+### Added (Chain Reasoning)
+- Chain reasoning accumulation: `<memory:reasoning>` now appends with `---` separator for chain-* entities (preserves narrative evolution). Standalone entities retain replace behavior.
+
 ### Added (Hook Consolidation)
 - `src/memoryschema/cli/_hooks_util.py` — shared hook management module with `HOOK_MATCHER`/`LEGACY_MATCHERS` constants and 8 utility functions (path resolution, settings I/O, hook registration/removal)
 - `tests/test_hooks_util.py` — 25 tests for shared hook utilities

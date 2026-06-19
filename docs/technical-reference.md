@@ -241,7 +241,7 @@ from memoryschema import Neo4jMemoryStore, embed_text, embed_batch, rerank
 | `memoryschema.audit` | Append-only mutation log with field-level change tracking |
 | `memoryschema.l0_budget` | MEMORY.md token budget enforcement with score-based eviction |
 | `memoryschema.write_gate` | Three-verdict write gate: ACCEPT/REJECT/QUARANTINE pipeline |
-| `memoryschema.cli._hooks_util` | Shared hook utilities: path resolution, settings I/O, registration/removal (HOOK_MATCHER, LEGACY_MATCHERS constants) |
+| `memoryschema.cli._hooks_util` | Shared hook utilities: path resolution, settings I/O, registration/removal/upgrade, version detection, diagnostics, cross-project scan (HOOK_MATCHER, LEGACY_MATCHERS, HOOK_VERSION constants) |
 | `memoryschema.numeric_probe` | Numeric contradiction detection: extract_claims, compare |
 | `memoryschema.cli.eval_cmd` | Evaluation harness: recall@k, MRR, nDCG metrics |
 | `memoryschema.cli.reflect_cmd` | Episodic clustering and semantic summary synthesis |
@@ -280,7 +280,7 @@ from memoryschema import Neo4jMemoryStore, embed_text, embed_batch, rerank
 | `clean` | Lifecycle | `--confirm`, `--dry-run` | Complete removal of memory system |
 | `export` | Data | `--format` (tar/jsonl/md), `--output` | Portable archive for moving to another project |
 | `import` | Data | `--format` | Import from portable archive |
-| `hook` | Hooks | install `--timeout --per-project`, uninstall, status, test | Manage PostToolUse and Stop hooks |
+| `hook` | Hooks | install, uninstall, status `--json`, upgrade `--dry-run --per-project`, check `--json`, scan `--json --scan-dir`, test | Manage PostToolUse and Stop hooks (version tracking, upgrade, diagnostics, cross-project scan) |
 | `force` | Audit | `--type`, `--target`, `--level` | Record typed force event (world-change) |
 | `decline` | Audit | `--reason`, `--name-hint` | Record write decline (salience instrumentation) |
 | `doctor` | Diagnostics | `--fix`, `--json` | 21-point health check |
@@ -318,7 +318,7 @@ from memoryschema import Neo4jMemoryStore, embed_text, embed_batch, rerank
 
 ### Coverage
 
-677 tests across 36 files + 2 Neo4j integration (deselected by default). 22/22 doctor checks.
+707 tests across 36 files + 2 Neo4j integration (deselected by default). 22/22 doctor checks.
 
 | Category | Files | Tests |
 |----------|------:|------:|
@@ -330,7 +330,7 @@ from memoryschema import Neo4jMemoryStore, embed_text, embed_batch, rerank
 | CLI commands | 11 | 84 |
 | Eval + metrics | 1 | 24 |
 | Other (tags, discovery, decline) | 3 | 35 |
-| **Total (collected)** | **36** | **677** |
+| **Total (collected)** | **36** | **707** |
 | Neo4j integration (deselected, `pytest -m integration`) | — | 2 |
 
 ### Mocking Patterns

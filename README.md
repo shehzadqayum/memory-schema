@@ -190,8 +190,11 @@ Each external service is optional. The system degrades gracefully:
 | `memoryschema voyage test <text>` | Embed text, show vector stats |
 | `memoryschema hook install` | Register PostToolUse and Stop hooks |
 | `memoryschema hook uninstall` | Remove PostToolUse and Stop hooks |
-| `memoryschema hook status` | Show hook registration (both types) |
-| `memoryschema hook test` | Test hook execution |
+| `memoryschema hook status` | Show version, staleness, registration |
+| `memoryschema hook upgrade` | Upgrade stale hooks to current version (v2) |
+| `memoryschema hook check` | Run 8 diagnostic checks on hook scripts |
+| `memoryschema hook scan` | Find all hook installations across projects |
+| `memoryschema hook test` | Test hook execution on a memory file |
 
 ### Operations
 | Command | Description |
@@ -344,7 +347,7 @@ pytest tests/ --cov=memoryschema --cov-report=term-missing
 pytest tests/test_store.py -v
 ```
 
-**677 tests** across 36 test files covering all modules:
+**707 tests** across 36 test files covering all modules:
 
 | Category | Files | Tests | What's tested |
 |----------|------:|------:|---------------|

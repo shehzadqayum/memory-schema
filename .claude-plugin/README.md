@@ -51,6 +51,17 @@ Fires on every Write or Edit to `memory/*.md`. The hook:
 
 Fires at the end of every Claude response. If an active chain exists (`memory/.active_chain`) but no memory write occurred during the response (sentinel absent), injects a reminder via `systemMessage` to update the chain entity.
 
+### Hook management
+
+- `memoryschema hook status` — shows version (v0/v1/v2), staleness, script health
+- `memoryschema hook upgrade` — upgrades stale installations (Write→Write|Edit, adds Stop hook)
+- `memoryschema hook check` — runs 8 diagnostic checks (script existence, executability, dry-run)
+- `memoryschema hook scan` — finds all installations across projects, reports version table
+
+### Chain reasoning accumulation
+
+For chain entities (`chain-*` prefix), reasoning accumulates across updates with `---` separators, preserving the narrative evolution. Standalone entities replace reasoning on each update.
+
 ### Rules
 
 - **memory-schema.md** — Schema rules (entity structure, fields, relations, scoring, storage)
