@@ -426,3 +426,16 @@
 2026-06-16 17:35:45	checkpoint	START	—	—
 2026-06-16 17:37:11	checkpoint	END	completed	Session 25 — bootstrap skill 3/3 PASS, 0 new residuals
 2026-06-16 17:38:33	session-close	START	—	—
+2026-06-16 17:41:14	session-close	END	completed	Session 25 — ebdc331 — bootstrap skill complete, 1 residual carried
+2026-06-18 22:41:46	session-open	END	completed	Session 26 briefing from packages/memory-schema, last S4 at ebdc331 (2026-06-16)
+2026-06-19 06:07:51	session-open	START	—	—
+2026-06-19 06:08:17	session-open	END	completed	Session 26 briefing, S4 at ebdc331 (2026-06-16), new session, 1 residual carried
+2026-06-19 07:59:08	plan-commit	START	—	—
+2026-06-19 08:07:14	plan-commit	END	completed	S1 committed and pushed: ba597b7, 1 residual deferred (plugin_cmd.py test coverage)
+2026-06-19 08:08:06	implement	START	—	—
+2026-06-19 08:16:42	implement	END	completed	Phase 1: Write|Edit matcher + sentinel touch — 9048165, 630 tests passing
+2026-06-19 08:22:17	implement	START	—	—
+2026-06-19 08:27:59	implement	END	completed	Phase 2: Stop hook script + registration — 0423a40, 633 tests passing
+2026-06-19 08:32:15	implement	START	—	—
+2026-06-19 08:35:40	implement	END	completed	Phase 3: Edit-not-Write docs — 371f708, 633 tests passing
+2026-06-19 08:36:39	implement	START	—	—

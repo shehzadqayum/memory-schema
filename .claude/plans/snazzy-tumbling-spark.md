@@ -22,7 +22,7 @@ Single source of truth is the package at `/Volumes/RAID0/Users/shehzad/Claude/pa
 
 ---
 
-## Phase 1 — Widen hook matcher to `Write|Edit` + sentinel touch
+## Phase 1 — Widen hook matcher to `Write|Edit` + sentinel touch ✓ 9048165
 
 ### 1.1 hook-post-write.sh
 
@@ -98,7 +98,7 @@ echo '{"tool_name":"Read","tool_input":{"file_path":"memory/test.md"}}' | bash s
 
 ---
 
-## Phase 2 — Stop hook script + registration
+## Phase 2 — Stop hook script + registration ✓ 0423a40
 
 ### 2.1 New Stop hook script
 
@@ -211,7 +211,7 @@ rm -rf /tmp/test-stop
 
 ---
 
-## Phase 3 — Documentation: Edit-not-Write guidance
+## Phase 3 — Documentation: Edit-not-Write guidance ✓ 371f708
 
 ### 3.1 docs/schema.md (source of truth)
 
@@ -274,7 +274,7 @@ The upsert semantics at the index layer handle accumulation (only works because 
 
 ---
 
-## Phase 4 — Deploy + cleanup
+## Phase 4 — Deploy + cleanup ✓ deployed
 
 ### 4.1 Deploy to global settings
 
