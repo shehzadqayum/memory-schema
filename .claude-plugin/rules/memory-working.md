@@ -37,7 +37,7 @@ NEVER use Write on an existing chain file — it replaces the entire file, riski
 Three targeted Edits per update:
 1. **Append** new `<memory:observation>` before `</memory:observations>`
 2. **Replace** `<memory:description>` content
-3. **Replace** `<memory:reasoning>` content
+3. **Append** to `<memory:reasoning>` — add new narrative after a `---` separator, preserving prior reasoning
 
 The upsert semantics at the index layer handle accumulation (only works because the chain is authorised):
 - Observations are APPENDED (each step adds to the list)

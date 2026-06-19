@@ -51,6 +51,11 @@ When updating a chain entity, use the **Edit** tool (not Write). Write replaces 
 entire file — if a previous observation is omitted, it is lost from the authoritative
 `.md` source. Edit preserves existing content and targets only the changed sections.
 
+Three targeted Edits per update:
+1. **Append** new `<memory:observation>` before `</memory:observations>`
+2. **Replace** `<memory:description>` with updated summary
+3. **Append** to `<memory:reasoning>` — add new narrative after a `---` separator, preserving prior reasoning
+
 ## Write decline instrumentation
 
 When the selective-write policy above is weighed and the decision is **not** to write, record a decline:

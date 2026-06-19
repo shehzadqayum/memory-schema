@@ -217,7 +217,7 @@ Only ONE memory can be authorised at a time: the active chain, tracked in `memor
 | `importance` | Set | Replaced if provided |
 | `status` | Set | Replaced (server-managed: auto-set by SUPERSEDES, archive, quarantine) |
 | `observations` | Set | Appended (exact duplicates skipped) |
-| `reasoning` | Set | Replaced if provided |
+| `reasoning` | Set | Replaced if provided (standalone) / Appended with `---` separator (chain entities) |
 | `prompt` | Set | Replaced if provided |
 | `chain` | Set | Replaced if provided |
 | `relations` | Set | Appended (deduped by target+type) |
@@ -513,7 +513,7 @@ A **chain entity** is a memory that represents a sequence of reasoning steps fro
 Chain entities are **live accumulating** — they grow with each response in a session:
 
 1. **Create** — `memoryschema chain start <name>` authorises the entity for writes. First response creates `memory/<name>.md` with Step 1.
-2. **Update** — the authorised chain accepts upserts. Use the Edit tool (not Write) to update chain files — three targeted edits per response: append observation, replace description, replace reasoning. Write overwrites the entire `.md` file, risking observation loss. Observations append (each step adds). Description and reasoning are replaced (evolving summary). Relations merge (USES links accumulate). All other memories remain unauthorised (read-only).
+2. **Update** — the authorised chain accepts upserts. Use the Edit tool (not Write) to update chain files — three targeted edits per response: append observation, replace description, append reasoning (separated by `---`). Write overwrites the entire `.md` file, risking observation loss. Observations append (each step adds). Description is replaced (evolving summary). Reasoning accumulates with `---` separators (preserving the narrative evolution). Relations merge (USES links accumulate). All other memories remain unauthorised (read-only).
 3. **Release** — `memoryschema chain release` transitions the chain to unauthorised (read-only, permanent). Append a "Conclusion:" observation before releasing.
 4. **New chain** — if the topic changes, release the current chain and start a new one. Only one chain can be authorised at a time.
 

@@ -272,9 +272,17 @@ class MemoryStore:
 
         # Merge (schema, filepath, project are immutable after creation)
         for key in ('type', 'status', 'description', 'importance',
-                     'body', 'prompt', 'reasoning', 'chain', 'confidence'):
+                     'body', 'prompt', 'chain', 'confidence'):
             if key in memory_dict and memory_dict[key] is not None:
                 existing[key] = memory_dict[key]
+
+        # Reasoning: append for chain entities, replace for standalone
+        if 'reasoning' in memory_dict and memory_dict['reasoning'] is not None:
+            name = existing.get('name', '')
+            if name.startswith('chain-') and existing.get('reasoning'):
+                existing['reasoning'] = existing['reasoning'] + '\n---\n' + memory_dict['reasoning']
+            else:
+                existing['reasoning'] = memory_dict['reasoning']
 
         # Observation merge (append, deduplicate by text)
         existing_obs = existing.get('observations', [])
