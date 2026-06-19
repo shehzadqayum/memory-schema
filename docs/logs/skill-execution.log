@@ -477,3 +477,11 @@
 2026-06-19 12:06:26	checkpoint	START	—	—
 2026-06-19 12:08:58	checkpoint	END	completed	Session 28: 5/5 PASS, 677 tests, ledger empty
 2026-06-19 12:09:28	session-close	START	—	—
+2026-06-19 12:10:42	session-close	END	completed	Session 28 closed: add5988, 8 commits, 677 tests, ledger empty
+2026-06-19 12:11:37	session-open	START	—	—
+2026-06-19 12:12:43	session-open	END	completed	Session 29 briefing, S4 at add5988 (2026-06-19), ledger empty
+2026-06-19 12:20:12	plan-commit	START	—	—
+2026-06-19 12:21:30	plan-commit	END	completed	S1 committed and pushed: 96e00c4, no prior residuals
+2026-06-19 12:21:59	implement	START	—	—
+2026-06-19 12:29:36	implement	END	completed	Docs alignment: 4 files fixed in single commit — 318864c, 677 tests, all items complete
+2026-06-19 12:31:09	checkpoint	START	—	—
