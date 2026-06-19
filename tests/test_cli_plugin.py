@@ -500,3 +500,94 @@ class TestUninstall:
         assert "Unhooked" not in result.output
         settings = json.loads(settings_path.read_text())
         assert len(settings["hooks"]["PostToolUse"]) > 0
+
+
+# ---------------------------------------------------------------------------
+# 4. Status command tests
+# ---------------------------------------------------------------------------
+
+class TestStatus:
+    def test_not_deployed(self, runner, tmp_path):
+        """No manifest → 'Not deployed' message."""
+        claude_dir = tmp_path / ".claude"
+        claude_dir.mkdir()
+        manifest_path = claude_dir / "manifest.json"
+        with patch("memoryschema.cli.plugin_cmd.CLAUDE_DIR", claude_dir), \
+             patch("memoryschema.cli.plugin_cmd.MANIFEST_PATH", manifest_path):
+            result = runner.invoke(cli, ["plugin", "status"], catch_exceptions=False)
+        assert result.exit_code == 0
+        assert "Not deployed" in result.output
+
+    def test_deployed_healthy(self, runner, tmp_path, plugin_dir):
+        """All files present, hook registered → clean status."""
+        claude_dir = tmp_path / ".claude"
+        claude_dir.mkdir(exist_ok=True)
+        manifest_path = claude_dir / "memory-schema-manifest.json"
+
+        # Deploy first
+        with patch("memoryschema.cli.plugin_cmd.CLAUDE_DIR", claude_dir), \
+             patch("memoryschema.cli.plugin_cmd.MANIFEST_PATH", manifest_path), \
+             patch("memoryschema.cli.plugin_cmd._find_plugin_dir", return_value=plugin_dir), \
+             patch("memoryschema.cli.plugin_cmd._find_hook_script", return_value="/pkg/memoryschema/hook.sh"), \
+             patch("memoryschema.cli.plugin_cmd._find_stop_hook_script", return_value="/pkg/memoryschema/stop.sh"):
+            runner.invoke(cli, ["plugin", "deploy"], catch_exceptions=False)
+
+        # Check status
+        with patch("memoryschema.cli.plugin_cmd.CLAUDE_DIR", claude_dir), \
+             patch("memoryschema.cli.plugin_cmd.MANIFEST_PATH", manifest_path):
+            result = runner.invoke(cli, ["plugin", "status"], catch_exceptions=False)
+        assert result.exit_code == 0
+        assert "Version:" in result.output
+        assert "0 missing" in result.output
+        assert "registered" in result.output.lower()
+
+    def test_missing_files(self, runner, tmp_path, plugin_dir):
+        """Some deployed files deleted → reports missing count."""
+        claude_dir = tmp_path / ".claude"
+        claude_dir.mkdir(exist_ok=True)
+        manifest_path = claude_dir / "memory-schema-manifest.json"
+
+        # Deploy
+        with patch("memoryschema.cli.plugin_cmd.CLAUDE_DIR", claude_dir), \
+             patch("memoryschema.cli.plugin_cmd.MANIFEST_PATH", manifest_path), \
+             patch("memoryschema.cli.plugin_cmd._find_plugin_dir", return_value=plugin_dir), \
+             patch("memoryschema.cli.plugin_cmd._find_hook_script", return_value="/pkg/memoryschema/hook.sh"), \
+             patch("memoryschema.cli.plugin_cmd._find_stop_hook_script", return_value="/pkg/memoryschema/stop.sh"):
+            runner.invoke(cli, ["plugin", "deploy"], catch_exceptions=False)
+
+        # Delete some deployed files
+        for _, dst_rel in SKILL_FILES[:2]:
+            (claude_dir / dst_rel).unlink()
+
+        # Check status
+        with patch("memoryschema.cli.plugin_cmd.CLAUDE_DIR", claude_dir), \
+             patch("memoryschema.cli.plugin_cmd.MANIFEST_PATH", manifest_path):
+            result = runner.invoke(cli, ["plugin", "status"], catch_exceptions=False)
+        assert result.exit_code == 0
+        assert "2 missing" in result.output
+        assert "Missing:" in result.output
+
+    def test_hook_not_registered(self, runner, tmp_path, plugin_dir):
+        """Hook absent from settings → reports NOT registered."""
+        claude_dir = tmp_path / ".claude"
+        claude_dir.mkdir(exist_ok=True)
+        manifest_path = claude_dir / "memory-schema-manifest.json"
+
+        # Deploy
+        with patch("memoryschema.cli.plugin_cmd.CLAUDE_DIR", claude_dir), \
+             patch("memoryschema.cli.plugin_cmd.MANIFEST_PATH", manifest_path), \
+             patch("memoryschema.cli.plugin_cmd._find_plugin_dir", return_value=plugin_dir), \
+             patch("memoryschema.cli.plugin_cmd._find_hook_script", return_value="/pkg/memoryschema/hook.sh"), \
+             patch("memoryschema.cli.plugin_cmd._find_stop_hook_script", return_value="/pkg/memoryschema/stop.sh"):
+            runner.invoke(cli, ["plugin", "deploy"], catch_exceptions=False)
+
+        # Remove hook from settings
+        settings_path = claude_dir / "settings.json"
+        settings_path.write_text("{}")
+
+        # Check status
+        with patch("memoryschema.cli.plugin_cmd.CLAUDE_DIR", claude_dir), \
+             patch("memoryschema.cli.plugin_cmd.MANIFEST_PATH", manifest_path):
+            result = runner.invoke(cli, ["plugin", "status"], catch_exceptions=False)
+        assert result.exit_code == 0
+        assert "NOT registered" in result.output
