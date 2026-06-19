@@ -7,6 +7,11 @@
 # Uses the memoryschema package (pip install memory-schema).
 # One hook handles ALL projects — derives project root from file path.
 #
+# Output format (PostToolUse event):
+#   PostToolUse hooks support hookSpecificOutput with additionalContext.
+#   This hook returns no stdout JSON (pass-through via exit code only).
+#   See docs/technical-reference.md § Hook Output Formats.
+#
 # Exit codes:
 #   0 — success (or non-memory write, silently ignored)
 #   2 — flag for Claude review (indexing error)

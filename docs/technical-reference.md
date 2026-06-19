@@ -119,6 +119,55 @@ Query → embed query → vector k-NN seeds → cascade BFS
 
 ---
 
+## Hook Output Formats
+
+Hooks communicate with Claude Code by printing JSON to stdout. The valid fields depend on the event type.
+
+### Common Fields (all event types)
+
+| Field | Type | Effect |
+|-------|------|--------|
+| `continue` | boolean | If `false`, abort the current operation |
+| `suppressOutput` | boolean | Hide the hook's output from the user |
+| `stopReason` | string | Reason shown when `continue: false` |
+| `decision` | string | PreToolUse only: `"allow"`, `"deny"`, `"ask"` |
+| `reason` | string | Explanation for the decision |
+| `systemMessage` | string | Injected into Claude's context as a system message |
+
+### Event-Specific: `hookSpecificOutput`
+
+The `hookSpecificOutput` object (with `hookEventName` and `additionalContext`) is only valid for certain event types:
+
+| Event Type | `hookSpecificOutput` supported? |
+|------------|-------------------------------|
+| PreToolUse | Yes |
+| PostToolUse | Yes |
+| UserPromptSubmit | Yes |
+| **Stop** | **No** — use `systemMessage` instead |
+| **SessionStart** | **No** |
+| **PreCompact** | **No** |
+
+> **Common mistake:** Using `hookSpecificOutput.additionalContext` in a Stop hook. Claude Code silently ignores this field for Stop events. Use `systemMessage` at the top level instead.
+
+### Examples
+
+**Stop hook (correct):**
+```json
+{"systemMessage": "Reminder: update the active chain entity."}
+```
+
+**Stop hook (WRONG — will be ignored):**
+```json
+{"hookSpecificOutput": {"hookEventName": "Stop", "additionalContext": "..."}}
+```
+
+**PostToolUse hook (correct — either form works):**
+```json
+{"hookSpecificOutput": {"hookEventName": "PostToolUse", "additionalContext": "..."}}
+```
+
+---
+
 ## Audit Trail
 
 All mutations and gate decisions are logged to `memory/audit.jsonl` (append-only, never truncated).
@@ -230,7 +279,7 @@ from memoryschema import Neo4jMemoryStore, embed_text, embed_batch, rerank
 | `clean` | Lifecycle | `--confirm`, `--dry-run` | Complete removal of memory system |
 | `export` | Data | `--format` (tar/jsonl/md), `--output` | Portable archive for moving to another project |
 | `import` | Data | `--format` | Import from portable archive |
-| `hook` | Hooks | install `--timeout --per-project`, uninstall, status, test | Manage PostToolUse hook |
+| `hook` | Hooks | install `--timeout --per-project`, uninstall, status, test | Manage PostToolUse and Stop hooks |
 | `force` | Audit | `--type`, `--target`, `--level` | Record typed force event (world-change) |
 | `decline` | Audit | `--reason`, `--name-hint` | Record write decline (salience instrumentation) |
 | `doctor` | Diagnostics | `--fix`, `--json` | 21-point health check |

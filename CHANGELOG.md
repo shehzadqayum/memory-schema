@@ -11,6 +11,9 @@
 - Stop hook registration in `hook_cmd.py` install/uninstall/status and `plugin_cmd.py` deploy/uninstall
 - Stop hook health check in `doctor_cmd.py`
 
+### Fixed (Chain Enforcement)
+- Stop hook: replaced invalid `hookSpecificOutput.additionalContext` with `systemMessage` — `hookSpecificOutput` is only valid for PreToolUse, PostToolUse, and UserPromptSubmit events
+
 ### Changed (Chain Enforcement)
 - PostToolUse hook matcher widened from `Write` to `Write|Edit` — Edit-based chain updates are now indexed
 - Hook detection uses `in ("Write", "Write|Edit")` for backward compatibility with existing installations
