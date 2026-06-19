@@ -17,7 +17,7 @@ def runner():
 
 class TestHookStatus:
     def test_status_no_settings(self, runner, tmp_path):
-        with patch("memoryschema.cli.hook_cmd._settings_path", return_value=tmp_path / "nonexistent.json"):
+        with patch("memoryschema.cli.hook_cmd.get_settings_path", return_value=tmp_path / "nonexistent.json"):
             result = runner.invoke(cli, ["hook", "status"])
         assert result.exit_code == 0
         assert "not found" in result.output.lower() or "no" in result.output.lower()
@@ -29,8 +29,8 @@ class TestHookStatus:
                 {"type": "command", "command": "bash /path/hook-post-write.sh", "timeout": 10}
             ]}]}
         }))
-        with patch("memoryschema.cli.hook_cmd._settings_path", return_value=settings):
-            with patch("memoryschema.cli.hook_cmd._hook_script_path", return_value="/path/hook-post-write.sh"):
+        with patch("memoryschema.cli.hook_cmd.get_settings_path", return_value=settings):
+            with patch("memoryschema.cli.hook_cmd.find_hook_script_path", return_value="/path/hook-post-write.sh"):
                 result = runner.invoke(cli, ["hook", "status"])
         assert result.exit_code == 0
         assert "registered" in result.output.lower() or "yes" in result.output.lower()
@@ -44,8 +44,8 @@ class TestHookStatus:
                 {"type": "command", "command": "bash /path/hook-post-write.sh", "timeout": 10}
             ]}]}
         }))
-        with patch("memoryschema.cli.hook_cmd._settings_path", return_value=settings):
-            with patch("memoryschema.cli.hook_cmd._hook_script_path", return_value="/path/hook-post-write.sh"):
+        with patch("memoryschema.cli.hook_cmd.get_settings_path", return_value=settings):
+            with patch("memoryschema.cli.hook_cmd.find_hook_script_path", return_value="/path/hook-post-write.sh"):
                 result = runner.invoke(cli, ["hook", "status"])
         assert result.exit_code == 0
         assert "registered" in result.output.lower() or "yes" in result.output.lower()
@@ -63,9 +63,9 @@ class TestHookStatus:
                 ]}]
             }
         }))
-        with patch("memoryschema.cli.hook_cmd._settings_path", return_value=settings):
-            with patch("memoryschema.cli.hook_cmd._hook_script_path", return_value="/path/hook-post-write.sh"):
-                with patch("memoryschema.cli.hook_cmd._stop_hook_script_path", return_value="/path/hook-stop.sh"):
+        with patch("memoryschema.cli.hook_cmd.get_settings_path", return_value=settings):
+            with patch("memoryschema.cli.hook_cmd.find_hook_script_path", return_value="/path/hook-post-write.sh"):
+                with patch("memoryschema.cli.hook_cmd.find_stop_hook_script_path", return_value="/path/hook-stop.sh"):
                     result = runner.invoke(cli, ["hook", "status"])
         assert result.exit_code == 0
         assert "posttooluse: yes" in result.output.lower()
@@ -79,8 +79,8 @@ class TestHookStatus:
                 {"type": "command", "command": "bash /path/hook-post-write.sh", "timeout": 10}
             ]}]}
         }))
-        with patch("memoryschema.cli.hook_cmd._settings_path", return_value=settings):
-            with patch("memoryschema.cli.hook_cmd._hook_script_path", return_value="/path/hook-post-write.sh"):
+        with patch("memoryschema.cli.hook_cmd.get_settings_path", return_value=settings):
+            with patch("memoryschema.cli.hook_cmd.find_hook_script_path", return_value="/path/hook-post-write.sh"):
                 result = runner.invoke(cli, ["hook", "status"])
         assert result.exit_code == 0
         assert "registered" in result.output.lower() or "yes" in result.output.lower()
@@ -90,9 +90,9 @@ class TestHookInstall:
     def test_install_creates_entry(self, runner, tmp_path):
         settings = tmp_path / "settings.json"
         settings.write_text("{}")
-        with patch("memoryschema.cli.hook_cmd._settings_path", return_value=settings):
-            with patch("memoryschema.cli.hook_cmd._hook_script_path", return_value="/pkg/hook-post-write.sh"):
-                with patch("memoryschema.cli.hook_cmd._stop_hook_script_path", return_value="/pkg/hook-stop.sh"):
+        with patch("memoryschema.cli.hook_cmd.get_settings_path", return_value=settings):
+            with patch("memoryschema.cli.hook_cmd.find_hook_script_path", return_value="/pkg/memoryschema/hook-post-write.sh"):
+                with patch("memoryschema.cli.hook_cmd.find_stop_hook_script_path", return_value="/pkg/hook-stop.sh"):
                     with patch("os.path.exists", return_value=True):
                         result = runner.invoke(cli, ["hook", "install"])
         assert result.exit_code == 0
@@ -105,9 +105,9 @@ class TestHookInstall:
         """Install creates both PostToolUse and Stop hook entries."""
         settings = tmp_path / "settings.json"
         settings.write_text("{}")
-        with patch("memoryschema.cli.hook_cmd._settings_path", return_value=settings):
-            with patch("memoryschema.cli.hook_cmd._hook_script_path", return_value="/pkg/hook-post-write.sh"):
-                with patch("memoryschema.cli.hook_cmd._stop_hook_script_path", return_value="/pkg/hook-stop.sh"):
+        with patch("memoryschema.cli.hook_cmd.get_settings_path", return_value=settings):
+            with patch("memoryschema.cli.hook_cmd.find_hook_script_path", return_value="/pkg/memoryschema/hook-post-write.sh"):
+                with patch("memoryschema.cli.hook_cmd.find_stop_hook_script_path", return_value="/pkg/hook-stop.sh"):
                     with patch("os.path.exists", return_value=True):
                         result = runner.invoke(cli, ["hook", "install"])
         assert result.exit_code == 0
@@ -120,11 +120,11 @@ class TestHookInstall:
         settings = tmp_path / "settings.json"
         settings.write_text(json.dumps({
             "hooks": {"PostToolUse": [{"matcher": "Write", "hooks": [
-                {"type": "command", "command": "bash /pkg/hook-post-write.sh", "timeout": 10}
+                {"type": "command", "command": "bash /pkg/memoryschema/hook-post-write.sh", "timeout": 10}
             ]}]}
         }))
-        with patch("memoryschema.cli.hook_cmd._settings_path", return_value=settings):
-            with patch("memoryschema.cli.hook_cmd._hook_script_path", return_value="/pkg/hook-post-write.sh"):
+        with patch("memoryschema.cli.hook_cmd.get_settings_path", return_value=settings):
+            with patch("memoryschema.cli.hook_cmd.find_hook_script_path", return_value="/pkg/memoryschema/hook-post-write.sh"):
                 with patch("os.path.exists", return_value=True):
                     result = runner.invoke(cli, ["hook", "install"])
         assert "already registered" in result.output.lower()
@@ -135,11 +135,11 @@ class TestHookUninstall:
         settings = tmp_path / "settings.json"
         settings.write_text(json.dumps({
             "hooks": {"PostToolUse": [{"matcher": "Write", "hooks": [
-                {"type": "command", "command": "bash /pkg/hook-post-write.sh", "timeout": 10}
+                {"type": "command", "command": "bash /pkg/memoryschema/hook-post-write.sh", "timeout": 10}
             ]}]}
         }))
-        with patch("memoryschema.cli.hook_cmd._settings_path", return_value=settings):
-            with patch("memoryschema.cli.hook_cmd._hook_script_path", return_value="/pkg/hook-post-write.sh"):
+        with patch("memoryschema.cli.hook_cmd.get_settings_path", return_value=settings):
+            with patch("memoryschema.cli.hook_cmd.find_hook_script_path", return_value="/pkg/memoryschema/hook-post-write.sh"):
                 result = runner.invoke(cli, ["hook", "uninstall"])
         assert result.exit_code == 0
         assert "unregistered" in result.output.lower()
@@ -151,16 +151,16 @@ class TestHookUninstall:
         settings.write_text(json.dumps({
             "hooks": {
                 "PostToolUse": [{"matcher": "Write|Edit", "hooks": [
-                    {"type": "command", "command": "bash /pkg/hook-post-write.sh", "timeout": 10}
+                    {"type": "command", "command": "bash /pkg/memoryschema/hook-post-write.sh", "timeout": 10}
                 ]}],
                 "Stop": [{"hooks": [
                     {"type": "command", "command": "bash /pkg/hook-stop.sh", "timeout": 5}
                 ]}]
             }
         }))
-        with patch("memoryschema.cli.hook_cmd._settings_path", return_value=settings):
-            with patch("memoryschema.cli.hook_cmd._hook_script_path", return_value="/pkg/hook-post-write.sh"):
-                with patch("memoryschema.cli.hook_cmd._stop_hook_script_path", return_value="/pkg/hook-stop.sh"):
+        with patch("memoryschema.cli.hook_cmd.get_settings_path", return_value=settings):
+            with patch("memoryschema.cli.hook_cmd.find_hook_script_path", return_value="/pkg/memoryschema/hook-post-write.sh"):
+                with patch("memoryschema.cli.hook_cmd.find_stop_hook_script_path", return_value="/pkg/hook-stop.sh"):
                     result = runner.invoke(cli, ["hook", "uninstall"])
         assert result.exit_code == 0
         assert "posttooluse" in result.output.lower() or "unregistered" in result.output.lower()
@@ -174,11 +174,11 @@ class TestHookUninstall:
         settings = tmp_path / "settings.json"
         settings.write_text(json.dumps({
             "hooks": {"PostToolUse": [{"matcher": "Write", "hooks": [
-                {"type": "command", "command": "bash /pkg/hook-post-write.sh", "timeout": 10}
+                {"type": "command", "command": "bash /pkg/memoryschema/hook-post-write.sh", "timeout": 10}
             ]}]}
         }))
-        with patch("memoryschema.cli.hook_cmd._settings_path", return_value=settings):
-            with patch("memoryschema.cli.hook_cmd._hook_script_path", return_value="/pkg/hook-post-write.sh"):
+        with patch("memoryschema.cli.hook_cmd.get_settings_path", return_value=settings):
+            with patch("memoryschema.cli.hook_cmd.find_hook_script_path", return_value="/pkg/memoryschema/hook-post-write.sh"):
                 result = runner.invoke(cli, ["hook", "uninstall"])
         assert result.exit_code == 0
         assert "unregistered" in result.output.lower()

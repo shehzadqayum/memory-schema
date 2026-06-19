@@ -1,40 +1,22 @@
 """PostToolUse and Stop hook management."""
 
-import json
 import os
 import sys
-from importlib.resources import files
-from pathlib import Path
 
 import click
 
-
-def _settings_path(per_project=False, project_root=None):
-    """Path to Claude Code settings file.
-
-    Args:
-        per_project: If True, use project-level .claude/settings.json.
-        project_root: Project root directory (required if per_project).
-    """
-    if per_project and project_root:
-        return Path(project_root) / ".claude" / "settings.json"
-    return Path.home() / ".claude" / "settings.json"
-
-
-def _hook_script_path():
-    """Resolve the installed PostToolUse hook script path."""
-    try:
-        return str(files("memoryschema.hooks") / "hook-post-write.sh")
-    except Exception:
-        return None
-
-
-def _stop_hook_script_path():
-    """Resolve the installed Stop hook script path."""
-    try:
-        return str(files("memoryschema.hooks") / "hook-stop.sh")
-    except Exception:
-        return None
+from memoryschema.cli._hooks_util import (
+    HOOK_MATCHER,
+    LEGACY_MATCHERS,
+    find_hook_script_path,
+    find_stop_hook_script_path,
+    get_settings_path,
+    hook_already_registered,
+    read_settings,
+    register_hooks,
+    unregister_hooks,
+    write_settings,
+)
 
 
 @click.group()
@@ -51,7 +33,7 @@ def hook():
 @click.option("--per-project", is_flag=True, help="Install to project-level .claude/settings.json instead of global.")
 @click.pass_obj
 def install(config, timeout, per_project):
-    """Add PostToolUse Write hook to settings.json.
+    """Add PostToolUse and Stop hooks to settings.json.
 
     By default installs to ~/.claude/settings.json (global).
     Use --per-project to install to the project's .claude/settings.json.
@@ -61,133 +43,63 @@ def install(config, timeout, per_project):
         memoryschema hook install --per-project
         memoryschema hook install --timeout 15
     """
-    hook_path = _hook_script_path()
+    hook_path = find_hook_script_path()
     if not hook_path or not os.path.exists(hook_path):
         click.echo("Error: Hook script not found in package.", err=True)
         click.echo("Fix: Reinstall with 'pip install memory-schema'.", err=True)
         sys.exit(1)
 
-    settings_file = _settings_path(
+    settings_file = get_settings_path(
         per_project=per_project,
         project_root=config.project_root if per_project else None,
     )
-    settings = {}
-    if settings_file.exists():
-        with open(settings_file) as f:
-            settings = json.load(f)
-
-    hooks = settings.setdefault("hooks", {})
-    post_tool = hooks.setdefault("PostToolUse", [])
+    settings = read_settings(settings_file)
 
     # Check if already registered
+    registered, existing_cmd = hook_already_registered(settings)
+    if registered and hook_path in existing_cmd:
+        click.echo(f"Hook already registered at {settings_file}")
+        return
+
+    # Register both hooks
+    stop_path = find_stop_hook_script_path()
     hook_cmd = f"bash {hook_path}"
-    for entry in post_tool:
-        if entry.get("matcher") in ("Write", "Write|Edit"):
-            for h in entry.get("hooks", []):
-                if hook_path in h.get("command", ""):
-                    click.echo(f"Hook already registered at {settings_file}")
-                    return
+    stop_cmd = f"bash {stop_path}" if stop_path and os.path.exists(stop_path) else None
+    register_hooks(settings, hook_cmd, stop_cmd)
 
-    # Add new hook entry
-    post_tool.append({
-        "matcher": "Write|Edit",
-        "hooks": [{
-            "type": "command",
-            "command": hook_cmd,
-            "timeout": timeout,
-        }]
-    })
+    write_settings(settings_file, settings, backup=True)
 
-    # Register Stop hook for chain update reminders
-    stop_path = _stop_hook_script_path()
-    if stop_path and os.path.exists(stop_path):
-        stop_hooks = hooks.setdefault("Stop", [])
-        stop_already = False
-        for entry in stop_hooks:
-            for h in entry.get("hooks", []):
-                if stop_path in h.get("command", ""):
-                    stop_already = True
-                    break
-        if not stop_already:
-            stop_hooks.append({
-                "hooks": [{
-                    "type": "command",
-                    "command": f"bash {stop_path}",
-                    "timeout": 5,
-                }]
-            })
-
-    settings_file.parent.mkdir(parents=True, exist_ok=True)
-    with open(settings_file, 'w') as f:
-        json.dump(settings, f, indent=2)
-
-    click.echo(f"Registered PostToolUse Write|Edit hook.")
+    click.echo(f"Registered PostToolUse {HOOK_MATCHER} hook.")
     click.echo(f"  Settings: {settings_file}")
     click.echo(f"  Script:   {hook_path}")
     click.echo(f"  Timeout:  {timeout}s")
-    if stop_path and os.path.exists(stop_path):
+    if stop_cmd:
         click.echo(f"Registered Stop hook.")
         click.echo(f"  Script:   {stop_path}")
 
 
 @hook.command()
 def uninstall():
-    """Remove memory-schema hook from ~/.claude/settings.json.
+    """Remove memory-schema hooks from ~/.claude/settings.json.
 
     Example:
         memoryschema hook uninstall
     """
-    settings_file = _settings_path()
+    settings_file = get_settings_path()
     if not settings_file.exists():
         click.echo("No settings file found.")
         return
 
-    with open(settings_file) as f:
-        settings = json.load(f)
+    settings = read_settings(settings_file)
+    settings, removed = unregister_hooks(settings)
 
-    post_tool = settings.get("hooks", {}).get("PostToolUse", [])
-    hook_path = _hook_script_path()
-
-    new_post_tool = []
-    removed = False
-    for entry in post_tool:
-        if entry.get("matcher") in ("Write", "Write|Edit"):
-            new_hooks = [h for h in entry.get("hooks", [])
-                        if hook_path and hook_path not in h.get("command", "")]
-            if len(new_hooks) < len(entry.get("hooks", [])):
-                removed = True
-            if new_hooks:
-                entry["hooks"] = new_hooks
-                new_post_tool.append(entry)
-        else:
-            new_post_tool.append(entry)
-
-    # Also remove Stop hook entries
-    stop_path = _stop_hook_script_path()
-    stop_hooks = settings.get("hooks", {}).get("Stop", [])
-    new_stop = []
-    stop_removed = False
-    for entry in stop_hooks:
-        keep_hooks = [h for h in entry.get("hooks", [])
-                      if stop_path and stop_path not in h.get("command", "")]
-        if len(keep_hooks) < len(entry.get("hooks", [])):
-            stop_removed = True
-        if keep_hooks:
-            entry["hooks"] = keep_hooks
-            new_stop.append(entry)
-        elif not entry.get("hooks"):
-            new_stop.append(entry)
-
-    if removed or stop_removed:
-        settings["hooks"]["PostToolUse"] = new_post_tool
-        if stop_removed:
-            settings["hooks"]["Stop"] = new_stop
-        with open(settings_file, 'w') as f:
-            json.dump(settings, f, indent=2)
-        if removed:
-            click.echo("PostToolUse hook unregistered.")
-        if stop_removed:
-            click.echo("Stop hook unregistered.")
+    if removed:
+        write_settings(settings_file, settings, backup=True)
+        for cmd in removed:
+            if "hook-stop" in cmd:
+                click.echo("Stop hook unregistered.")
+            else:
+                click.echo("PostToolUse hook unregistered.")
     else:
         click.echo("Hook not found in settings.")
 
@@ -199,23 +111,21 @@ def hook_status():
     Example:
         memoryschema hook status
     """
-    hook_path = _hook_script_path()
+    hook_path = find_hook_script_path()
     click.echo(f"Hook script: {hook_path or 'not found'}")
     click.echo(f"Script exists: {os.path.exists(hook_path) if hook_path else False}")
 
-    settings_file = _settings_path()
+    settings_file = get_settings_path()
     if not settings_file.exists():
         click.echo(f"Settings: {settings_file} (not found)")
         return
 
-    with open(settings_file) as f:
-        settings = json.load(f)
+    settings = read_settings(settings_file)
 
     # Check PostToolUse hook
-    post_tool = settings.get("hooks", {}).get("PostToolUse", [])
     post_registered = False
-    for entry in post_tool:
-        if entry.get("matcher") in ("Write", "Write|Edit"):
+    for entry in settings.get("hooks", {}).get("PostToolUse", []):
+        if entry.get("matcher") in LEGACY_MATCHERS:
             for h in entry.get("hooks", []):
                 if hook_path and hook_path in h.get("command", ""):
                     post_registered = True
@@ -228,10 +138,9 @@ def hook_status():
         click.echo(f"  Fix: Run 'memoryschema hook install'")
 
     # Check Stop hook
-    stop_path = _stop_hook_script_path()
-    stop_hooks = settings.get("hooks", {}).get("Stop", [])
+    stop_path = find_stop_hook_script_path()
     stop_registered = False
-    for entry in stop_hooks:
+    for entry in settings.get("hooks", {}).get("Stop", []):
         for h in entry.get("hooks", []):
             if stop_path and stop_path in h.get("command", ""):
                 stop_registered = True
