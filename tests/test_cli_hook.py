@@ -242,6 +242,146 @@ class TestEmbedWithConfig:
             emb_mod._cached_client = old_cache
 
 
+class TestHookUpgrade:
+    def _make_v1_settings(self, tmp_path):
+        """Create a v1 settings file (Write matcher, no Stop hook)."""
+        settings = tmp_path / "settings.json"
+        settings.write_text(json.dumps({
+            "hooks": {"PostToolUse": [{"matcher": "Write", "hooks": [
+                {"type": "command", "command": "bash /pkg/memoryschema/hook-post-write.sh", "timeout": 10}
+            ]}]}
+        }))
+        return settings
+
+    def test_upgrade_v1_to_v2(self, runner, tmp_path):
+        settings = self._make_v1_settings(tmp_path)
+        with patch("memoryschema.cli.hook_cmd.get_settings_path", return_value=settings):
+            with patch("memoryschema.cli.hook_cmd.find_hook_script_path", return_value="/pkg/memoryschema/hook.sh"):
+                with patch("memoryschema.cli.hook_cmd.find_stop_hook_script_path", return_value="/pkg/memoryschema/stop.sh"):
+                    result = runner.invoke(cli, ["hook", "upgrade"])
+        assert result.exit_code == 0
+        assert "Upgraded" in result.output or "Applied" in result.output
+        data = json.loads(settings.read_text())
+        assert data["hooks"]["PostToolUse"][0]["matcher"] == "Write|Edit"
+        assert "Stop" in data["hooks"]
+
+    def test_upgrade_already_current(self, runner, tmp_path):
+        settings = tmp_path / "settings.json"
+        settings.write_text(json.dumps({
+            "hooks": {
+                "PostToolUse": [{"matcher": "Write|Edit", "hooks": [
+                    {"command": "bash /pkg/memoryschema/hook.sh"}
+                ]}],
+                "Stop": [{"hooks": [
+                    {"command": "bash /pkg/hook-stop.sh"}
+                ]}]
+            }
+        }))
+        with patch("memoryschema.cli.hook_cmd.get_settings_path", return_value=settings):
+            with patch("memoryschema.cli.hook_cmd.find_hook_script_path", return_value="/pkg/memoryschema/hook.sh"):
+                with patch("memoryschema.cli.hook_cmd.find_stop_hook_script_path", return_value="/pkg/stop.sh"):
+                    result = runner.invoke(cli, ["hook", "upgrade"])
+        assert result.exit_code == 0
+        assert "Already current" in result.output or "No upgrade" in result.output
+
+    def test_upgrade_dry_run(self, runner, tmp_path):
+        settings = self._make_v1_settings(tmp_path)
+        with patch("memoryschema.cli.hook_cmd.get_settings_path", return_value=settings):
+            with patch("memoryschema.cli.hook_cmd.find_hook_script_path", return_value="/pkg/memoryschema/hook.sh"):
+                with patch("memoryschema.cli.hook_cmd.find_stop_hook_script_path", return_value="/pkg/memoryschema/stop.sh"):
+                    result = runner.invoke(cli, ["hook", "upgrade", "--dry-run"])
+        assert result.exit_code == 0
+        assert "Would apply" in result.output
+        # File not modified
+        data = json.loads(settings.read_text())
+        assert data["hooks"]["PostToolUse"][0]["matcher"] == "Write"
+
+
+class TestHookCheck:
+    def test_check_with_valid_scripts(self, runner, tmp_path):
+        # Create real scripts
+        hook_script = tmp_path / "hook-post-write.sh"
+        hook_script.write_text("#!/bin/bash\nexit 0\n")
+        hook_script.chmod(0o755)
+        stop_script = tmp_path / "hook-stop.sh"
+        stop_script.write_text('#!/bin/bash\necho "{}"\nexit 0\n')
+        stop_script.chmod(0o755)
+        with patch("memoryschema.cli.hook_cmd.find_hook_script_path", return_value=str(hook_script)):
+            with patch("memoryschema.cli.hook_cmd.find_stop_hook_script_path", return_value=str(stop_script)):
+                result = runner.invoke(cli, ["hook", "check"])
+        assert result.exit_code == 0
+        assert "passed" in result.output.lower()
+
+    def test_check_missing_scripts(self, runner):
+        with patch("memoryschema.cli.hook_cmd.find_hook_script_path", return_value=None):
+            with patch("memoryschema.cli.hook_cmd.find_stop_hook_script_path", return_value=None):
+                result = runner.invoke(cli, ["hook", "check"])
+        assert result.exit_code == 0
+        assert "not found" in result.output.lower()
+
+    def test_check_json_output(self, runner, tmp_path):
+        hook_script = tmp_path / "hook-post-write.sh"
+        hook_script.write_text("#!/bin/bash\nexit 0\n")
+        hook_script.chmod(0o755)
+        stop_script = tmp_path / "hook-stop.sh"
+        stop_script.write_text('#!/bin/bash\necho "{}"\nexit 0\n')
+        stop_script.chmod(0o755)
+        with patch("memoryschema.cli.hook_cmd.find_hook_script_path", return_value=str(hook_script)):
+            with patch("memoryschema.cli.hook_cmd.find_stop_hook_script_path", return_value=str(stop_script)):
+                result = runner.invoke(cli, ["hook", "check", "--json"])
+        assert result.exit_code == 0
+        data = json.loads(result.output)
+        assert isinstance(data, list)
+        assert all("name" in c and "passed" in c for c in data)
+
+
+class TestHookScan:
+    def test_scan_finds_global(self, runner, tmp_path):
+        claude_dir = tmp_path / ".claude"
+        claude_dir.mkdir()
+        settings = claude_dir / "settings.json"
+        settings.write_text(json.dumps({
+            "hooks": {"PostToolUse": [{"matcher": "Write|Edit", "hooks": [
+                {"command": "bash /pkg/memoryschema/hook.sh"}
+            ]}]}
+        }))
+        with patch("memoryschema.cli.hook_cmd.find_project_settings",
+                   return_value=[{"path": str(settings), "project_root": str(claude_dir),
+                                  "project_name": "(global)", "scope": "global"}]):
+            with patch("memoryschema.cli.hook_cmd.find_hook_script_path", return_value="/pkg/memoryschema/hook.sh"):
+                with patch("memoryschema.cli.hook_cmd.find_stop_hook_script_path", return_value=None):
+                    result = runner.invoke(cli, ["hook", "scan"])
+        assert result.exit_code == 0
+        assert "(global)" in result.output
+        assert "1 installation" in result.output
+
+    def test_scan_json_output(self, runner, tmp_path):
+        claude_dir = tmp_path / ".claude"
+        claude_dir.mkdir()
+        settings = claude_dir / "settings.json"
+        settings.write_text(json.dumps({
+            "hooks": {"PostToolUse": [{"matcher": "Write|Edit", "hooks": [
+                {"command": "bash /pkg/memoryschema/hook.sh"}
+            ]}]}
+        }))
+        with patch("memoryschema.cli.hook_cmd.find_project_settings",
+                   return_value=[{"path": str(settings), "project_root": str(claude_dir),
+                                  "project_name": "(global)", "scope": "global"}]):
+            with patch("memoryschema.cli.hook_cmd.find_hook_script_path", return_value="/pkg/memoryschema/hook.sh"):
+                with patch("memoryschema.cli.hook_cmd.find_stop_hook_script_path", return_value=None):
+                    result = runner.invoke(cli, ["hook", "scan", "--json"])
+        assert result.exit_code == 0
+        data = json.loads(result.output)
+        assert isinstance(data, list)
+        assert data[0]["scope"] == "global"
+
+    def test_scan_no_installations(self, runner):
+        with patch("memoryschema.cli.hook_cmd.find_project_settings", return_value=[]):
+            result = runner.invoke(cli, ["hook", "scan"])
+        assert result.exit_code == 0
+        assert "No hook installations" in result.output
+
+
 class TestHookHelp:
     def test_group_help(self, runner):
         result = runner.invoke(cli, ["hook", "--help"])
@@ -249,4 +389,7 @@ class TestHookHelp:
         assert "install" in result.output
         assert "uninstall" in result.output
         assert "status" in result.output
+        assert "upgrade" in result.output
+        assert "check" in result.output
+        assert "scan" in result.output
         assert "test" in result.output
