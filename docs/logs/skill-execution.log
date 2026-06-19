@@ -521,3 +521,17 @@
 2026-06-19 17:27:02	checkpoint	START	—	—
 2026-06-19 17:30:51	checkpoint	END	completed	Session 31: 2/2 PASS, 707 tests, ledger empty
 2026-06-19 17:31:33	session-close	START	—	—
+2026-06-19 17:33:19	session-close	END	completed	Session 31 closed: 466f0fa, 4 commits, 707 tests, ledger empty
+2026-06-19 18:30:23	session-open	START	—	—
+2026-06-19 18:30:55	session-open	END	completed	Session 32 briefing, S4 at 466f0fa (2026-06-19), ledger empty
+2026-06-19 18:36:47	plan-commit	START	—	—
+2026-06-19 18:38:54	plan-commit	END	completed	S1 committed and pushed: 5379d36, no prior residuals, 4 phases
+2026-06-19 18:39:56	implement	START	—	—
+2026-06-19 18:43:02	implement	END	completed	Phase 1: portable Python path — 78101f3, 707 tests
+2026-06-19 18:44:00	implement	START	—	—
+2026-06-19 19:06:07	implement	END	completed	Phase 2: doctor test target fix — 1e863c9, 707 tests
+2026-06-19 19:06:43	implement	START	—	—
+2026-06-19 19:10:09	implement	END	completed	Phase 3: Docker detection fix — 116ced5, 707 tests
+2026-06-19 19:15:01	implement	START	—	—
+2026-06-19 20:43:32	implement	END	completed	Phase 4: docs alignment — 00975ff, 707 tests, all items complete
+2026-06-19 21:23:44	checkpoint	START	—	—
