@@ -1,7 +1,6 @@
 """CLI commands for deploying/uninstalling the memory-schema plugin at user level (~/.claude/)."""
 
 import json
-import os
 import shutil
 from datetime import datetime, timezone
 from pathlib import Path
@@ -9,6 +8,15 @@ from pathlib import Path
 import click
 
 from memoryschema._version import __version__
+from memoryschema.cli._hooks_util import (
+    find_hook_script_path,
+    find_stop_hook_script_path,
+    hook_already_registered,
+    read_settings,
+    register_hooks,
+    unregister_hooks,
+    write_settings,
+)
 
 
 CLAUDE_DIR = Path.home() / ".claude"
@@ -32,13 +40,11 @@ RULE_FILES = [
 
 def _find_plugin_dir():
     """Find the .claude-plugin/ directory relative to the package source."""
-    # Walk up from this file to find the repo root with .claude-plugin/
     pkg_dir = Path(__file__).resolve().parent.parent  # src/memoryschema/
     repo_root = pkg_dir.parent.parent  # repo root (contains src/ and .claude-plugin/)
     plugin_dir = repo_root / ".claude-plugin"
     if plugin_dir.is_dir():
         return plugin_dir
-    # Fallback: try importlib.resources for installed package
     try:
         from importlib.resources import files as pkg_files
         candidate = Path(str(pkg_files("memoryschema"))) / ".." / ".." / ".claude-plugin"
@@ -47,140 +53,6 @@ def _find_plugin_dir():
     except Exception:
         pass
     return None
-
-
-def _find_hook_script():
-    """Find the hook-post-write.sh script path."""
-    try:
-        from importlib.resources import files as pkg_files
-        hook_path = Path(str(pkg_files("memoryschema.hooks") / "hook-post-write.sh"))
-        if hook_path.exists():
-            return str(hook_path)
-    except Exception:
-        pass
-    # Fallback: relative to this file
-    candidate = Path(__file__).resolve().parent.parent / "hooks" / "hook-post-write.sh"
-    if candidate.exists():
-        return str(candidate)
-    return None
-
-
-def _find_stop_hook_script():
-    """Find the hook-stop.sh script path."""
-    try:
-        from importlib.resources import files as pkg_files
-        hook_path = Path(str(pkg_files("memoryschema.hooks") / "hook-stop.sh"))
-        if hook_path.exists():
-            return str(hook_path)
-    except Exception:
-        pass
-    candidate = Path(__file__).resolve().parent.parent / "hooks" / "hook-stop.sh"
-    if candidate.exists():
-        return str(candidate)
-    return None
-
-
-def _read_settings():
-    """Read ~/.claude/settings.json."""
-    settings_path = CLAUDE_DIR / "settings.json"
-    if settings_path.exists():
-        with open(settings_path) as f:
-            return json.load(f)
-    return {}
-
-
-def _write_settings(data):
-    """Write ~/.claude/settings.json."""
-    settings_path = CLAUDE_DIR / "settings.json"
-    # Backup before modifying
-    if settings_path.exists():
-        backup = CLAUDE_DIR / "settings.json.memory-schema-backup"
-        shutil.copy2(settings_path, backup)
-    with open(settings_path, "w") as f:
-        json.dump(data, f, indent=2)
-        f.write("\n")
-
-
-def _hook_already_registered(settings, hook_command_fragment="memoryschema"):
-    """Check if a memory-schema hook is already in PostToolUse Write|Edit."""
-    hooks = settings.get("hooks", {})
-    for entry in hooks.get("PostToolUse", []):
-        if entry.get("matcher") in ("Write", "Write|Edit"):
-            for h in entry.get("hooks", []):
-                cmd = h.get("command", "")
-                if hook_command_fragment in cmd:
-                    return True, cmd
-    return False, None
-
-
-def _add_hook(settings, hook_command, stop_hook_command=None):
-    """Add the memory-schema PostToolUse Write|Edit and Stop hooks to settings."""
-    if "hooks" not in settings:
-        settings["hooks"] = {}
-    if "PostToolUse" not in settings["hooks"]:
-        settings["hooks"]["PostToolUse"] = []
-    settings["hooks"]["PostToolUse"].append({
-        "matcher": "Write|Edit",
-        "hooks": [{
-            "type": "command",
-            "command": hook_command,
-            "timeout": 10,
-        }],
-    })
-    if stop_hook_command:
-        if "Stop" not in settings["hooks"]:
-            settings["hooks"]["Stop"] = []
-        settings["hooks"]["Stop"].append({
-            "hooks": [{
-                "type": "command",
-                "command": stop_hook_command,
-                "timeout": 5,
-            }],
-        })
-    return settings
-
-
-def _remove_hook(settings, hook_command_fragment="memoryschema"):
-    """Remove memory-schema PostToolUse and Stop hook entries from settings."""
-    hooks = settings.get("hooks", {})
-    removed = []
-
-    # Remove PostToolUse entries
-    post_tool = hooks.get("PostToolUse", [])
-    filtered = []
-    for entry in post_tool:
-        if entry.get("matcher") in ("Write", "Write|Edit"):
-            keep_hooks = []
-            for h in entry.get("hooks", []):
-                if hook_command_fragment in h.get("command", ""):
-                    removed.append(h.get("command", ""))
-                else:
-                    keep_hooks.append(h)
-            if keep_hooks:
-                entry["hooks"] = keep_hooks
-                filtered.append(entry)
-        else:
-            filtered.append(entry)
-    if "PostToolUse" in hooks:
-        settings["hooks"]["PostToolUse"] = filtered
-
-    # Remove Stop hook entries
-    stop_hooks = hooks.get("Stop", [])
-    stop_filtered = []
-    for entry in stop_hooks:
-        keep_hooks = []
-        for h in entry.get("hooks", []):
-            if "hook-stop.sh" in h.get("command", ""):
-                removed.append(h.get("command", ""))
-            else:
-                keep_hooks.append(h)
-        if keep_hooks:
-            entry["hooks"] = keep_hooks
-            stop_filtered.append(entry)
-    if "Stop" in hooks:
-        settings["hooks"]["Stop"] = stop_filtered
-
-    return settings, removed
 
 
 def _write_manifest(manifest):
@@ -293,20 +165,21 @@ def deploy(config, force):
         click.echo(f"  Created:   {memory_dir}/")
 
     # 4. Register hooks in settings.json
-    hook_script = _find_hook_script()
-    stop_hook_script = _find_stop_hook_script()
+    hook_script = find_hook_script_path()
+    stop_hook_script = find_stop_hook_script_path()
     if hook_script:
         hook_command = f"bash {hook_script}"
         stop_hook_command = f"bash {stop_hook_script}" if stop_hook_script else None
-        settings = _read_settings()
-        registered, existing_cmd = _hook_already_registered(settings)
+        settings_path = CLAUDE_DIR / "settings.json"
+        settings = read_settings(settings_path)
+        registered, existing_cmd = hook_already_registered(settings)
         if registered:
             click.echo(f"  Hook:      already registered ({existing_cmd})")
             manifest["hook_registered"] = existing_cmd
             manifest["hook_was_existing"] = True
         else:
-            settings = _add_hook(settings, hook_command, stop_hook_command)
-            _write_settings(settings)
+            register_hooks(settings, hook_command, stop_hook_command)
+            write_settings(settings_path, settings, backup=True)
             manifest["hook_registered"] = hook_command
             manifest["hook_was_existing"] = False
             manifest["settings_backup"] = str(CLAUDE_DIR / "settings.json.memory-schema-backup")
@@ -399,7 +272,6 @@ def uninstall(config, confirm, keep_data):
             continue
         if dir_path.exists() and dir_path.is_dir():
             try:
-                # Only remove if empty (or if it's a skill dir we created)
                 contents = list(dir_path.iterdir())
                 if not contents:
                     dir_path.rmdir()
@@ -411,10 +283,11 @@ def uninstall(config, confirm, keep_data):
 
     # 4. Remove hook from settings.json (only if we added it)
     if not manifest.get("hook_was_existing") and manifest.get("hook_registered"):
-        settings = _read_settings()
-        settings, removed_hooks = _remove_hook(settings)
+        settings_path = CLAUDE_DIR / "settings.json"
+        settings = read_settings(settings_path)
+        settings, removed_hooks = unregister_hooks(settings)
         if removed_hooks:
-            _write_settings(settings)
+            write_settings(settings_path, settings, backup=True)
             for h in removed_hooks:
                 click.echo(f"  Unhooked: {h}")
         else:
@@ -477,8 +350,9 @@ def plugin_status(config):
 
     # Check hook
     if manifest.get("hook_registered"):
-        settings = _read_settings()
-        registered, _ = _hook_already_registered(settings)
+        settings_path = CLAUDE_DIR / "settings.json"
+        settings = read_settings(settings_path)
+        registered, _ = hook_already_registered(settings)
         click.echo(f"Hook:        {'registered' if registered else 'NOT registered'}")
     else:
         click.echo("Hook:        not managed by deploy")
