@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Added (Test Coverage)
+- `tests/test_cli_plugin.py` — 42 tests for `plugin_cmd.py` (deploy, uninstall, status commands + 10 helper functions). Resolves residual carried since session 24.
+
 ### Added (Chain Enforcement)
 - Stop hook (`hook-stop.sh`) — reminds Claude to update the active chain entity when no memory write occurred during a response
 - Sentinel mechanism (`/tmp/claude-memory-chain-updated`) — PostToolUse hook touches sentinel on memory writes, Stop hook checks for it
