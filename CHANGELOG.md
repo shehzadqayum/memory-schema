@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+### Added (Chain Enforcement)
+- Stop hook (`hook-stop.sh`) — reminds Claude to update the active chain entity when no memory write occurred during a response
+- Sentinel mechanism (`/tmp/claude-memory-chain-updated`) — PostToolUse hook touches sentinel on memory writes, Stop hook checks for it
+- Stop hook registration in `hook_cmd.py` install/uninstall/status and `plugin_cmd.py` deploy/uninstall
+- Stop hook health check in `doctor_cmd.py`
+
+### Changed (Chain Enforcement)
+- PostToolUse hook matcher widened from `Write` to `Write|Edit` — Edit-based chain updates are now indexed
+- Hook detection uses `in ("Write", "Write|Edit")` for backward compatibility with existing installations
+- Chain lifecycle docs updated with Edit-not-Write guidance (schema.md, memory-working.md, memory-schema.md, memory-working.tpl)
+
 ### Added (Claude Code Plugin)
 - `.claude-plugin/` directory with plugin manifest (`plugin.json`)
 - PostToolUse Write hook registration (`hooks/hooks.json`) using `${CLAUDE_PLUGIN_ROOT}` path
