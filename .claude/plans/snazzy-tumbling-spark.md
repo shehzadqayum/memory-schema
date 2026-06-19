@@ -1,338 +1,191 @@
-# Chain Enforcement: Edit-not-Write + Stop Hook Reminder
+# Resolve Residuals: plugin_cmd.py Test Coverage
 
 ## Context
 
-Two issues discovered during active use of the memory system:
+`plugin_cmd.py` has had no test coverage since it was created in session 24. It has been carried as a residual through sessions 24→25→26. The module has 3 CLI commands (deploy, uninstall, status), 10 helper functions, and complex filesystem/settings interactions. This is the only actionable code residual — the other "work remaining" items (voyage API key setup, M2/M3 field spaces) are operational or gated.
 
-1. **No enforcement of chain updates** — Rules say "update chain every response" but nothing enforces it. Claude can deliver an entire session without updating the chain, and the rules are purely advisory.
-2. **Write overwrites chain files** — Using `Write` to update a chain entity replaces the entire `.md` file. If a prior observation is omitted from the rewrite, it's permanently lost from disk. The JSONL/Neo4j upsert merge semantics protect the index layer, but the `.md` file is the authoritative source.
+## Prior Residuals (from [S4] d68182a)
 
-A working prototype exists at `/Volumes/RAID0/Users/shehzad/Projects/karpathy-llm-wiki/.claude/settings.local.json` — it uses a PostToolUse sentinel touch + Stop hook reminder. This plan upstreams that prototype into the memory-schema package properly.
+- R1: `plugin_cmd.py` has no test coverage (source: session 24) → addressing in Phases 1-4
 
-Single source of truth is the package at `/Volumes/RAID0/Users/shehzad/Claude/packages/memory-schema/`.
+## Other Work Remaining (not in scope)
 
-## Prior Residuals (from [S4] ebdc331)
-
-- R1: `plugin_cmd.py` has no test coverage (source: session 24) → deferring (this plan updates matchers in plugin_cmd.py but comprehensive deploy/uninstall/status test coverage is a separate effort)
-
-## Pre-existing state
-
-- `hook-post-write.sh` has uncommitted `python3` → `$PYTHON` changes — fold into Phase 1.
-- `~/.claude/settings.json` has stale skills/ict/fos Write hooks (per disabled-hooks memory) — separate issue, not in scope.
+- Set `voyage.api_key` in `memoryschema.toml` — operational setup, not code work
+- M2: summary/prompt spaces — gated on beating single-space baseline
+- M3: mutable/drift spaces — deferred
 
 ---
 
-## Phase 1 — Widen hook matcher to `Write|Edit` + sentinel touch ✓ 9048165
+## Phase 1 — Helper function unit tests
 
-### 1.1 hook-post-write.sh
+**New file:** `tests/test_cli_plugin.py`
 
-**File:** `src/memoryschema/hooks/hook-post-write.sh`
+Test the pure-logic helpers that don't need full CLI invocation:
 
-- Line 3: comment → "Triggered by Claude Code after every Write or Edit tool call."
-- Line 24: `if [ "$TOOL_NAME" != "Write" ]` → `if [ "$TOOL_NAME" != "Write" ] && [ "$TOOL_NAME" != "Edit" ]`
-- After line 33 (after memory-file filter, before MEMORY.md skip): add sentinel touch:
-  ```bash
-  # Touch sentinel so Stop hook knows a memory file was updated this response
-  touch /tmp/claude-memory-chain-updated 2>/dev/null || true
-  ```
-- Folds in existing uncommitted `$PYTHON` changes (lines 15, 21, 28, 41).
+### 1.1 `_hook_already_registered(settings, fragment)`
 
-### 1.2 hooks.json
+- Empty settings → `(False, None)`
+- Settings with `"Write"` matcher containing `"memoryschema"` → `(True, cmd)`
+- Settings with `"Write|Edit"` matcher containing `"memoryschema"` → `(True, cmd)`
+- Settings with unrelated hooks only → `(False, None)`
 
-**File:** `.claude-plugin/hooks/hooks.json`
+### 1.2 `_add_hook(settings, hook_cmd, stop_hook_cmd)`
 
-- Line 5: `"matcher": "Write"` → `"matcher": "Write|Edit"`
+- Empty settings → creates PostToolUse `Write|Edit` entry
+- With `stop_hook_cmd` → also creates Stop entry
+- Without `stop_hook_cmd` → no Stop entry
 
-### 1.3 hook_cmd.py (4 locations)
+### 1.3 `_remove_hook(settings, fragment)`
 
-**File:** `src/memoryschema/cli/hook_cmd.py`
+- Settings with memory-schema PostToolUse + Stop hooks → both removed, returned in list
+- Settings with mixed hooks (aurora + memoryschema) → only memoryschema removed
+- Settings with no matching hooks → empty removed list, settings unchanged
 
-| Line | Current | New |
-|------|---------|-----|
-| 77 | `== "Write"` | `in ("Write", "Write|Edit")` |
-| 85 | `"matcher": "Write"` | `"matcher": "Write|Edit"` |
-| 124 | `== "Write"` | `in ("Write", "Write|Edit")` |
-| 166 | `== "Write"` | `in ("Write", "Write|Edit")` |
+### 1.4 `_read_settings()` / `_write_settings(data)`
 
-The `in ("Write", "Write|Edit")` pattern gives backward compat — existing installs with old `"Write"` matcher are still found by `uninstall`/`status`.
+- Missing file → returns `{}`
+- Valid JSON → returns parsed dict
+- Write creates backup `.memory-schema-backup` before overwriting
+- Write produces valid JSON with trailing newline
 
-### 1.4 plugin_cmd.py (3 locations)
+### 1.5 `_read_manifest()` / `_write_manifest(manifest)`
 
-**File:** `src/memoryschema/cli/plugin_cmd.py`
+- Missing file → returns `None`
+- Valid manifest → returns parsed dict
+- Write produces valid JSON
 
-| Line | Function | Current | New |
-|------|----------|---------|-----|
-| 93 | `_hook_already_registered` | `== "Write"` | `in ("Write", "Write|Edit")` |
-| 108 | `_add_hook` | `"matcher": "Write"` | `"matcher": "Write|Edit"` |
-| 125 | `_remove_hook` | `== "Write"` | `in ("Write", "Write|Edit")` |
+### Fixtures needed
 
-### 1.5 doctor_cmd.py
+```python
+@pytest.fixture
+def claude_dir(tmp_path, monkeypatch):
+    """Redirect CLAUDE_DIR and MANIFEST_PATH to tmp_path."""
+    d = tmp_path / ".claude"
+    d.mkdir()
+    monkeypatch.setattr("memoryschema.cli.plugin_cmd.CLAUDE_DIR", d)
+    monkeypatch.setattr("memoryschema.cli.plugin_cmd.MANIFEST_PATH", d / "memory-schema-manifest.json")
+    return d
 
-**File:** `src/memoryschema/cli/doctor_cmd.py`
+@pytest.fixture
+def plugin_dir(tmp_path):
+    """Create minimal .claude-plugin/ directory with all expected files."""
+    ...create SKILL_FILES + RULE_FILES structure...
+    return plugin
+```
 
-- Line 264: `== "Write"` → `in ("Write", "Write|Edit")`
-
-### 1.6 main.py (cosmetic)
-
-**File:** `src/memoryschema/cli/main.py`
-
-- Line 213: init example `"matcher": "Write"` → `"matcher": "Write|Edit"`
-
-### 1.7 Tests
-
-**File:** `tests/test_cli_hook.py`
-
-- Lines 28, 55, 70: update fixture `"matcher": "Write"` → `"matcher": "Write|Edit"`
-- Line 49: add assertion that installed entry has `"matcher": "Write|Edit"`
-- New test: `test_status_detects_legacy_write_matcher` — verify `status` finds old `"Write"` matcher (backward compat)
+**Key files:**
+- `tests/test_cli_plugin.py` (new)
+- `src/memoryschema/cli/plugin_cmd.py` (read-only reference)
 
 ### Verify Phase 1
 
 ```bash
-pytest tests/test_cli_hook.py -v
-echo '{"tool_name":"Edit","tool_input":{"file_path":"memory/test.md"}}' | bash src/memoryschema/hooks/hook-post-write.sh
-# ^ should not exit early (passes tool_name filter)
-echo '{"tool_name":"Read","tool_input":{"file_path":"memory/test.md"}}' | bash src/memoryschema/hooks/hook-post-write.sh
-# ^ should exit 0 immediately (filtered out)
+pytest tests/test_cli_plugin.py -v -k "not deploy and not uninstall and not status"
 ```
 
 ---
 
-## Phase 2 — Stop hook script + registration ✓ 0423a40
+## Phase 2 — Deploy command tests
 
-### 2.1 New Stop hook script
+### 2.1 Basic deploy
 
-**New file:** `src/memoryschema/hooks/hook-stop.sh`
+- Plugin dir found, no prior deployment → creates skills, rules, memory dir, manifest, registers hook
+- Verify manifest structure: `version`, `deployed_at`, `files_created`, `hook_registered`
+- Verify settings.json updated with PostToolUse `Write|Edit` + Stop hooks
 
-```bash
-#!/bin/bash
-# Stop hook: reminds Claude to update the active chain if no memory write
-# happened this response. Works with hook-post-write.sh which touches the
-# sentinel on every memory file write.
+### 2.2 Deploy with `--force`
 
-set -uo pipefail
+- Files already exist → overwrites them, manifest records `files_overwritten`
 
-CHAIN_FILE="memory/.active_chain"
-SENTINEL="/tmp/claude-memory-chain-updated"
+### 2.3 Deploy without `--force`
 
-# No active chain — nothing to remind
-if [ ! -f "$CHAIN_FILE" ]; then
-    echo '{}'
-    exit 0
-fi
+- Files already exist → skips them, output says "Exists (skip)"
 
-CHAIN_NAME=$(cat "$CHAIN_FILE" | tr -d '[:space:]')
+### 2.4 Deploy idempotent hook
 
-# Chain was updated this response — clear sentinel
-if [ -f "$SENTINEL" ]; then
-    rm -f "$SENTINEL"
-    echo '{}'
-    exit 0
-fi
+- Hook already registered → "already registered" message, `hook_was_existing=True`
 
-# Chain active but not updated — inject reminder
-echo "{\"hookSpecificOutput\":{\"hookEventName\":\"Stop\",\"additionalContext\":\"MEMORY CHAIN REMINDER: The active chain \\\"$CHAIN_NAME\\\" was NOT updated this response. Edit memory/$CHAIN_NAME.md now (use Edit, not Write).\"}}"
-exit 0
-```
+### 2.5 Plugin dir not found
 
-### 2.2 hooks.json — add Stop entry
+- `_find_plugin_dir()` returns `None` → error exit
 
-**File:** `.claude-plugin/hooks/hooks.json`
+### 2.6 Hook scripts missing
 
-```json
-{
-  "hooks": {
-    "PostToolUse": [
-      {
-        "matcher": "Write|Edit",
-        "hooks": [{
-          "type": "command",
-          "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/hook-post-write.sh",
-          "timeout": 15
-        }]
-      }
-    ],
-    "Stop": [
-      {
-        "hooks": [{
-          "type": "command",
-          "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/hook-stop.sh",
-          "timeout": 5
-        }]
-      }
-    ]
-  }
-}
-```
-
-### 2.3 hook_cmd.py — Stop hook install/uninstall/status
-
-**File:** `src/memoryschema/cli/hook_cmd.py`
-
-- Add `_stop_hook_script_path()` resolving `memoryschema.hooks/hook-stop.sh`
-- `install()`: after registering PostToolUse, also register Stop hook in `settings["hooks"].setdefault("Stop", [])`
-- `uninstall()`: also remove Stop hook entries containing `hook-stop.sh`
-- `hook_status()`: also check and report Stop hook registration
-
-### 2.4 plugin_cmd.py — Stop hook deploy/uninstall
-
-**File:** `src/memoryschema/cli/plugin_cmd.py`
-
-- `_add_hook()`: also add Stop hook entry
-- `_remove_hook()`: also remove Stop hook entries
-- `_hook_already_registered()`: also check Stop hook
-- `deploy()`, `uninstall()`, `plugin_status()`: report both hooks
-
-### 2.5 doctor_cmd.py — Stop hook health check
-
-**File:** `src/memoryschema/cli/doctor_cmd.py`
-
-- After existing hook check (~line 270): add check for Stop hook registration
-
-### 2.6 Tests
-
-**File:** `tests/test_cli_hook.py`
-
-- `test_install_creates_stop_entry`: verify `install` creates both PostToolUse and Stop entries
-- `test_uninstall_removes_stop_entry`: verify `uninstall` removes both
-- `test_status_shows_stop_hook`: verify `status` reports Stop hook state
+- `_find_hook_script()` returns `None` → warning but deploy continues
 
 ### Verify Phase 2
 
 ```bash
-pytest tests/test_cli_hook.py -v
-# Manual Stop hook test:
-mkdir -p /tmp/test-stop && echo "chain-test" > /tmp/test-stop/memory/.active_chain
-cd /tmp/test-stop && bash /path/to/hook-stop.sh  # Should print reminder JSON
-touch /tmp/claude-memory-chain-updated
-cd /tmp/test-stop && bash /path/to/hook-stop.sh  # Should print {} and remove sentinel
-rm -rf /tmp/test-stop
+pytest tests/test_cli_plugin.py -v -k "deploy"
 ```
 
 ---
 
-## Phase 3 — Documentation: Edit-not-Write guidance ✓ 371f708
+## Phase 3 — Uninstall command tests
 
-### 3.1 docs/schema.md (source of truth)
+### 3.1 Dry-run (no `--confirm`)
 
-**File:** `docs/schema.md`
+- Shows what would be removed, doesn't delete anything
 
-- Line 516: after "the authorised chain accepts upserts" add: "Use the Edit tool (not Write) to update chain files — three targeted edits per response: append observation, replace description, replace reasoning. Write overwrites the entire `.md` file, risking observation loss."
-- Line 520: "the hook fires on every write" → "the hook fires on every Write or Edit"
-- Line 192 (enforcement): "on every Write to `memory/*.md`" → "on every Write or Edit to `memory/*.md`"
+### 3.2 Full uninstall (`--confirm`)
 
-### 3.2 memory-working.tpl (template)
+- Removes files listed in manifest, removes empty dirs, removes hook from settings, removes manifest
 
-**File:** `src/memoryschema/templates/memory-working.tpl`
+### 3.3 `--keep-data`
 
-After line 46 ("File path" section), before line 49 ("Write decline"), add:
+- Preserves `memory/` directory contents
 
-```markdown
-## Chain updates
+### 3.4 No manifest
 
-When updating a chain entity, use the **Edit** tool (not Write). Write replaces the 
-entire file — if a previous observation is omitted, it is lost from the authoritative 
-`.md` source. Edit preserves existing content and targets only the changed sections.
-```
+- "Nothing to uninstall" message
 
-Note: the template has selective-write policy without chain lifecycle, so this is a standalone section, not embedded in lifecycle docs.
+### 3.5 Hook preservation
 
-### 3.3 Plugin rules — memory-working.md
-
-**File:** `.claude-plugin/rules/memory-working.md`
-
-Lines 34-39 "How to update" section. Replace:
-
-```
-Write the SAME `memory/<chain-name>.md` file on every response. The upsert semantics handle accumulation (only works because the chain is authorised):
-```
-
-With:
-
-```
-**Edit** (not Write) the SAME `memory/<chain-name>.md` file on every response.
-NEVER use Write on an existing chain file — it replaces the entire file, risking observation loss.
-
-Three targeted Edits per update:
-1. **Append** new `<memory:observation>` before `</memory:observations>`
-2. **Replace** `<memory:description>` content
-3. **Replace** `<memory:reasoning>` content
-
-The upsert semantics at the index layer handle accumulation (only works because the chain is authorised):
-```
-
-### 3.4 Plugin rules — memory-schema.md
-
-**File:** `.claude-plugin/rules/memory-schema.md`
-
-- Line 192: "on every Write to `memory/*.md`" → "on every Write or Edit to `memory/*.md`"
+- `hook_was_existing=True` in manifest → hook NOT removed from settings on uninstall
 
 ### Verify Phase 3
 
-- Read through each file for consistency
-- Grep: `grep -rn '"Write"' docs/ .claude-plugin/rules/ src/memoryschema/templates/` — no stale bare `Write` references in hook/enforcement context
+```bash
+pytest tests/test_cli_plugin.py -v -k "uninstall"
+```
 
 ---
 
-## Phase 4 — Deploy + cleanup ✓ deployed
+## Phase 4 — Status command tests
 
-### 4.1 Deploy to global settings
+### 4.1 Not deployed
 
-```bash
-memoryschema plugin deploy --force
-```
+- No manifest → "Not deployed"
 
-This updates:
-- `~/.claude/rules/memory-working.md` (from `.claude-plugin/rules/`)
-- `~/.claude/rules/memory-schema.md` (from `.claude-plugin/rules/`)
-- `~/.claude/settings.json` — PostToolUse `Write|Edit` + Stop hook
+### 4.2 Deployed, all healthy
 
-### 4.2 Remove karpathy prototype
+- Manifest exists, all files present, hook registered → clean status output
 
-**File:** `/Volumes/RAID0/Users/shehzad/Projects/karpathy-llm-wiki/.claude/settings.local.json`
+### 4.3 Missing files
 
-Delete or empty this file — the global hooks supersede it.
+- Some deployed files deleted → reports missing count
+
+### 4.4 Hook not registered
+
+- Hook absent from settings.json → reports "NOT registered"
 
 ### Verify Phase 4
 
 ```bash
-memoryschema hook status   # Shows Write|Edit + Stop hook
-memoryschema doctor        # All checks pass
-cat ~/.claude/rules/memory-working.md | grep -A5 "How to update"  # Shows Edit guidance
+pytest tests/test_cli_plugin.py -v -k "status"
 ```
 
 ---
 
-## File Inventory
-
-| File | Change | Phase |
-|------|--------|-------|
-| `src/memoryschema/hooks/hook-post-write.sh` | Widen tool filter + sentinel touch | 1.1 |
-| `src/memoryschema/hooks/hook-stop.sh` | **New** — Stop hook script | 2.1 |
-| `.claude-plugin/hooks/hooks.json` | Widen matcher + Stop entry | 1.2, 2.2 |
-| `src/memoryschema/cli/hook_cmd.py` | Matcher + Stop support | 1.3, 2.3 |
-| `src/memoryschema/cli/plugin_cmd.py` | Matcher + Stop support | 1.4, 2.4 |
-| `src/memoryschema/cli/doctor_cmd.py` | Matcher + Stop check | 1.5, 2.5 |
-| `src/memoryschema/cli/main.py` | Init example (cosmetic) | 1.6 |
-| `tests/test_cli_hook.py` | Matcher fixtures + Stop tests | 1.7, 2.6 |
-| `docs/schema.md` | Edit guidance + "Write or Edit" | 3.1 |
-| `src/memoryschema/templates/memory-working.tpl` | Chain updates section | 3.2 |
-| `.claude-plugin/rules/memory-working.md` | Edit-not-Write in "How to update" | 3.3 |
-| `.claude-plugin/rules/memory-schema.md` | "Write or Edit" in enforcement | 3.4 |
-| `~/.claude/settings.json` | Via `plugin deploy --force` | 4.1 |
-| `karpathy-llm-wiki/.claude/settings.local.json` | Remove prototype | 4.2 |
-
 ## Verification (end-to-end)
 
-1. `pytest tests/ -x -q` — full suite green
-2. Start chain: `memoryschema chain start chain-test`
-3. Edit a memory file → sentinel touched → Stop hook returns `{}`
-4. Don't edit any memory file → Stop hook returns reminder JSON
-5. `memoryschema hook status` — both hooks registered
-6. `memoryschema doctor` — all checks pass
-7. `memoryschema plugin deploy --force` — deploys updated rules + hooks
+```bash
+pytest tests/test_cli_plugin.py -v          # All plugin tests
+pytest tests/ -x -q                          # Full suite regression
+```
 
-## Status: COMPLETE
+## File Inventory
 
-All 4 phases delivered, 4/4 PASS. 633 tests passing.
-Session report: `docs/reports/2026-06-19-session-report-26.md`
+| File | Change |
+|------|--------|
+| `tests/test_cli_plugin.py` | **New** — full test coverage for plugin_cmd.py |
