@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Changed (Templates)
+- Synced `memory-working.tpl` and `memory-schema.rules.tpl` from deployed global rules — templates now include chain lifecycle, Edit-not-Write, reasoning accumulation, Write|Edit enforcement, Stop hook docs
+
 ### Added (Hook Management System)
 - `memoryschema hook upgrade` — upgrade stale installations (Write→Write|Edit, add Stop hook) with `--dry-run` and `--per-project` flags
 - `memoryschema hook check` — 8 diagnostic checks (script existence, executability, Python interpreter, dry-run both hooks, sentinel writable) with `--json` output
