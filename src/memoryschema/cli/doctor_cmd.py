@@ -15,7 +15,14 @@ from pathlib import Path
 
 import click
 
-from memoryschema.cli._hooks_util import LEGACY_MATCHERS
+from memoryschema.cli._hooks_util import (
+    detect_hook_version,
+    find_hook_script_path,
+    find_stop_hook_script_path,
+    get_hook_registration_detail,
+    get_settings_path,
+    read_settings,
+)
 
 
 def _check(name, test_fn):
@@ -254,51 +261,43 @@ def run_checks(config):
             return False, str(e)[:80], "Check API key validity"
     checks.append(_check("voyage_embed", check_voyage_embed))
 
-    # 16. Hook registered
+    # 16-17b. Hook checks (delegated to _hooks_util)
+    hook_path = find_hook_script_path()
+    stop_path = find_stop_hook_script_path()
+    settings_path = get_settings_path()
+    hook_settings = read_settings(settings_path) if settings_path.exists() else {}
+    hook_detail = get_hook_registration_detail(hook_settings, hook_path, stop_path)
+    hook_version = detect_hook_version(hook_detail)
+
+    # 16. PostToolUse hook registered
     def check_hook():
-        settings_path = Path.home() / ".claude" / "settings.json"
         if not settings_path.exists():
             return False, "~/.claude/settings.json not found", "Run: memoryschema hook install"
-        with open(settings_path) as f:
-            settings = json_mod.load(f)
-        post_tool = settings.get("hooks", {}).get("PostToolUse", [])
-        for entry in post_tool:
-            if entry.get("matcher") in LEGACY_MATCHERS:
-                for h in entry.get("hooks", []):
-                    if "hook-post-write.sh" in h.get("command", ""):
-                        timeout = h.get("timeout", "?")
-                        return True, f"registered (timeout: {timeout}s)", None
-        return False, "not registered", "Run: memoryschema hook install"
+        if not hook_detail["post_tool_use_registered"]:
+            return False, "not registered", "Run: memoryschema hook install"
+        stale = " ⚠ STALE" if hook_detail["post_tool_use_stale"] else ""
+        fix = "Run: memoryschema hook upgrade" if hook_detail["post_tool_use_stale"] else None
+        return True, f"v{hook_version} (matcher: {hook_detail['post_tool_use_matcher']}, timeout: {hook_detail['post_tool_use_timeout']}s){stale}", fix
     checks.append(_check("hook", check_hook))
 
     # 17. Hook script exists
     def check_hook_script():
-        try:
-            from importlib.resources import files
-            hook_path = str(files("memoryschema.hooks") / "hook-post-write.sh")
-            if os.path.exists(hook_path):
-                executable = os.access(hook_path, os.X_OK)
-                return True, f"{hook_path} ({'executable' if executable else 'not executable'})", \
-                    None if executable else "Run: chmod +x " + hook_path
+        if not hook_path:
             return False, "hook script not found", "Reinstall: pip install memory-schema"
-        except Exception:
-            return False, "cannot locate hook", "Reinstall: pip install memory-schema"
+        if not os.path.exists(hook_path):
+            return False, f"missing: {hook_path}", "Reinstall: pip install memory-schema"
+        executable = os.access(hook_path, os.X_OK)
+        return True, f"{hook_path} ({'executable' if executable else 'not executable'})", \
+            None if executable else "Run: chmod +x " + hook_path
     checks.append(_check("hook_script", check_hook_script))
 
     # 17b. Stop hook registered
     def check_stop_hook():
-        settings_path = Path.home() / ".claude" / "settings.json"
         if not settings_path.exists():
             return False, "~/.claude/settings.json not found", "Run: memoryschema hook install"
-        with open(settings_path) as f:
-            settings = json_mod.load(f)
-        stop_hooks = settings.get("hooks", {}).get("Stop", [])
-        for entry in stop_hooks:
-            for h in entry.get("hooks", []):
-                if "hook-stop.sh" in h.get("command", ""):
-                    timeout = h.get("timeout", "?")
-                    return True, f"registered (timeout: {timeout}s)", None
-        return False, "not registered", "Run: memoryschema hook install"
+        if not hook_detail["stop_registered"]:
+            return False, "not registered", "Run: memoryschema hook upgrade"
+        return True, f"registered (timeout: {hook_detail['stop_timeout']}s)", None
     checks.append(_check("stop_hook", check_stop_hook))
 
     # 18. Tests
