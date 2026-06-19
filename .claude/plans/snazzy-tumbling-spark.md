@@ -1,197 +1,175 @@
-# Resolve Residuals: plugin_cmd.py Test Coverage
+# Hook Consolidation: Fix Bug, Document Formats, Extract Shared Utilities
 
 ## Context
 
-`plugin_cmd.py` has had no test coverage since it was created in session 24. It has been carried as a residual through sessions 24→25→26. The module has 3 CLI commands (deploy, uninstall, status), 10 helper functions, and complex filesystem/settings interactions. This is the only actionable code residual — the other "work remaining" items (voyage API key setup, M2/M3 field spaces) are operational or gated.
+Three issues with the hook management code:
 
-## Prior Residuals (from [S4] d68182a)
+1. **Bug**: Stop hook used `hookSpecificOutput.additionalContext` instead of `systemMessage` — fix is on disk but uncommitted, and no documentation exists about valid output formats per event type.
+2. **Duplication**: Hook registration/removal/detection logic is duplicated across `hook_cmd.py`, `plugin_cmd.py`, and `doctor_cmd.py` (~200 lines of duplication). The matcher string `"Write|Edit"` appears 15+ times as a magic literal.
+3. **Global gaps**: `hook_cmd.py` uninstall/status are global-only despite install supporting `--per-project`. Settings backup only happens in `plugin_cmd.py`, not `hook_cmd.py`. Timeout inconsistency (hooks.json: 15s, CLI: 10s).
 
-- R1: `plugin_cmd.py` has no test coverage (source: session 24) → addressing in Phases 1-4
+## Prior Residuals (from [S4] 1efd5cb)
 
-## Other Work Remaining (not in scope)
-
-- Set `voyage.api_key` in `memoryschema.toml` — operational setup, not code work
-- M2: summary/prompt spaces — gated on beating single-space baseline
-- M3: mutable/drift spaces — deferred
+- None — ledger is empty
 
 ---
 
-## Phase 1 — Helper function unit tests ✓ 4a49a0e
+## Phase 1 — Bug fix + document hook output formats
 
-**New file:** `tests/test_cli_plugin.py`
+Single commit covering the Stop hook fix and output format documentation.
 
-Test the pure-logic helpers that don't need full CLI invocation:
+### 1.1 `src/memoryschema/hooks/hook-stop.sh`
 
-### 1.1 `_hook_already_registered(settings, fragment)`
+Expand header with output format spec. The `systemMessage` fix is already on disk.
 
-- Empty settings → `(False, None)`
-- Settings with `"Write"` matcher containing `"memoryschema"` → `(True, cmd)`
-- Settings with `"Write|Edit"` matcher containing `"memoryschema"` → `(True, cmd)`
-- Settings with unrelated hooks only → `(False, None)`
+### 1.2 `src/memoryschema/hooks/hook-post-write.sh`
 
-### 1.2 `_add_hook(settings, hook_cmd, stop_hook_cmd)`
+Add output format comment block after existing header.
 
-- Empty settings → creates PostToolUse `Write|Edit` entry
-- With `stop_hook_cmd` → also creates Stop entry
-- Without `stop_hook_cmd` → no Stop entry
+### 1.3 `docs/technical-reference.md`
 
-### 1.3 `_remove_hook(settings, fragment)`
+Insert `## Hook Output Formats` section between Pipeline and Audit Trail:
+- Common fields table (all events): `continue`, `suppressOutput`, `systemMessage`, etc.
+- Event-specific `hookSpecificOutput` table: supported by PreToolUse/PostToolUse/UserPromptSubmit, NOT by Stop/SessionStart/PreCompact
+- Common mistake callout + correct/incorrect examples
 
-- Settings with memory-schema PostToolUse + Stop hooks → both removed, returned in list
-- Settings with mixed hooks (aurora + memoryschema) → only memoryschema removed
-- Settings with no matching hooks → empty removed list, settings unchanged
+Update CLI table: "Manage PostToolUse hook" → "Manage PostToolUse and Stop hooks"
 
-### 1.4 `_read_settings()` / `_write_settings(data)`
+### 1.4 `CHANGELOG.md`
 
-- Missing file → returns `{}`
-- Valid JSON → returns parsed dict
-- Write creates backup `.memory-schema-backup` before overwriting
-- Write produces valid JSON with trailing newline
+Insert `### Fixed (Chain Enforcement)` entry for the `systemMessage` fix.
 
-### 1.5 `_read_manifest()` / `_write_manifest(manifest)`
+### Verify
 
-- Missing file → returns `None`
-- Valid manifest → returns parsed dict
-- Write produces valid JSON
+```bash
+pytest tests/ -x -q
+grep "systemMessage" src/memoryschema/hooks/hook-stop.sh
+grep "Hook Output Formats" docs/technical-reference.md
+```
 
-### Fixtures needed
+---
+
+## Phase 2 — Extract shared hook utilities
+
+**New file:** `src/memoryschema/cli/_hooks_util.py`
+
+Extract from `hook_cmd.py` and `plugin_cmd.py` into a single module:
 
 ```python
-@pytest.fixture
-def claude_dir(tmp_path, monkeypatch):
-    """Redirect CLAUDE_DIR and MANIFEST_PATH to tmp_path."""
-    d = tmp_path / ".claude"
-    d.mkdir()
-    monkeypatch.setattr("memoryschema.cli.plugin_cmd.CLAUDE_DIR", d)
-    monkeypatch.setattr("memoryschema.cli.plugin_cmd.MANIFEST_PATH", d / "memory-schema-manifest.json")
-    return d
+HOOK_MATCHER = "Write|Edit"
+LEGACY_MATCHERS = ("Write", "Write|Edit")
 
-@pytest.fixture
-def plugin_dir(tmp_path):
-    """Create minimal .claude-plugin/ directory with all expected files."""
-    ...create SKILL_FILES + RULE_FILES structure...
-    return plugin
+def find_hook_script_path() -> str | None
+def find_stop_hook_script_path() -> str | None
+def get_settings_path(per_project=False, project_root=None) -> Path
+def read_settings(path: Path = None) -> dict
+def write_settings(path: Path, data: dict, backup: bool = True) -> None
+def hook_already_registered(settings: dict, fragment="memoryschema") -> tuple[bool, str | None]
+def register_hooks(settings: dict, hook_cmd: str, stop_cmd: str | None = None) -> dict
+def unregister_hooks(settings: dict, fragment="memoryschema") -> tuple[dict, list[str]]
 ```
 
-**Key files:**
-- `tests/test_cli_plugin.py` (new)
-- `src/memoryschema/cli/plugin_cmd.py` (read-only reference)
+Key decisions:
+- `backup=True` by default (plugin_cmd had it, hook_cmd didn't — consolidate on safer default)
+- `HOOK_MATCHER` constant replaces all magic `"Write|Edit"` literals
+- `LEGACY_MATCHERS` tuple replaces `in ("Write", "Write|Edit")` pattern
+- `get_settings_path()` from hook_cmd.py becomes the shared path resolver
 
-### Verify Phase 1
+### Verify
 
 ```bash
-pytest tests/test_cli_plugin.py -v -k "not deploy and not uninstall and not status"
+pytest tests/ -x -q   # Existing tests still pass (no consumers changed yet)
+python3 -c "from memoryschema.cli._hooks_util import HOOK_MATCHER; print(HOOK_MATCHER)"
 ```
 
 ---
 
-## Phase 2 — Deploy command tests ✓ 8294cca
+## Phase 3 — Refactor hook_cmd.py to use shared utilities
 
-### 2.1 Basic deploy
+Replace inline logic with imports from `_hooks_util`:
 
-- Plugin dir found, no prior deployment → creates skills, rules, memory dir, manifest, registers hook
-- Verify manifest structure: `version`, `deployed_at`, `files_created`, `hook_registered`
-- Verify settings.json updated with PostToolUse `Write|Edit` + Stop hooks
+- Remove `_settings_path()`, `_hook_script_path()`, `_stop_hook_script_path()` — import from `_hooks_util`
+- `install()`: use `register_hooks()` + `write_settings(backup=True)`
+- `uninstall()`: use `unregister_hooks()` + `write_settings(backup=True)` — add backup (was missing)
+- `hook_status()`: use `hook_already_registered()` from shared util
+- Replace all `"Write|Edit"` / `in ("Write", "Write|Edit")` with `HOOK_MATCHER` / `LEGACY_MATCHERS`
 
-### 2.2 Deploy with `--force`
-
-- Files already exist → overwrites them, manifest records `files_overwritten`
-
-### 2.3 Deploy without `--force`
-
-- Files already exist → skips them, output says "Exists (skip)"
-
-### 2.4 Deploy idempotent hook
-
-- Hook already registered → "already registered" message, `hook_was_existing=True`
-
-### 2.5 Plugin dir not found
-
-- `_find_plugin_dir()` returns `None` → error exit
-
-### 2.6 Hook scripts missing
-
-- `_find_hook_script()` returns `None` → warning but deploy continues
-
-### Verify Phase 2
+### Verify
 
 ```bash
-pytest tests/test_cli_plugin.py -v -k "deploy"
+pytest tests/test_cli_hook.py -v    # All hook tests pass
+pytest tests/ -x -q                 # Full regression
 ```
 
 ---
 
-## Phase 3 — Uninstall command tests ✓ e5747c3
+## Phase 4 — Refactor plugin_cmd.py to use shared utilities
 
-### 3.1 Dry-run (no `--confirm`)
+Replace inline logic with imports from `_hooks_util`:
 
-- Shows what would be removed, doesn't delete anything
+- Remove `_find_hook_script()`, `_find_stop_hook_script()`, `_read_settings()`, `_write_settings()`, `_hook_already_registered()`, `_add_hook()`, `_remove_hook()` — import from `_hooks_util`
+- `deploy()`: use `register_hooks()` + `write_settings(backup=True)` + `hook_already_registered()`
+- `uninstall()`: use `unregister_hooks()` + `write_settings()`
+- `plugin_status()`: use `hook_already_registered()` from shared util
+- Replace all matcher literals with constants
 
-### 3.2 Full uninstall (`--confirm`)
-
-- Removes files listed in manifest, removes empty dirs, removes hook from settings, removes manifest
-
-### 3.3 `--keep-data`
-
-- Preserves `memory/` directory contents
-
-### 3.4 No manifest
-
-- "Nothing to uninstall" message
-
-### 3.5 Hook preservation
-
-- `hook_was_existing=True` in manifest → hook NOT removed from settings on uninstall
-
-### Verify Phase 3
+### Verify
 
 ```bash
-pytest tests/test_cli_plugin.py -v -k "uninstall"
+pytest tests/test_cli_plugin.py -v   # All plugin tests pass
+pytest tests/ -x -q                  # Full regression
 ```
 
 ---
 
-## Phase 4 — Status command tests ✓ 08b9e39
+## Phase 5 — Refactor doctor_cmd.py + consolidate tests
 
-### 4.1 Not deployed
+### 5.1 doctor_cmd.py
 
-- No manifest → "Not deployed"
+Replace inline matcher check with `LEGACY_MATCHERS` import.
 
-### 4.2 Deployed, all healthy
+### 5.2 main.py
 
-- Manifest exists, all files present, hook registered → clean status output
+Replace matcher literal in init example output with `HOOK_MATCHER`.
 
-### 4.3 Missing files
+### 5.3 Test consolidation
 
-- Some deployed files deleted → reports missing count
+- **New file:** `tests/test_hooks_util.py` — tests for the shared utility functions (extracted from `test_cli_plugin.py` Phase 1 tests: `TestHookAlreadyRegistered`, `TestAddHook`, `TestRemoveHook`, `TestReadWriteSettings`)
+- **Update `test_cli_plugin.py`** — remove helper function tests (now in `test_hooks_util.py`), keep deploy/uninstall/status command tests
+- **Update `test_cli_hook.py`** — update imports, ensure tests use shared util behavior
 
-### 4.4 Hook not registered
-
-- Hook absent from settings.json → reports "NOT registered"
-
-### Verify Phase 4
+### Verify
 
 ```bash
-pytest tests/test_cli_plugin.py -v -k "status"
+pytest tests/test_hooks_util.py -v    # Shared util tests pass
+pytest tests/ -x -q                   # Full regression — same count, reorganized
 ```
 
 ---
+
+## File Inventory
+
+| File | Change | Phase |
+|------|--------|-------|
+| `src/memoryschema/hooks/hook-stop.sh` | Expand header + fix | 1.1 |
+| `src/memoryschema/hooks/hook-post-write.sh` | Add output format comment | 1.2 |
+| `docs/technical-reference.md` | Hook Output Formats section | 1.3 |
+| `CHANGELOG.md` | Fixed entry + consolidation entry | 1.4, 5 |
+| `src/memoryschema/cli/_hooks_util.py` | **New** — shared hook utilities | 2 |
+| `src/memoryschema/cli/hook_cmd.py` | Refactor to use `_hooks_util` | 3 |
+| `src/memoryschema/cli/plugin_cmd.py` | Refactor to use `_hooks_util` | 4 |
+| `src/memoryschema/cli/doctor_cmd.py` | Use `LEGACY_MATCHERS` | 5.1 |
+| `src/memoryschema/cli/main.py` | Use `HOOK_MATCHER` | 5.2 |
+| `tests/test_hooks_util.py` | **New** — shared util tests | 5.3 |
+| `tests/test_cli_plugin.py` | Remove helper tests (moved) | 5.3 |
+| `tests/test_cli_hook.py` | Update imports | 5.3 |
 
 ## Verification (end-to-end)
 
 ```bash
-pytest tests/test_cli_plugin.py -v          # All plugin tests
-pytest tests/ -x -q                          # Full suite regression
+pytest tests/ -x -q                           # Full suite green
+memoryschema hook status                       # Both hooks reported
+memoryschema doctor                            # All checks pass
+python3 -c "from memoryschema.cli._hooks_util import HOOK_MATCHER; print(HOOK_MATCHER)"
+grep -rn "Write|Edit" src/memoryschema/cli/    # Only in _hooks_util.py constant
 ```
-
-## File Inventory
-
-| File | Change |
-|------|--------|
-| `tests/test_cli_plugin.py` | **New** — full test coverage for plugin_cmd.py |
-
-## Status: COMPLETE
-
-All 4 phases delivered, 4/4 PASS. 675 tests passing (+42 new).
-Residual R1 (plugin_cmd.py test coverage, session 24) → RESOLVED.
-Session report: `docs/reports/2026-06-19-session-report-27.md`
