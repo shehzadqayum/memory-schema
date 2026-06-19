@@ -238,6 +238,12 @@ def hook_check(config, as_json):
     """
     hook_path = find_hook_script_path()
     stop_path = find_stop_hook_script_path()
+
+    # Read settings to get hook command (needed for Python path extraction)
+    settings_file = get_settings_path()
+    settings = read_settings(settings_file) if settings_file.exists() else {}
+    reg_detail = get_hook_registration_detail(settings, hook_path, stop_path)
+
     checks = []
 
     def _check(name, fn):
@@ -260,7 +266,7 @@ def hook_check(config, as_json):
 
     # 3. Python interpreter valid
     _check("python_interpreter",
-           lambda: validate_hook_python(hook_path))
+           lambda: validate_hook_python(hook_path, hook_command=reg_detail.get("post_tool_use_command")))
 
     # 4. PostToolUse dry run
     def _post_dry():

@@ -462,14 +462,17 @@ def find_project_settings(scan_dirs=None):
     return results
 
 
-def validate_hook_python(hook_script_path):
-    """Validate the Python interpreter referenced by a hook script.
+def validate_hook_python(hook_script_path, hook_command=None):
+    """Validate the Python interpreter referenced by a hook script or command.
 
-    Extracts the MEMORYSCHEMA_PYTHON default or PYTHON= assignment from the
-    script and checks that the interpreter exists and can import memoryschema.
+    Checks (in order):
+    1. MEMORYSCHEMA_PYTHON default in the script
+    2. PYTHON= assignment in the script
+    3. Python path argument in the settings.json command string
 
     Args:
         hook_script_path: Path to the hook shell script.
+        hook_command: Full command string from settings.json (e.g. "bash /path/hook.sh /path/python3").
 
     Returns:
         tuple[bool, str]: (valid, detail_message).
@@ -493,8 +496,17 @@ def validate_hook_python(hook_script_path):
     except Exception as e:
         return False, f"Cannot read script: {e}"
 
+    # Fallback: extract from settings.json command args
+    if not python_path and hook_command:
+        parts = hook_command.split()
+        # Command format: "bash /path/hook.sh /path/python3"
+        if len(parts) >= 3:
+            candidate = parts[-1]
+            if os.path.exists(candidate):
+                python_path = candidate
+
     if not python_path:
-        return False, "No Python interpreter found in script"
+        return False, "No Python interpreter found in script or command"
 
     if not os.path.exists(python_path):
         return False, f"Python not found: {python_path}"
