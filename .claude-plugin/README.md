@@ -34,9 +34,9 @@ Get your key at [dash.voyageai.com](https://dash.voyageai.com/).
 
 ## What the plugin provides
 
-### Hook: PostToolUse Write
+### Hook: PostToolUse (Write or Edit)
 
-Fires on every Write to `memory/*.md`. The hook:
+Fires on every Write or Edit to `memory/*.md`. The hook:
 
 1. Parses the `<memory:entity>` XML
 2. Checks authorisation (only the active chain or new entities can be written)
@@ -45,6 +45,11 @@ Fires on every Write to `memory/*.md`. The hook:
 5. Runs the write gate (validation, consistency, numeric probe, L0 echo)
 6. Indexes to Neo4j (primary) or JSONL (fallback)
 7. Updates MEMORY.md with L0 budget enforcement
+8. Touches sentinel for Stop hook chain-update check
+
+### Hook: Stop (chain update reminder)
+
+Fires at the end of every Claude response. If an active chain exists (`memory/.active_chain`) but no memory write occurred during the response (sentinel absent), injects a reminder via `systemMessage` to update the chain entity.
 
 ### Rules
 

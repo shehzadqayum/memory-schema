@@ -96,8 +96,8 @@ memoryschema rules --conflicts
 memoryschema hook install
 ```
 
-Adds the PostToolUse Write hook to `~/.claude/settings.json`. The hook:
-1. Fires on every Write to `memory/*.md`
+Adds the PostToolUse and Stop hooks to `~/.claude/settings.json`. The PostToolUse hook:
+1. Fires on every Write or Edit to `memory/*.md`
 2. Parses the `<memory:entity>` XML
 3. Runs write gate pipeline (REJECT / QUARANTINE / ACCEPT)
 4. Embeds via Voyage AI (if key set, non-blocking on failure)
@@ -188,9 +188,9 @@ Each external service is optional. The system degrades gracefully:
 | `memoryschema neo4j shell` | Open Cypher shell |
 | `memoryschema voyage status` | Check API key, test embed |
 | `memoryschema voyage test <text>` | Embed text, show vector stats |
-| `memoryschema hook install` | Register PostToolUse hook |
-| `memoryschema hook uninstall` | Remove PostToolUse hook |
-| `memoryschema hook status` | Show hook registration |
+| `memoryschema hook install` | Register PostToolUse and Stop hooks |
+| `memoryschema hook uninstall` | Remove PostToolUse and Stop hooks |
+| `memoryschema hook status` | Show hook registration (both types) |
 | `memoryschema hook test` | Test hook execution |
 
 ### Operations
@@ -344,14 +344,16 @@ pytest tests/ --cov=memoryschema --cov-report=term-missing
 pytest tests/test_store.py -v
 ```
 
-**569 tests** across 33 test files covering all modules:
+**677 tests** across 36 test files covering all modules:
 
 | Category | Files | Tests | What's tested |
 |----------|------:|------:|---------------|
 | Core modules | 7 | 236 | config, discovery, validator, tags, store, consolidation, hierarchy |
 | Mocked deps | 5 | 48 | embeddings, neo4j_store, schema, migration, reembed |
 | Lazy imports | 1 | 23 | __init__.py public API, __getattr__, __all__ |
-| CLI commands | 12 | 89 | All CLI modules via Click CliRunner |
+| CLI commands | 13 | 116 | All CLI modules via Click CliRunner (hook, plugin, chain, etc.) |
+| Shared utils | 1 | 25 | _hooks_util: registration, removal, settings I/O, constants |
+| Plugin deploy | 1 | 19 | deploy, uninstall, status commands + manifest |
 | Integration | 2 | 76 | inheritance (config chain), write_gate, eval harness |
 
 **Mocking strategy:** External dependencies (voyageai, neo4j, Docker) are mocked with `unittest.mock.patch` — no real API calls, containers, or network required to run tests.

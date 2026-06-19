@@ -241,6 +241,7 @@ from memoryschema import Neo4jMemoryStore, embed_text, embed_batch, rerank
 | `memoryschema.audit` | Append-only mutation log with field-level change tracking |
 | `memoryschema.l0_budget` | MEMORY.md token budget enforcement with score-based eviction |
 | `memoryschema.write_gate` | Three-verdict write gate: ACCEPT/REJECT/QUARANTINE pipeline |
+| `memoryschema.cli._hooks_util` | Shared hook utilities: path resolution, settings I/O, registration/removal (HOOK_MATCHER, LEGACY_MATCHERS constants) |
 | `memoryschema.numeric_probe` | Numeric contradiction detection: extract_claims, compare |
 | `memoryschema.cli.eval_cmd` | Evaluation harness: recall@k, MRR, nDCG metrics |
 | `memoryschema.cli.reflect_cmd` | Episodic clustering and semantic summary synthesis |
@@ -317,7 +318,7 @@ from memoryschema import Neo4jMemoryStore, embed_text, embed_batch, rerank
 
 ### Coverage
 
-627 tests across 35 files + 2 Neo4j integration (deselected by default). 21/21 doctor checks.
+677 tests across 36 files + 2 Neo4j integration (deselected by default). 22/22 doctor checks.
 
 | Category | Files | Tests |
 |----------|------:|------:|
@@ -329,7 +330,7 @@ from memoryschema import Neo4jMemoryStore, embed_text, embed_batch, rerank
 | CLI commands | 11 | 84 |
 | Eval + metrics | 1 | 24 |
 | Other (tags, discovery, decline) | 3 | 35 |
-| **Total (collected)** | **35** | **627** |
+| **Total (collected)** | **36** | **677** |
 | Neo4j integration (deselected, `pytest -m integration`) | — | 2 |
 
 ### Mocking Patterns
