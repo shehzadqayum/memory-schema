@@ -1,11 +1,62 @@
 """Neo4j Docker container management."""
 
 import json
+import os
+import shutil
 import subprocess
 import sys
 import time
 
 import click
+
+
+def _find_docker():
+    """Find the Docker binary, checking PATH and common locations.
+
+    Returns:
+        str or None: Path to docker binary, or None if not found.
+    """
+    docker_path = shutil.which("docker")
+    if docker_path:
+        return docker_path
+    for path in ["/usr/local/bin/docker", "/usr/bin/docker", "/opt/homebrew/bin/docker"]:
+        if os.path.exists(path):
+            return path
+    return None
+
+
+def _check_docker():
+    """Check Docker availability with detailed diagnostics.
+
+    Returns:
+        str: Path to the docker binary.
+
+    Raises:
+        SystemExit: If Docker is not found or not running.
+    """
+    docker_path = _find_docker()
+    if not docker_path:
+        click.echo("Error: Docker binary not found in PATH.", err=True)
+        click.echo(f"  PATH: {os.environ.get('PATH', 'not set')}", err=True)
+        click.echo("Fix: Install Docker from https://docker.com.", err=True)
+        sys.exit(1)
+
+    try:
+        result = subprocess.run(
+            [docker_path, "info"], capture_output=True, text=True, timeout=10)
+        if result.returncode != 0:
+            click.echo("Error: Docker is installed but not running.", err=True)
+            click.echo(f"  stderr: {result.stderr.strip()[:200]}", err=True)
+            click.echo("Fix: Start the Docker daemon.", err=True)
+            sys.exit(1)
+    except subprocess.TimeoutExpired:
+        click.echo("Error: Docker command timed out.", err=True)
+        sys.exit(1)
+    except Exception as e:
+        click.echo(f"Error: Cannot run Docker: {e}", err=True)
+        sys.exit(1)
+
+    return docker_path
 
 
 @click.group()
@@ -29,12 +80,7 @@ def deploy(config):
         memoryschema neo4j deploy
     """
     # Check Docker
-    try:
-        subprocess.run(["docker", "info"], capture_output=True, check=True)
-    except (FileNotFoundError, subprocess.CalledProcessError):
-        click.echo("Error: Docker is not installed or not running.", err=True)
-        click.echo("Fix: Install Docker from https://docker.com and start the daemon.", err=True)
-        sys.exit(1)
+    _check_docker()
 
     compose_path = config.docker_compose_path
     if not compose_path.exists():
@@ -136,11 +182,15 @@ def neo4j_status(config, as_json):
     info = {"container": config.neo4j_container_name, "uri": config.neo4j_uri}
 
     # Docker availability
-    try:
-        subprocess.run(["docker", "info"], capture_output=True, check=True)
-        docker_available = True
-    except (FileNotFoundError, subprocess.CalledProcessError):
-        docker_available = False
+    docker_path = _find_docker()
+    docker_available = False
+    if docker_path:
+        try:
+            result = subprocess.run(
+                [docker_path, "info"], capture_output=True, text=True, timeout=10)
+            docker_available = result.returncode == 0
+        except Exception:
+            pass
 
     info["docker_available"] = docker_available
 
