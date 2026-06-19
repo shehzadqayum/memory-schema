@@ -59,6 +59,33 @@ class TestUpsert:
         store.upsert({'name': 'test', 'description': 'V2'})
         assert store.get('test')['created_at'] == created
 
+    def test_chain_reasoning_appends(self, store):
+        """Chain entities accumulate reasoning with --- separator."""
+        store.upsert({'name': 'chain-test', 'schema': 2, 'description': 'Chain',
+                       'reasoning': 'Step 1: initial approach'})
+        store.upsert({'name': 'chain-test',
+                       'reasoning': 'Step 2: refined after testing'})
+        entry = store.get('chain-test')
+        assert '---' in entry['reasoning']
+        assert 'Step 1' in entry['reasoning']
+        assert 'Step 2' in entry['reasoning']
+        # Third update also appends
+        store.upsert({'name': 'chain-test',
+                       'reasoning': 'Step 3: conclusion'})
+        entry = store.get('chain-test')
+        assert entry['reasoning'].count('---') == 2
+        assert 'Step 3' in entry['reasoning']
+
+    def test_standalone_reasoning_replaces(self, store):
+        """Non-chain entities replace reasoning (no accumulation)."""
+        store.upsert({'name': 'my-fact', 'schema': 2, 'description': 'Fact',
+                       'reasoning': 'Original reasoning'})
+        store.upsert({'name': 'my-fact',
+                       'reasoning': 'Updated reasoning'})
+        entry = store.get('my-fact')
+        assert entry['reasoning'] == 'Updated reasoning'
+        assert '---' not in entry['reasoning']
+
 
 class TestGet:
     def test_found(self, populated_store):
