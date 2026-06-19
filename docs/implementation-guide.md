@@ -67,7 +67,7 @@ memoryschema voyage status
 memoryschema hook install
 ```
 
-This adds the PostToolUse and Stop hooks to `~/.claude/settings.json` (global). The PostToolUse hook fires on every Write or Edit to `memory/*.md`, parsing, embedding, and indexing automatically. The Stop hook reminds Claude to update the active chain entity when no memory write occurred during a response.
+This adds the PostToolUse and Stop hooks to `~/.claude/settings.json` (global). The install command embeds the current Python interpreter path in the hook command, so the hook always uses the correct Python regardless of shell environment. The PostToolUse hook fires on every Write or Edit to `memory/*.md`, parsing, embedding, and indexing automatically. The Stop hook reminds Claude to update the active chain entity when no memory write occurred during a response.
 
 **Note:** The hook installs globally, not per-project. On multi-project machines, the hook runs for all projects. This is safe — the hook derives the project root from the file path and only processes files under `memory/`.
 

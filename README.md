@@ -96,7 +96,7 @@ memoryschema rules --conflicts
 memoryschema hook install
 ```
 
-Adds the PostToolUse and Stop hooks to `~/.claude/settings.json`. The PostToolUse hook:
+Adds the PostToolUse and Stop hooks to `~/.claude/settings.json`. The install command embeds the current Python interpreter path in the hook command, so the hook always uses the correct Python regardless of shell environment. The PostToolUse hook:
 1. Fires on every Write or Edit to `memory/*.md`
 2. Parses the `<memory:entity>` XML
 3. Runs write gate pipeline (REJECT / QUARANTINE / ACCEPT)
@@ -361,7 +361,7 @@ pytest tests/test_store.py -v
 
 **Mocking strategy:** External dependencies (voyageai, neo4j, Docker) are mocked with `unittest.mock.patch` — no real API calls, containers, or network required to run tests.
 
-**Diagnostics:** `memoryschema doctor` runs 21 health checks against the live system. Use it to verify a real deployment:
+**Diagnostics:** `memoryschema doctor` runs 22 health checks against the live system (always tests the memory-schema package, not the consumer project). Use it to verify a real deployment:
 
 ```bash
 memoryschema doctor          # Human-readable status report

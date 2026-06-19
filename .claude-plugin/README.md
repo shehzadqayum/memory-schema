@@ -36,7 +36,7 @@ Get your key at [dash.voyageai.com](https://dash.voyageai.com/).
 
 ### Hook: PostToolUse (Write or Edit)
 
-Fires on every Write or Edit to `memory/*.md`. The hook:
+Fires on every Write or Edit to `memory/*.md`. The Python interpreter is resolved via: argument (embedded by `hook install`) > `MEMORYSCHEMA_PYTHON` env var > auto-detect (`python3`/`python` with memoryschema importable). The hook:
 
 1. Parses the `<memory:entity>` XML
 2. Checks authorisation (only the active chain or new entities can be written)

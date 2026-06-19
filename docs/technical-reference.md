@@ -367,9 +367,10 @@ from memoryschema import Neo4jMemoryStore, embed_text, embed_batch, rerank
 | neo4j_nodes | node count > 0 | `memoryschema index` |
 | voyage_key | API key set | `export VOYAGE_API_KEY=...` |
 | voyage_embed | test embed succeeds | Check key validity |
-| hook | registered | `memoryschema hook install` |
+| hook | registered, version, staleness | `memoryschema hook install` or `hook upgrade` |
 | hook_script | exists, executable | Reinstall package |
-| tests | pytest passes | Fix failing tests |
+| stop_hook | registered | `memoryschema hook install` or `hook upgrade` |
+| tests | pytest passes (package tests) | Fix failing tests |
 
 ---
 
