@@ -376,3 +376,127 @@ class TestDeploy:
         result, claude_dir = self._deploy(runner, tmp_path, plugin_dir, hook_path=None)
         assert result.exit_code == 0
         assert "script not found" in result.output.lower() or "register manually" in result.output.lower()
+
+
+# ---------------------------------------------------------------------------
+# 3. Uninstall command tests
+# ---------------------------------------------------------------------------
+
+class TestUninstall:
+    def _deploy_then_uninstall(self, runner, tmp_path, plugin_dir, uninstall_args=None):
+        """Deploy first, then run uninstall with given args."""
+        claude_dir = tmp_path / ".claude"
+        claude_dir.mkdir(exist_ok=True)
+        manifest_path = claude_dir / "memory-schema-manifest.json"
+
+        # Deploy
+        with patch("memoryschema.cli.plugin_cmd.CLAUDE_DIR", claude_dir), \
+             patch("memoryschema.cli.plugin_cmd.MANIFEST_PATH", manifest_path), \
+             patch("memoryschema.cli.plugin_cmd._find_plugin_dir", return_value=plugin_dir), \
+             patch("memoryschema.cli.plugin_cmd._find_hook_script", return_value="/pkg/memoryschema/hook.sh"), \
+             patch("memoryschema.cli.plugin_cmd._find_stop_hook_script", return_value="/pkg/memoryschema/stop.sh"):
+            runner.invoke(cli, ["plugin", "deploy"], catch_exceptions=False)
+
+        # Uninstall
+        args = ["plugin", "uninstall"] + (uninstall_args or [])
+        with patch("memoryschema.cli.plugin_cmd.CLAUDE_DIR", claude_dir), \
+             patch("memoryschema.cli.plugin_cmd.MANIFEST_PATH", manifest_path):
+            result = runner.invoke(cli, args, catch_exceptions=False)
+        return result, claude_dir
+
+    def test_dry_run(self, runner, tmp_path, plugin_dir):
+        """Without --confirm, shows what would be removed but doesn't delete."""
+        result, claude_dir = self._deploy_then_uninstall(runner, tmp_path, plugin_dir)
+        assert result.exit_code == 0
+        assert "Dry run" in result.output
+        # Files still exist
+        for _, dst_rel in SKILL_FILES:
+            assert (claude_dir / dst_rel).exists()
+
+    def test_full_uninstall(self, runner, tmp_path, plugin_dir):
+        """With --confirm, removes deployed files and manifest."""
+        result, claude_dir = self._deploy_then_uninstall(
+            runner, tmp_path, plugin_dir, ["--confirm"])
+        assert result.exit_code == 0
+        assert "Removed" in result.output
+        # Manifest removed
+        assert not (claude_dir / "memory-schema-manifest.json").exists()
+        # Deployed skill files removed
+        for _, dst_rel in SKILL_FILES:
+            assert not (claude_dir / dst_rel).exists()
+
+    def test_keep_data(self, runner, tmp_path, plugin_dir):
+        """With --keep-data, preserves memory directory."""
+        # Deploy first
+        claude_dir = tmp_path / ".claude"
+        claude_dir.mkdir(exist_ok=True)
+        manifest_path = claude_dir / "memory-schema-manifest.json"
+        with patch("memoryschema.cli.plugin_cmd.CLAUDE_DIR", claude_dir), \
+             patch("memoryschema.cli.plugin_cmd.MANIFEST_PATH", manifest_path), \
+             patch("memoryschema.cli.plugin_cmd._find_plugin_dir", return_value=plugin_dir), \
+             patch("memoryschema.cli.plugin_cmd._find_hook_script", return_value="/pkg/memoryschema/hook.sh"), \
+             patch("memoryschema.cli.plugin_cmd._find_stop_hook_script", return_value="/pkg/memoryschema/stop.sh"):
+            runner.invoke(cli, ["plugin", "deploy"], catch_exceptions=False)
+
+        # Create a file in memory dir to verify it's preserved
+        memory_dir = claude_dir / "memory"
+        (memory_dir / "test-entity.md").write_text("test data")
+
+        # Uninstall with --keep-data
+        with patch("memoryschema.cli.plugin_cmd.CLAUDE_DIR", claude_dir), \
+             patch("memoryschema.cli.plugin_cmd.MANIFEST_PATH", manifest_path):
+            result = runner.invoke(cli, ["plugin", "uninstall", "--confirm", "--keep-data"],
+                                   catch_exceptions=False)
+        assert result.exit_code == 0
+        assert "Data preserved" in result.output
+        assert memory_dir.exists()
+        assert (memory_dir / "test-entity.md").exists()
+
+    def test_no_manifest(self, runner, tmp_path):
+        """No manifest means nothing to uninstall."""
+        claude_dir = tmp_path / ".claude"
+        claude_dir.mkdir()
+        manifest_path = claude_dir / "manifest.json"
+        with patch("memoryschema.cli.plugin_cmd.CLAUDE_DIR", claude_dir), \
+             patch("memoryschema.cli.plugin_cmd.MANIFEST_PATH", manifest_path):
+            result = runner.invoke(cli, ["plugin", "uninstall", "--confirm"],
+                                   catch_exceptions=False)
+        assert result.exit_code == 0
+        assert "Nothing to uninstall" in result.output
+
+    def test_hook_preservation_when_preexisting(self, runner, tmp_path, plugin_dir):
+        """When hook_was_existing=True, uninstall does NOT remove the hook."""
+        claude_dir = tmp_path / ".claude"
+        claude_dir.mkdir(exist_ok=True)
+        manifest_path = claude_dir / "memory-schema-manifest.json"
+
+        # Pre-register a hook before deploy
+        settings_path = claude_dir / "settings.json"
+        settings_path.write_text(json.dumps({
+            "hooks": {"PostToolUse": [{"matcher": "Write|Edit", "hooks": [
+                {"type": "command", "command": "bash /pkg/memoryschema/hook.sh"}
+            ]}]}
+        }))
+
+        # Deploy (hook already exists → hook_was_existing=True)
+        with patch("memoryschema.cli.plugin_cmd.CLAUDE_DIR", claude_dir), \
+             patch("memoryschema.cli.plugin_cmd.MANIFEST_PATH", manifest_path), \
+             patch("memoryschema.cli.plugin_cmd._find_plugin_dir", return_value=plugin_dir), \
+             patch("memoryschema.cli.plugin_cmd._find_hook_script", return_value="/pkg/memoryschema/hook.sh"), \
+             patch("memoryschema.cli.plugin_cmd._find_stop_hook_script", return_value="/pkg/memoryschema/stop.sh"):
+            runner.invoke(cli, ["plugin", "deploy", "--force"], catch_exceptions=False)
+
+        # Verify manifest has hook_was_existing=True
+        manifest = json.loads(manifest_path.read_text())
+        assert manifest["hook_was_existing"] is True
+
+        # Uninstall
+        with patch("memoryschema.cli.plugin_cmd.CLAUDE_DIR", claude_dir), \
+             patch("memoryschema.cli.plugin_cmd.MANIFEST_PATH", manifest_path):
+            result = runner.invoke(cli, ["plugin", "uninstall", "--confirm"],
+                                   catch_exceptions=False)
+        assert result.exit_code == 0
+        # Hook should NOT be removed (was pre-existing)
+        assert "Unhooked" not in result.output
+        settings = json.loads(settings_path.read_text())
+        assert len(settings["hooks"]["PostToolUse"]) > 0
