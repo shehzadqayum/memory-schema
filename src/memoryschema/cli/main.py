@@ -210,7 +210,8 @@ def init(config, with_neo4j, scopes, neo4j_password):
         hook_path = str(_files("memoryschema.hooks") / "hook-post-write.sh")
         click.echo(f"\nHook registration — run: memoryschema hook install")
         click.echo(f"  Or add to ~/.claude/settings.json:")
-        click.echo(f'  {{"matcher": "Write|Edit", "hooks": [{{"type": "command", "command": "bash {hook_path}", "timeout": 10}}]}}')
+        from memoryschema.cli._hooks_util import HOOK_MATCHER
+        click.echo(f'  {{"matcher": "{HOOK_MATCHER}", "hooks": [{{"type": "command", "command": "bash {hook_path}", "timeout": 10}}]}}')
     except Exception:
         pass
 

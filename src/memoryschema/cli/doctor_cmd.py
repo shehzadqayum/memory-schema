@@ -15,6 +15,8 @@ from pathlib import Path
 
 import click
 
+from memoryschema.cli._hooks_util import LEGACY_MATCHERS
+
 
 def _check(name, test_fn):
     """Run a diagnostic check. Returns (name, passed, detail, fix)."""
@@ -261,7 +263,7 @@ def run_checks(config):
             settings = json_mod.load(f)
         post_tool = settings.get("hooks", {}).get("PostToolUse", [])
         for entry in post_tool:
-            if entry.get("matcher") in ("Write", "Write|Edit"):
+            if entry.get("matcher") in LEGACY_MATCHERS:
                 for h in entry.get("hooks", []):
                     if "hook-post-write.sh" in h.get("command", ""):
                         timeout = h.get("timeout", "?")
