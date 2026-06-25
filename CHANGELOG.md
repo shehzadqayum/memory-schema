@@ -1,0 +1,318 @@
+# Changelog
+
+## [Unreleased]
+
+### Fixed (Consumer Project Compatibility)
+- Hook Python path: replaced hardcoded user-specific path with portable resolution chain (argument > env var > auto-detect > bare python3). `hook install` and `plugin deploy` embed `sys.executable` in the hook command.
+- Doctor test check: now targets the memory-schema package's own tests instead of the consumer project's tests when invoked from another project. Excludes `test_cli_doctor.py` from the subprocess pytest to prevent infinite recursion.
+- Docker detection: `neo4j deploy` and `neo4j status` use `shutil.which` with fallbacks to common locations instead of bare `docker` command that fails in pyenv/poetry environments
+- Neo4j test mocks: updated `test_cli_neo4j.py` to mock `_find_docker()` instead of bare `subprocess.run` after Docker detection refactor
+- Hook check: `validate_hook_python()` now extracts Python path from settings.json command args (fallback after script scan), fixing 7/8 → 8/8 after portable Python path change
+
+### Changed (Templates)
+- Synced `memory-working.tpl` and `memory-schema.rules.tpl` from deployed global rules — templates now include chain lifecycle, Edit-not-Write, reasoning accumulation, Write|Edit enforcement, Stop hook docs
+
+### Added (Hook Management System)
+- `memoryschema hook upgrade` — upgrade stale installations (Write→Write|Edit, add Stop hook) with `--dry-run` and `--per-project` flags
+- `memoryschema hook check` — 8 diagnostic checks (script existence, executability, Python interpreter, dry-run both hooks, sentinel writable) with `--json` output
+- `memoryschema hook scan` — cross-project hook installation discovery with version table and `--json` output
+- `HOOK_VERSION` constant for version tracking (v0=not installed, v1=Write only, v2=Write|Edit+Stop)
+- `get_hook_registration_detail()` — core inspection function for staleness, script health, upgrade needs
+- `upgrade_hooks()` — in-place upgrade of stale hook registrations
+- `find_project_settings()` — scan directories for .claude/settings.json files
+- `validate_hook_python()` — check Python interpreter referenced by hook scripts
+- `dry_run_post_tool_use_hook()` / `dry_run_stop_hook()` — non-destructive hook testing
+
+### Added (Chain Reasoning)
+- Chain reasoning accumulation: `<memory:reasoning>` now appends with `---` separator for chain-* entities (preserves narrative evolution). Standalone entities retain replace behavior.
+
+### Added (Hook Consolidation)
+- `src/memoryschema/cli/_hooks_util.py` — shared hook management module with `HOOK_MATCHER`/`LEGACY_MATCHERS` constants and 8 utility functions (path resolution, settings I/O, hook registration/removal)
+- `tests/test_hooks_util.py` — 25 tests for shared hook utilities
+- Hook Output Formats section in `docs/technical-reference.md` — documents valid JSON fields per event type
+
+### Changed (Hook Consolidation)
+- `hook_cmd.py` refactored to import from `_hooks_util` (removed 3 inline functions, net -91 lines)
+- `plugin_cmd.py` refactored to import from `_hooks_util` (removed 7 inline functions, net -128 lines)
+- `doctor_cmd.py` and `main.py` use `LEGACY_MATCHERS`/`HOOK_MATCHER` constants instead of magic literals
+- Settings backup (`write_settings(backup=True)`) now applied consistently in both hook and plugin commands
+
+### Added (Test Coverage)
+- `tests/test_cli_plugin.py` — 42 tests for `plugin_cmd.py` (deploy, uninstall, status commands + 10 helper functions). Resolves residual carried since session 24.
+
+### Added (Chain Enforcement)
+- Stop hook (`hook-stop.sh`) — reminds Claude to update the active chain entity when no memory write occurred during a response
+- Sentinel mechanism (`/tmp/claude-memory-chain-updated`) — PostToolUse hook touches sentinel on memory writes, Stop hook checks for it
+- Stop hook registration in `hook_cmd.py` install/uninstall/status and `plugin_cmd.py` deploy/uninstall
+- Stop hook health check in `doctor_cmd.py`
+
+### Fixed (Chain Enforcement)
+- Stop hook: replaced invalid `hookSpecificOutput.additionalContext` with `systemMessage` — `hookSpecificOutput` is only valid for PreToolUse, PostToolUse, and UserPromptSubmit events
+
+### Changed (Chain Enforcement)
+- PostToolUse hook matcher widened from `Write` to `Write|Edit` — Edit-based chain updates are now indexed
+- Hook detection uses `in ("Write", "Write|Edit")` for backward compatibility with existing installations
+- Chain lifecycle docs updated with Edit-not-Write guidance (schema.md, memory-working.md, memory-schema.md, memory-working.tpl)
+
+### Added (Claude Code Plugin)
+- `.claude-plugin/` directory with plugin manifest (`plugin.json`)
+- PostToolUse Write hook registration (`hooks/hooks.json`) using `${CLAUDE_PLUGIN_ROOT}` path
+- Hook symlink to `src/memoryschema/hooks/hook-post-write.sh` (development mode)
+- Rules: `memory-schema.md` and `memory-working.md` copied to plugin
+- Skills: `/recall`, `/chain-start`, `/chain-status`, `/chain-release`, `/memory-status`
+- Hybrid memory scope: hook falls back to `~/.claude/memory/` when no project root derivable
+- Recall dual-store search: project store first, user-level fallback for cross-project knowledge
+- Plugin README with architecture, prerequisites, installation, quick start
+- Project README updated with Claude Code Plugin section
+- `memoryschema plugin deploy` — deploy skills, rules, hook to `~/.claude/` with manifest
+- `memoryschema plugin uninstall` — clean removal using manifest (supports `--keep-data`)
+- `memoryschema plugin status` — deployment health check
+- `/bootstrap` skill — scan project docs and source after init, create knowledge map as interconnected memory entities (7-phase procedure, 8-22 entities, hub-and-spoke relation graph)
+
+### Changed (Content-Agnostic Architecture)
+- Removed provenance system (VALID_PROVENANCES, TRUST_LEVELS, trust multiplier, L0 gating, SUPERSEDES trust guard)
+- Removed basis system (Observation subclass, VALID_BASES, VERIFICATION_RANKS, basis factor, verified_at, V14, Q9)
+- Removed source field from entity schema
+- Observations are now plain strings (no per-observation metadata)
+- Added `confidence` attribute (integer 1-10, author-declared, scored as confidence/10 multiplier)
+- Gate pipeline: 6 stages → 4 stages (validation, consistency, numeric, L0 echo)
+- SUPERSEDES retains cycle detection only (no trust or verification guards)
+
+### Added (7-Space Architecture)
+- 7 embedding spaces: default + name + description + observations + prompt + reasoning + chain
+- 1:1 field-to-space mapping (each field has its own embedding space)
+- Variance-weighted combiner: Σ(sim × divergence) / Σ(divergence) — no base weights, no heuristics
+- Divergence profile computed at embed time (structural fingerprint per entry)
+- `chain` field on entities for reasoning chain context
+- Chain entities: live accumulating memories with authorised/unauthorised states
+- `memoryschema chain start/release` CLI commands
+- Authorisation gate in hook: only active chain writable, all others read-only
+- Free-form `type` attribute (no predefined values enforced by validator)
+
+### Fixed (Framework Hardening)
+- Hook: skip non-entity files (YAML frontmatter) instead of blocking with exit 2
+- Reflect: `_cluster_by_associations` score threshold (0.7) fixes 0-cluster bug from giant connected component
+- Neo4j: auth failure now raises ConnectionError with actionable message instead of raw driver error
+- Neo4j: deleted orphaned test entries (`imported`, `test`), stores in sync at 34/34
+- Hook: pass config to embed_text — embeddings now work via TOML api_key, not just env var
+
+### Added (Framework Hardening)
+- `tests/test_l0_budget.py`: 22 tests for token budget enforcement (was the only untested module)
+- `tests/test_e2e_pipeline.py`: 10 tests covering write -> gate -> store -> recall + hook pipeline
+- Neo4j integration tests with `pytest.mark.integration` marker (deselected by default)
+- `--score-threshold` CLI option for `memoryschema reflect`
+
+### Added (Multi-space — M1, NO SHIP)
+- Field-level embedding spaces: `observations` and `reasoning` in embedding_input.py
+- Space registry: 3 spaces (default, observations, reasoning) in spaces.py
+- Multi-space scoring: `_multi_space_relevance()` in store.py with coverage-aware combiner
+- Multi-space numpy batch path in `_score_all_entries`
+- Per-space reembedding: `memoryschema embed --all --space observations` CLI option
+- Structural absence handling: entries without observations/reasoning skip those spaces
+- `EXPERIMENT_WEIGHTS = None` constant for explicit experiment configuration
+- Gating experiment result: multi-space nDCG 0.601 < single-space 0.608, NO SHIP
+
+### Added (v4 — Unit C)
+- `log_decline()` in audit.py — write decline records for salience instrumentation
+- CLI: `memoryschema decline --reason "..." [--name-hint X]` — frictionless decline recording
+- CLI: `memoryschema force --type world-change --target NAME` — typed force events
+- Guideline amendment: write decline instrumentation section in memory-working.md
+- Report sequencing patch spec: docs/plans/phase-7-skill-amendments.md
+
+### Added (v4 — Unit B)
+- MITIGATES relation type (7 active, 9 total) — target stays active, no status change
+- Mitigation dampening: 0.95 score multiplier for entries with inbound MITIGATES (both backends)
+- Criterion capture: target description stored in audit record on SUPERSEDES
+- Typed force records: operation="force" with force_type/level/source/target in audit.jsonl
+- CLI: `memoryschema force --type world-change --target NAME` for unreconstructable events
+- Force by-products: SUPERSEDES→supersession, CONTRADICTS→contradiction auto-emitted
+- numeric_probe.py: extract_claims with qualifier-keyed (unit,qualifier) matching
+- Gate stage 5: numeric contradiction probe (log mode default, quarantine mode optional)
+- Gate stage 6: L0 echo probe (Jaccard overlap + measured conjunction)
+- CONTRADICTS/SUPERSEDES escape valves for numeric probe
+- memory:<name> source convention flagged in gate warnings
+- Contradiction-aware reflect: pre-synthesis check for CONTRADICTS + numeric contradictions
+- Reflect --include-contradictory: min importance, CONTRADICTS edges, inferred basis
+- Reflect skip audit: operation=reflect_skip with member names and reasons
+
+### Added (v4 — Unit A)
+- Schema v4: `basis` attribute on `<memory:observation>` (measured | inferred | reported)
+- `Observation(str)` subclass with basis attribute — zero consumer sweep design
+- `serialize_observation` / `deserialize_observation` serializer pair in tags.py
+- Neo4j preferred JSON-per-element model for labelled observations
+- Basis immutability on upsert; duplicate-text basis upgrade (higher rank upgrades)
+- `verified_at` server-managed field — set on measured observations
+- `generator_id` config field (env MEMORY_GENERATOR, session-scoped)
+- `embed_text` return_model parameter for embed model identification
+- V14 validation rule (basis values); Q9 strict warning (unlabelled observations)
+- VERIFICATION_RANKS + VALID_BASES constants in config.py
+- Basis factor in scoring: measured=1.0, inferred=0.97, reported=0.93 (both backends)
+- SUPERSEDES verification guard: source rank ≥ target rank (both backends)
+- Staleness presentation: [VERIFIED Nd ago] / [VERIFICATION STALE: Nd] in CLI recall
+- `verification_staleness_days` config (default 7)
+- `verification_age_hours` in JSON recall output
+
+### Fixed (v4 — Unit A)
+- schema.md v3 summary rows: appended R7 to both Schema Versioning and Design Decisions tables
+- schema.md: consolidated two overlapping upsert tables into one 16-field table
+- technical-reference.md: doctor table completed (added toml_config, rules_inherit, rules_hash)
+
+### Added CLI flags column for all 32 commands with key options
+- technical-reference.md: scoring detail — type factor, trust multiplier, BM25 params, weight redistribution, numpy
+- technical-reference.md: audit trail section with gate_decision and mutation record schemas
+- technical-reference.md: graceful degradation table (Neo4j/Voyage/embedding/concurrent/audit)
+- schema.md: trust level hierarchy table with "Can supersede" column
+- schema.md: L0 budget enforcement detail (token estimation, eviction, progressive disclosure)
+- schema.md: reflect algorithm (6-step clustering → synthesis → SUPERSEDES → archive)
+- hierarchy-and-inheritance.md: project auto-derivation from filepath
+- README.md: 8-step hook pipeline (write gate, L0 gating, budget enforcement)
+- README.md: graceful degradation table
+- Status lifecycle semantics — retrieval filtering with `--include-inactive`, traversable-not-returned for superseded entries in BFS recall
+- SUPERSEDES trust guard — ingested entries cannot supersede first-party/derived/user entries
+- SUPERSEDES cycle detection (R7) — prevents circular SUPERSEDES chains
+- `unarchive`, `reactivate`, `release_quarantine` store methods and CLI commands
+- `quarantine` CLI command group — list, review, release, reject subcommands
+- MEMORY.md line removal on archive status transition
+- Provenance immutability — provenance cannot be changed after entity creation
+- V13 validation rule — ingested provenance requires `<memory:source>` element
+- Untrusted presentation — CLI recall marks ingested entries with `[UNTRUSTED]` delimiter
+- Write gate two-verdict pipeline — REJECT (structural) vs QUARANTINE (suspicion) vs ACCEPT
+- `gate_pipeline()` function with GateVerdict/GateResult classes
+- `log_gate_decision()` audit function for machine-readable gate verdicts
+- `quarantine review` CLI command — inspect quarantined entry details
+- Type factor in scoring — semantic floor (0.6), episodic standard decay, procedural access-reinforced
+- Behavioral specification — On Supersede/Archive/Delete/Quarantine/Mutate lifecycle events
+- Upsert immutability table in schema.md
+- 32-command CLI reference table in technical-reference.md
+- `TRUST_LEVELS` config constant for SUPERSEDES authority guards
+- `hierarchy.py` — dot-notation project hierarchy utilities (parse, ancestor, scope/filter)
+- `inheritance.py` — TOML config loading, rules resolution with parent-wins authority
+- `PARENT_OF`, `CHILD_OF` relation types for agent hierarchy edges
+- `MemoryConfig.from_toml()` classmethod for TOML-based config with inheritance
+- `memoryschema rules` CLI command — show effective rules with inheritance markers
+- `memoryschema config` CLI command — show effective config with chain sources
+- `memoryschema.toml` template generated on `memoryschema init`
+- `max_depth` parameter on `project_matches_scope()` for bounded read-up
+- `validate_toml_name()` advisory check for project name / directory mismatch
+- `overridden_rules()` for detecting parent-shadowed child rules
+- Doctor checks: `toml_config`, `rules_inherit` (now 20/20)
+- `--project` option on `recall` and `search` CLI commands
+
+### Changed
+- Semantic scoring: recency floor at 0.6 (was hard 1.0 — allows some recency signal)
+- Procedural scoring: `recency^(1/(1+0.3*access_count))` formula (was `recency^(1-access_count/20)`)
+- Neo4j _score_entry: added type factor and trust multiplier (was missing both)
+- Neo4j recall: added max_inherit_depth post-filter (was ignoring parameter)
+- Neo4j upsert: provenance set only on CREATE, not on MATCH (immutability)
+- Neo4j upsert: status and provenance now included in props
+- CLI write command: runs write gate pipeline before indexing
+- Config neo4j_password default: empty string (was "changeme")
+- TOML template: secrets removed, env-only documentation added
+- `resolve_rules()` now returns `(effective, overridden)` tuple (single walk)
+- Unscoped entities (None/empty project) are universally visible in scoped queries
+- Store scoping uses module-level imports instead of repeated inline imports
+
+### Fixed
+- Neo4j hub bonus: `min(backlinks, 5)` → `math.log(1 + backlinks)` — scoring parity with JSONL store
+- Docker-compose: hardcoded `changeme` password → `${NEO4J_PASSWORD}` env var reference
+- Validator R6: dead code cleanup (`level = 'R6' if strict else 'R6'` → `'R6'`)
+- Config docstring: "default: changeme" → "no default" (matches actual empty-string default)
+- env.example: removed `changeme` placeholder from NEO4J_PASSWORD
+- Example scripts: schema="2" → schema="3" in all 3 ingest/consolidation scripts + README
+- Doctor count: 20→21 in doctor_cmd, implementation-guide, hierarchy-and-inheritance docs
+- Validation coverage: V1-V10→V1-V13, R1-R5→R1-R7 in rules, template, validate_cmd, validator
+- schema.md: added V13 and R7 rows to validation rules tables
+- Hub bonus formula: `min(backlinks, 5)` → `ln(1 + backlinks)` in rules, template, tech-ref
+- Text match scoring: "+0.1" → "+0.1 (Neo4j) or BM25 up to +0.3 (JSONL)" in schema, rules, tech-ref
+- Rules file: added type factor to Rule 7, added provenance/status/project to Rule 6 upsert table
+- README: added 6 missing CLI commands + 2 hook subcommands
+- Schema version: "stays at v2" → "is v3" in hierarchy doc
+- Module docstrings: store.py, tags.py, __init__.py updated for v3 features
+- Config table: expanded from 9 to 18 fields in technical-reference
+- Config precedence: 3 docs said "env vars override everything" — corrected to CLI > env > TOML
+- hierarchy-and-inheritance.md Example 4: "env beats CLI" → "CLI beats env and TOML"
+- Documentation counts: 432→472 tests, 28→27 files across all docs
+- schema="2" → schema="3" in all examples (7 locations across 5 files)
+- Stale references: scripts/memory-server/ and ict-neo4j removed
+- "Every response" → "Selected responses" in implementation guide
+- Optional field count: 8→10 in system overview
+- R2 wording: "six defined types" → "six active relation types"
+- v3 row added to schema versioning table
+- Neo4j status Docker detection — split availability from container status
+- `init --with-neo4j` — duplicate config argument in `ctx.invoke`
+- Doctor test check — cwd resolution, timeout (30s→120s), output parsing
+- Fragile gap heuristic replaced with marker-based `_walk_upward()`
+- Duplicate walk logic unified into shared helper
+- Dual env var reads removed from `inheritance.py`
+- `_name_warning` side-channel removed from config resolution dict
+- Direct `os.environ` reads removed from `neo4j_store.py` and `embeddings.py` — centralized in `config.py`
+- Env var precedence inversion in `from_toml()` — env vars now correctly override TOML values
+- Redundant inline import in `store.py` `compute_associations()`
+- **Cypher injection defense** — explicit ValueError on invalid relation types in `neo4j_store.py`
+- **Neo4j unscoped entities** — `OR m.project IS NULL` in all 5 project-scoped queries
+- **Type default** — `tags.py` now defaults type to `semantic` when omitted (was empty string)
+- **Hook reliability** — exit 2 when both Neo4j and JSONL fail; stderr no longer suppressed
+- **Upsert immutability** — `schema` and `filepath` excluded from merge (immutable after creation)
+- **`_derive_project` validation** — segments validated as non-empty kebab-case
+- **Scoring deduplication** — numpy path uses `_score_entry` with `precomputed_relevance`
+- **Dead imports** — removed unused `os` and `discover_memory_files` from `tags.py`
+
+### Changed (Session 5)
+- `requires-python` bumped from `>=3.10` to `>=3.11` (for `tomllib` stdlib)
+- Relation type constants consolidated — single source of truth in `config.py`
+- Scoring formula: `_searchable_text()` extracted, `precomputed_relevance` param added
+
+### Added (Session 8)
+- `memoryschema reflect` CLI command — wraps `consolidation.reflect()` for episodic clustering and semantic summary synthesis
+- `reflect` exported in `__init__.py` public API
+
+### Added (Session 6)
+- `docs/hierarchy-and-inheritance.md` — standalone feature reference (420 lines, 8 sections)
+- `docs/plans/` — history directory for completed plan documents
+- Scoring bonuses documented: hub `+0.05*min(backlinks,5)`, text match `+0.1`
+- Cross-references to new reference doc from README, system-overview, tech-ref, impl-guide
+
+### Added (Session 7 — v3 Remediation)
+- **Schema v3:** `status` attribute (active/superseded/archived/quarantined), `provenance` attribute (first-party/user/ingested/derived)
+- **Lifecycle:** SUPERSEDES consumption (auto-supersede targets), CONTRADICTS symmetry (auto-reverse), delete with full cleanup (MEMORY.md + .md file + inbound relations), archive command, R6 referential integrity validation
+- **L0 budget:** MEMORY.md token budget (2000 default) with score-based eviction via `l0_budget.py`
+- **Reflection:** `reflect()` function — clusters episodic entries, synthesises semantic summaries with LLM/mechanical fallback
+- **Trust:** provenance field, trust-weighted retrieval (ingested=0.7x), L0 gating (ingested blocked from MEMORY.md), pre-consolidation write gate with consistency probe
+- **Audit:** append-only `memory/audit.jsonl` with field-level change tracking
+- **Hygiene:** per-project hook install (`--per-project`), random Neo4j password on init, rules hash attestation in doctor
+- **Retrieval:** Voyage reranker wired into recall, BM25 lexical channel replacing substring boost, progressive disclosure with category grouping in MEMORY.md
+- **Evaluation:** `tests/eval/` harness with 50-entity fixture store, recall@k/MRR/nDCG metrics, poisoning red-team suite, `memoryschema eval` CLI command
+- **Concurrency:** advisory file lock (`fcntl`) for JSONL read-modify-write
+- **Config:** `max_inherit_depth` (default 3), `l0_token_budget` (default 2000) — both TOML-configurable
+- `scripts/docs_sync.py` — CI-ready documentation drift checker
+
+### Changed (Session 7)
+- Schema version bumped from 2 to 3
+- PARENT_OF/CHILD_OF relation types deprecated (accept on read, warn on write)
+- Config precedence reordered: CLI > env vars > parent TOML > child TOML > defaults
+- Hub bonus: linear `0.05*min(bl,5)` → log-scale `0.05*ln(1+bl)`
+- Type system active: semantic=no decay, episodic=standard, procedural=access-reinforced
+- Importance decoupled from scope — full 1-10 range by salience
+- Working memory: selective-write rule replaces mandatory every-response write
+- Embedding input standardized: name+description+observations+prompt+reasoning (body excluded)
+
+### Fixed (Session 7)
+- Doctor Python version check: 3.10 → 3.11 (matches requires-python)
+- Q8 strict-mode check for reasoning length (>500 words)
+- V11 status validation, V12 provenance validation
+
+### Fixed (Session 6)
+- Doctor Python version check aligned to 3.11 (was 3.10)
+- Doctor check count in tech-ref and impl-guide: 18 → 20
+- Phantom `memory/user/<name>.md` path removed from schema.md
+- Working memory importance: "8-10" → "10" in system-overview.md
+
+### Changed (Session 6)
+- `docs/plan-hierarchy-and-inheritance.md` moved to `docs/plans/` with superseded note
+- tech-ref hierarchy/inheritance module rows now link to reference doc instead of inline function lists
+
+### Removed
+- `docs/plan-hierarchical-nesting.md` — consolidated into `plan-hierarchy-and-inheritance.md`
+- `docs/plan-agent-inheritance.md` — consolidated
+- `docs/plan-fix-6-inheritance-issues.md` — consolidated
+- F2 validation rule removed from `docs/schema.md` (was never implemented)

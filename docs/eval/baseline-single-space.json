@@ -1,0 +1,71 @@
+{
+  "queries": [
+    {
+      "query": "schema v4 verification axis basis attribute",
+      "description": "v4 plan and implementation sessions",
+      "recall@5": 0.75,
+      "recall@10": 1.0,
+      "mrr": 1.0,
+      "ndcg@10": 0.9178287402913377,
+      "retrieved_count": 7,
+      "relevant_count": 4
+    },
+    {
+      "query": "hierarchy inheritance parent wins config rules",
+      "description": "Hierarchy and inheritance feature memories",
+      "recall@5": 0.3333333333333333,
+      "recall@10": 0.3333333333333333,
+      "mrr": 0.3333333333333333,
+      "ndcg@10": 0.23463936301137822,
+      "retrieved_count": 6,
+      "relevant_count": 3
+    },
+    {
+      "query": "documentation alignment audit fixes",
+      "description": "Documentation alignment sessions and plans",
+      "recall@5": 0.0,
+      "recall@10": 0.0,
+      "mrr": 0.0,
+      "ndcg@10": 0.0,
+      "retrieved_count": 5,
+      "relevant_count": 5
+    },
+    {
+      "query": "package audit code review bug fix",
+      "description": "Code audit and review sessions",
+      "recall@5": 0.3333333333333333,
+      "recall@10": 0.3333333333333333,
+      "mrr": 0.3333333333333333,
+      "ndcg@10": 0.23463936301137822,
+      "retrieved_count": 6,
+      "relevant_count": 3
+    },
+    {
+      "query": "memory system setup deployment Neo4j Voyage",
+      "description": "Initial setup and deployment memories",
+      "recall@5": 0.3333333333333333,
+      "recall@10": 0.3333333333333333,
+      "mrr": 1.0,
+      "ndcg@10": 0.46927872602275644,
+      "retrieved_count": 8,
+      "relevant_count": 3
+    },
+    {
+      "query": "superseded outdated plan resolved",
+      "description": "Superseded plans \u2014 should be excluded from default recall",
+      "recall@5": 1.0,
+      "recall@10": 1.0,
+      "mrr": 1.0,
+      "ndcg@10": 1.0,
+      "retrieved_count": 11,
+      "relevant_count": 0
+    }
+  ],
+  "averages": {
+    "recall@5": 0.4583333333333333,
+    "recall@10": 0.5,
+    "mrr": 0.611111111111111,
+    "ndcg@10": 0.4760643653894751
+  },
+  "source": "real store (memory/store.jsonl)"
+}
