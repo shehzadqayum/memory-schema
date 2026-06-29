@@ -19,6 +19,7 @@ Usage:
 import json
 import math
 import os
+import sys
 import tempfile
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -1090,26 +1091,47 @@ def multi_space_relevance(entry, query_embedding):
     return MemoryStore._multi_space_relevance(entry, query_embedding)
 
 
-def get_store(jsonl_path=None, config=None):
+def get_store(jsonl_path=None, config=None, require_neo4j=None):
     """Get the best available store backend.
 
-    Tries Neo4j first (L2b). Falls back to JSONL (L1b).
-    Graceful degradation — always returns a working store.
+    Tries Neo4j (L2b). Falls back to JSONL (L1b) — but NEVER silently: a fallback prints a
+    loud DEGRADED banner to stderr (the default mode is "Neo4j up at all times", so a
+    fallback means drift will accrue until reconciled). When require_neo4j is set (param,
+    else config.require_neo4j), a Neo4j failure RAISES instead of degrading — used by
+    write-class callers, since JSONL-only writes are what cause drift. (helios local patch.)
 
     Args:
         jsonl_path: Override JSONL file path.
         config: MemoryConfig instance for defaults.
+        require_neo4j: Hard-require Neo4j (raise on failure). Default (None) -> False, i.e.
+            degrade to JSONL with a LOUD banner — safe + non-breaking for reads and the hook
+            (a downtime write must not be lost). Write-class callers pass True to hard-require.
+            The "deps up at all times" invariant is enforced by the preflight gate (which reads
+            config.require_neo4j), not by every store access.
     """
+    if require_neo4j is None:
+        require_neo4j = False
+
+    neo4j_err = None
     try:
         from memoryschema.neo4j_store import Neo4jMemoryStore
-        if config:
-            store = Neo4jMemoryStore(config=config)
-        else:
-            store = Neo4jMemoryStore()
+        store = Neo4jMemoryStore(config=config) if config else Neo4jMemoryStore()
         store.count()
         return store
-    except Exception:
-        pass
+    except Exception as e:
+        neo4j_err = e
+
+    reason = (str(neo4j_err) or type(neo4j_err).__name__)[:200]
+    if require_neo4j:
+        raise ConnectionError(
+            f"Neo4j unavailable and required (default mode): {reason}. "
+            f"Run `memoryschema preflight` (or `neo4j up`), or set MEMORYSCHEMA_REQUIRE_NEO4J=false."
+        ) from neo4j_err
+
+    if not os.environ.get("MEMORYSCHEMA_SKIP_PREFLIGHT"):   # quiet in tests / self-checking hooks
+        print(f"⚠ DEGRADED: Neo4j unreachable ({reason}) — using the JSONL fallback; writes here "
+              f"drift until reconciled. Run `memoryschema preflight` then `memoryschema reconcile`.",
+              file=sys.stderr)
 
     if jsonl_path is None:
         if config:

@@ -27,6 +27,10 @@ _LIVE_BACKEND_ENV = (
     "VOYAGE_API_KEY",
     "MEMORY_ROOT",
     "MEMORY_PROJECT",
+    # helios default-mode flags: their factory default is ON, so they must be stripped AND
+    # forced off below, or non-integration tests would hard-require a (hermetically absent) Neo4j.
+    "MEMORYSCHEMA_REQUIRE_NEO4J",
+    "MEMORYSCHEMA_REQUIRE_VOYAGE",
 )
 
 
@@ -41,3 +45,7 @@ def _isolate_from_live_backend(request, monkeypatch):
         return
     for var in _LIVE_BACKEND_ENV:
         monkeypatch.delenv(var, raising=False)
+    # Force the default-mode dependency gates OFF for hermetic unit tests: don't hard-require
+    # the absent Neo4j, and don't run the CLI preflight (which would shell out to docker).
+    monkeypatch.setenv("MEMORYSCHEMA_REQUIRE_NEO4J", "false")
+    monkeypatch.setenv("MEMORYSCHEMA_SKIP_PREFLIGHT", "1")

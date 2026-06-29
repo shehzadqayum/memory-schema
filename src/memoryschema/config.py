@@ -67,6 +67,19 @@ class MemoryConfig:
     embed_dimensions: int = 1024
     rerank_model: str = "rerank-2"
 
+    # Default-mode dependency requirements (the operator's "Neo4j + Voyage up at all times").
+    # When require_neo4j is set, write-class operations FAIL LOUD rather than silently falling
+    # back to JSONL; reads warn loudly. Voyage degradation (-> keyword/BM25) is survivable by default.
+    # Env: MEMORYSCHEMA_REQUIRE_NEO4J / MEMORYSCHEMA_REQUIRE_VOYAGE. (helios local patch.)
+    require_neo4j: bool = field(
+        default_factory=lambda: os.environ.get("MEMORYSCHEMA_REQUIRE_NEO4J", "true").lower()
+        in ("1", "true", "yes", "on")
+    )
+    require_voyage: bool = field(
+        default_factory=lambda: os.environ.get("MEMORYSCHEMA_REQUIRE_VOYAGE", "false").lower()
+        in ("1", "true", "yes", "on")
+    )
+
     # Generator identity (v4, session-scoped — no TOML key)
     generator_id: str | None = field(
         default_factory=lambda: os.environ.get("MEMORY_GENERATOR")

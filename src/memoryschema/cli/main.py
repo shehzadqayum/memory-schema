@@ -86,6 +86,39 @@ def cli(ctx, project, root):
         ctx.obj = MemoryConfig.from_toml(root, cli_overrides=cli_overrides or None)
     else:
         ctx.obj = MemoryConfig(project_name=project, project_root=root)
+    _maybe_preflight(ctx.obj)
+
+
+def _maybe_preflight(config):
+    """Default-mode dependency gate: a throttled (<=1/60s) preflight that auto-recovers a
+    stopped Neo4j container and prints a LOUD banner when degraded — so degradation is never
+    silent. Banner-only (never exits/raises): reads degrade with the warning, write-class
+    callers self-guard via get_store(require_neo4j=...). Skipped when MEMORYSCHEMA_SKIP_PREFLIGHT
+    is set (tests / hooks that run their own). (helios local patch.)"""
+    import os
+    if os.environ.get("MEMORYSCHEMA_SKIP_PREFLIGHT"):
+        return
+    try:
+        import time
+        marker = config.memory_dir / ".preflight_ok"
+        if marker.exists() and (time.time() - marker.stat().st_mtime) < 60:
+            return
+        from memoryschema.preflight import ensure_backend
+        r = ensure_backend(config, auto_start=True)
+        if r["ok"]:
+            try:
+                config.memory_dir.mkdir(parents=True, exist_ok=True)
+                marker.write_text("ok")
+            except Exception:
+                pass
+            if r["degraded"]:
+                warn = "; ".join(f"{c['name']} {c['detail']}" for c in r["warnings"])
+                click.echo(f"⚠ memory (degraded): {warn}", err=True)
+        else:
+            fail = "; ".join(f"{c['name']}: {c['detail']}" for c in r["failures"])
+            click.echo(f"⚠ memory DEGRADED — {fail}  (run `memoryschema preflight`)", err=True)
+    except Exception:
+        pass  # the dependency gate must never break the CLI
 
 
 # --- Setup & Deployment ---
@@ -293,3 +326,6 @@ cli.add_command(chain_group)
 
 from memoryschema.cli.plugin_cmd import plugin as plugin_group
 cli.add_command(plugin_group)
+
+from memoryschema.cli.preflight_cmd import preflight
+cli.add_command(preflight)
