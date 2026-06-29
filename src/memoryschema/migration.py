@@ -64,10 +64,13 @@ def migrate_nodes(driver, entries, batch_size=500):
                               'multispace': _serialize_multispace(entry)})
 
         with driver.session() as session:
+            # MERGE (not CREATE) on the unique name so the bulk import is IDEMPOTENT — re-running
+            # against existing nodes no longer throws ConstraintError on memory_name_unique. += keeps
+            # the embedding/multispace props set below intact. (helios local patch — re-apply on re-vendor.)
             session.run("""
                 UNWIND $nodes AS nd
-                CREATE (m:Memory)
-                SET m = nd.props
+                MERGE (m:Memory {name: nd.props.name})
+                SET m += nd.props
             """, nodes=node_data)
 
             for nd in node_data:
