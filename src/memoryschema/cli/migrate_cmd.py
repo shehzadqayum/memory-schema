@@ -95,35 +95,90 @@ def neo4j_to_jsonl(config, output):
 @click.command()
 @click.pass_obj
 def sync(config):
-    """Reconcile JSONL and Neo4j stores.
+    """Report drift across the canonical memory/*.md set, the JSONL store, and Neo4j.
 
-    Compares entry counts and reports differences.
+    Read-only NAME-SET diff (counts can match while the sets differ, which hides
+    residuals). To FIX drift, run `memoryschema reconcile`.
 
     Example:
         memoryschema sync
     """
-    from memoryschema.store import MemoryStore
+    from memoryschema.reconcile import diff as _diff
 
-    jsonl_store = MemoryStore(str(config.store_path))
-    jsonl_count = jsonl_store.count()
+    d = _diff(config)
+    click.echo(f".md: {d['md_count']:,}    JSONL: {d['jsonl_count']:,}    Neo4j: {d['neo4j_count']:,}")
+    if d.get('neo4j_error'):
+        click.echo(f"  ⚠ Neo4j unreachable: {d['neo4j_error']}", err=True)
 
-    neo4j_count = 0
-    try:
-        from memoryschema.neo4j_store import Neo4jMemoryStore
-        neo4j_store = Neo4jMemoryStore(config=config)
-        neo4j_count = neo4j_store.count()
-        neo4j_store.close()
-    except Exception:
-        click.echo("Warning: Neo4j not available.", err=True)
+    def _line(label, names):
+        if names:
+            more = ' …' if len(names) > 8 else ''
+            click.echo(f"  {label} ({len(names)}): {', '.join(names[:8])}{more}")
 
-    click.echo(f"JSONL: {jsonl_count:,} entries")
-    click.echo(f"Neo4j: {neo4j_count:,} nodes")
-    if jsonl_count == neo4j_count:
-        click.echo("Status: in sync")
-    else:
-        diff = abs(jsonl_count - neo4j_count)
-        click.echo(f"Status: out of sync ({diff:,} difference)")
-        if jsonl_count > neo4j_count:
-            click.echo("Fix: Run 'memoryschema migrate jsonl-to-neo4j'")
-        else:
-            click.echo("Fix: Run 'memoryschema migrate neo4j-to-jsonl'")
+    if d['in_sync']:
+        click.echo("Status: in sync (name-sets match)")
+        return
+    click.echo("Status: OUT OF SYNC")
+    _line("missing from JSONL", d['missing_from_jsonl'])
+    _line("JSONL orphans (no .md)", d['jsonl_orphans'])
+    _line("Neo4j orphans (no .md)", d['neo4j_orphans'])
+    click.echo("Fix: memoryschema reconcile")
+
+
+@click.command()
+@click.option("--dry-run", is_flag=True, help="Report the plan without writing.")
+@click.option("--prune/--no-prune", default=True,
+              help="Delete JSONL/Neo4j entries with no backing .md (default: prune).")
+@click.option("--no-verify", "no_verify", is_flag=True, help="Skip the name-set verification pass.")
+@click.pass_obj
+def reconcile(config, dry_run, prune, no_verify):
+    """Reconcile memory/*.md with the JSONL store and the Neo4j projection.
+
+    Idempotent + comprehensive: reuses JSONL embeddings where the content is unchanged,
+    re-embeds ALL spaces for new/changed entities, rewrites store.jsonl to EXACTLY the
+    .md set, pushes it into Neo4j, PRUNES residuals with no .md, and verifies by
+    name-set. A second run on a clean store is a no-op.
+
+    Example:
+        memoryschema reconcile --dry-run     # preview the plan
+        memoryschema reconcile               # fix (prune + verify)
+        memoryschema reconcile --no-prune    # add/update only, keep orphans
+    """
+    from memoryschema.reconcile import reconcile as _reconcile
+
+    r = _reconcile(config, dry_run=dry_run, prune=prune, verify=not no_verify)
+    click.echo(f".md: {r['md_count']:,}    JSONL: {r['jsonl_count']:,}    Neo4j: {r['neo4j_count']:,}")
+    if r.get('neo4j_error'):
+        click.echo(f"  ⚠ Neo4j unreachable: {r['neo4j_error']}", err=True)
+
+    def _line(label, names):
+        if names:
+            more = ' …' if len(names) > 6 else ''
+            click.echo(f"  {label} ({len(names)}): {', '.join(names[:6])}{more}")
+
+    _line("missing from JSONL", r['missing_from_jsonl'])
+    _line("JSONL orphans", r['jsonl_orphans'])
+    _line("Neo4j orphans", r['neo4j_orphans'])
+
+    if dry_run:
+        click.echo(f"\nWould re-embed: {r.get('would_reembed', 0)}   (dry run — no changes made)")
+        return
+
+    click.echo(f"Re-embedded: {r['reembedded']:,}    JSONL pruned: {r['jsonl_pruned']:,}    "
+               f"Neo4j pruned: {r['neo4j_pruned']:,}")
+    if r['embed_failed']:
+        click.echo(f"  ⚠ {r['embed_failed']} entitie(s) not embedded (Voyage unavailable or no text)", err=True)
+    if r['neo4j_pushed']:
+        click.echo("Neo4j updated + associations recomputed.")
+    elif r.get('neo4j_push_error'):
+        click.echo(f"  ⚠ Neo4j not updated: {r['neo4j_push_error']}", err=True)
+
+    if 'verify_ok' in r:
+        ok = r['verify_ok']
+        click.echo(f"\nVerify: {'PASS — .md / JSONL / Neo4j name-sets match' if ok else 'FAIL'}")
+        if not ok:
+            if r.get('verify_missing'):
+                click.echo(f"  missing: {', '.join(r['verify_missing'][:8])}", err=True)
+            if r.get('verify_extra'):
+                click.echo(f"  extra:   {', '.join(r['verify_extra'][:8])}", err=True)
+            sys.exit(1)

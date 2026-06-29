@@ -230,13 +230,14 @@ def neo4j_deploy_fn(config):
 from memoryschema.cli.neo4j_cmd import neo4j
 from memoryschema.cli.voyage_cmd import voyage
 from memoryschema.cli.hook_cmd import hook
-from memoryschema.cli.migrate_cmd import migrate, sync
+from memoryschema.cli.migrate_cmd import migrate, sync, reconcile
 
 cli.add_command(neo4j)
 cli.add_command(voyage)
 cli.add_command(hook)
 cli.add_command(migrate)
 cli.add_command(sync)
+cli.add_command(reconcile)
 
 # --- Register individual commands ---
 
