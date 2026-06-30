@@ -150,23 +150,20 @@ def reconcile(config, dry_run=False, prune=True, verify=True, allow_empty=False)
         return result
 
     # --- 1+2: build the exact .md set, reusing the JSONL derived layer where unchanged ---
-    from memoryschema.spaces import embed_all_spaces
+    from memoryschema.spaces import apply_full_embeddings
     DERIVED = ("embedding", "embeddings", "divergence_profile",
                "created_at", "access_count", "last_accessed", "associations")
     final = []
     for name, e in md_entities.items():
+        out = dict(e)                                           # fresh dict — keep parsed .md pristine
         j = jsonl_by_name.get(name)
         if j and j.get("embedding") and _embed_text(j) == _embed_text(e):
             for k in DERIVED:                                   # reuse derived layer (full multi-space)
                 if k in j and j[k] is not None:
-                    e[k] = j[k]
+                    out[k] = j[k]
         else:                                                   # new or content-changed -> re-embed all spaces
             try:
-                embs, div = embed_all_spaces(e, config=config)
-                if embs:
-                    e["embeddings"] = embs
-                    e["embedding"] = embs.get("default")
-                    e["divergence_profile"] = div
+                if apply_full_embeddings(out, config=config):
                     result["reembedded"] += 1
                 else:
                     result["embed_failed"] += 1                 # no embeddable text
@@ -174,8 +171,8 @@ def reconcile(config, dry_run=False, prune=True, verify=True, allow_empty=False)
                 result["embed_failed"] += 1                     # Voyage down -> degraded, not a crash
                 result.setdefault("embed_errors", []).append((name, str(ex)[:120]))
             if j and j.get("created_at"):
-                e["created_at"] = j["created_at"]
-        final.append(e)
+                out["created_at"] = j["created_at"]
+        final.append(out)
 
     # --- 3: rewrite store.jsonl to EXACTLY the .md set (prunes JSONL residuals + applies edits) ---
     result["jsonl_pruned"] = len(jsonl_names - md)
@@ -192,10 +189,15 @@ def reconcile(config, dry_run=False, prune=True, verify=True, allow_empty=False)
                 for name in (post - md):
                     neo4j_store.delete(name)
                 result["neo4j_pruned"] = len(post - md)
-            try:
-                neo4j_store.compute_associations()
-            except Exception:
-                pass
+            changed = bool(result["reembedded"] or result["jsonl_pruned"]
+                           or result["neo4j_pruned"] or result["missing_from_jsonl"])
+            result["associations_recomputed"] = changed
+            if changed:                                         # skip the O(n^2) recompute on a no-op
+                try:
+                    neo4j_store.compute_associations()
+                except Exception as ex:
+                    result["assoc_error"] = str(ex)[:160]
+                    result["associations_recomputed"] = False
             result["neo4j_pushed"] = True
         except Exception as e:
             result["neo4j_push_error"] = str(e)

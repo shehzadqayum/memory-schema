@@ -88,8 +88,8 @@ class TestMigrate:
         mock_driver.session.return_value.__exit__ = MagicMock(return_value=False)
         mock_session.run.return_value = MagicMock(single=MagicMock(return_value={"n": 3}))
 
-        with patch("memoryschema.migration.GraphDatabase") as mock_gd:
-            mock_gd.driver.return_value = mock_driver
+        with patch("memoryschema.migration.connect") as mock_connect:
+            mock_connect.return_value = mock_driver
             result = migrate(config=config, skip_assoc=True)
         assert result["nodes_created"] == 3
         assert "duration_s" in result

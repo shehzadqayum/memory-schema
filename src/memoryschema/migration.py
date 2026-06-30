@@ -12,7 +12,7 @@ Usage:
 import json
 import time
 
-from neo4j import GraphDatabase
+from memoryschema.neo4j_store import connect
 
 from memoryschema.config import ALL_RELATION_TYPES as _RELATION_TYPES
 from memoryschema.neo4j_store import _serialize_multispace
@@ -64,26 +64,18 @@ def migrate_nodes(driver, entries, batch_size=500):
                               'multispace': _serialize_multispace(entry)})
 
         with driver.session() as session:
-            # MERGE (not CREATE) on the unique name so the bulk import is IDEMPOTENT — re-running
-            # against existing nodes no longer throws ConstraintError on memory_name_unique. += keeps
-            # the embedding/multispace props set below intact. (helios local patch — re-apply on re-vendor.)
+            # ONE UNWIND folds the MERGE + embedding + multispace into a single round-trip per batch
+            # (was 1 + 2N queries — this is the reconcile hot-path). MERGE (not CREATE) on the unique
+            # name keeps the import IDEMPOTENT (no ConstraintError on memory_name_unique re-runs).
+            # coalesce keeps existing values when a row carries no embedding / multispace.
+            # (helios local patch — re-apply on re-vendor.)
             session.run("""
                 UNWIND $nodes AS nd
                 MERGE (m:Memory {name: nd.props.name})
                 SET m += nd.props
+                SET m.embedding = coalesce(nd.embedding, m.embedding)
+                SET m += coalesce(nd.multispace, {})
             """, nodes=node_data)
-
-            for nd in node_data:
-                if nd['embedding']:
-                    session.run("""
-                        MATCH (m:Memory {name: $name})
-                        SET m.embedding = $embedding
-                    """, name=nd['props']['name'], embedding=nd['embedding'])
-                if nd['multispace'] is not None:
-                    session.run("""
-                        MATCH (m:Memory {name: $name})
-                        SET m += $multispace
-                    """, name=nd['props']['name'], multispace=nd['multispace'])
 
         created += len(batch)
 
@@ -200,10 +192,7 @@ def migrate(config=None, batch_size=500, skip_assoc=False, verify_flag=False, dr
         stats['dry_run'] = True
         return stats
 
-    driver = GraphDatabase.driver(
-        config.neo4j_uri,
-        auth=(config.neo4j_user, config.neo4j_password),
-    )
+    driver = connect(config=config)        # shared driver build + RETURN 1 probe + friendly auth error
 
     try:
         t0 = time.time()

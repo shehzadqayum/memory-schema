@@ -161,3 +161,18 @@ def embed_all_spaces(entry, config=None, embed_fn=None, max_chars=2000):
             embeddings[space] = embed_fn(text)
 
     return embeddings, compute_divergence_profile(embeddings)
+
+
+def apply_full_embeddings(entry, config=None):
+    """Embed ALL spaces for `entry` and set embedding/embeddings/divergence_profile IN PLACE.
+    Returns True if embedded, False if the entry has no embeddable text. Raises on a backend
+    failure (the caller decides whether to degrade). Shared by reconcile + reembed so the
+    derived-layer write happens in exactly one place."""
+    embeddings, divergence = embed_all_spaces(entry, config=config)
+    if not embeddings:
+        return False
+    entry['embeddings'] = embeddings
+    entry['embedding'] = embeddings.get('default')
+    if divergence:
+        entry['divergence_profile'] = divergence
+    return True

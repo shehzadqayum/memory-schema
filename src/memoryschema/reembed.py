@@ -150,7 +150,7 @@ def reembed_all_spaces(prefix='', config=None, store=None, dry_run=False):
         from memoryschema.store import get_store
         store = get_store(config=config)
 
-    from memoryschema.spaces import embed_all_spaces
+    from memoryschema.spaces import apply_full_embeddings
 
     entries = store.list_all(include_inactive=True)
     matched = [e for e in entries if e.get('name', '').startswith(prefix)]
@@ -160,14 +160,9 @@ def reembed_all_spaces(prefix='', config=None, store=None, dry_run=False):
         return stats
 
     for entry in matched:
-        embeddings, divergence = embed_all_spaces(entry, config=config)
-        if not embeddings:
+        if not apply_full_embeddings(entry, config=config):    # shared derived-layer write
             stats['skipped_empty'] += 1
             continue
-        entry['embedding'] = embeddings.get('default')
-        entry['embeddings'] = embeddings
-        if divergence:
-            entry['divergence_profile'] = divergence
         store.upsert(entry)
         stats['embedded'] += 1
 

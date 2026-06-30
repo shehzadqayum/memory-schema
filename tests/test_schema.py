@@ -45,28 +45,29 @@ class TestVerifySchema:
 
 
 class TestSetupSchema:
+    def _mock_driver(self):
+        mock_driver = MagicMock()
+        mock_session = MagicMock()
+        mock_driver.session.return_value.__enter__ = MagicMock(return_value=mock_session)
+        mock_driver.session.return_value.__exit__ = MagicMock(return_value=False)
+        mock_session.run.return_value = []
+        return mock_driver
+
     def test_creates_driver_from_config(self):
+        # setup_schema now routes through the shared neo4j_store.connect() helper.
         config = MemoryConfig(neo4j_uri="bolt://test:7687", neo4j_user="u", neo4j_password="p")
-        with patch("memoryschema.schema.GraphDatabase") as mock_gd:
-            mock_driver = MagicMock()
-            mock_session = MagicMock()
-            mock_driver.session.return_value.__enter__ = MagicMock(return_value=mock_session)
-            mock_driver.session.return_value.__exit__ = MagicMock(return_value=False)
-            mock_session.run.return_value = []
-            mock_gd.driver.return_value = mock_driver
+        mock_driver = self._mock_driver()
+        with patch("memoryschema.neo4j_store.connect", return_value=mock_driver) as mock_connect:
             from memoryschema.schema import setup_schema
             setup_schema(config)
-            mock_gd.driver.assert_called_once_with("bolt://test:7687", auth=("u", "p"))
+            mock_connect.assert_called_once()
+            assert mock_connect.call_args.kwargs.get("config") is config
             mock_driver.close.assert_called_once()
 
     def test_default_config(self):
-        with patch("memoryschema.schema.GraphDatabase") as mock_gd:
-            mock_driver = MagicMock()
-            mock_session = MagicMock()
-            mock_driver.session.return_value.__enter__ = MagicMock(return_value=mock_session)
-            mock_driver.session.return_value.__exit__ = MagicMock(return_value=False)
-            mock_session.run.return_value = []
-            mock_gd.driver.return_value = mock_driver
+        mock_driver = self._mock_driver()
+        with patch("memoryschema.neo4j_store.connect", return_value=mock_driver) as mock_connect:
             from memoryschema.schema import setup_schema
             setup_schema()
-            mock_gd.driver.assert_called_once()
+            mock_connect.assert_called_once()
+            mock_driver.close.assert_called_once()

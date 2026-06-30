@@ -60,15 +60,15 @@ def _wait_bolt(config, timeout=40):
 
 
 def _bolt_and_schema(config):
-    """(bolt_ok, schema_ok, detail) — connect and assert the memory_embedding vector index."""
-    from neo4j import GraphDatabase
+    """(bolt_ok, schema_ok, detail) — connect (shared probe + auth wrap) and assert the
+    memory_embedding vector index."""
+    from memoryschema.neo4j_store import connect
     try:
-        driver = GraphDatabase.driver(config.neo4j_uri, auth=(config.neo4j_user, config.neo4j_password))
+        driver = connect(config=config)        # build + RETURN 1 probe + friendly auth error
     except Exception as e:
         return False, False, str(e)[:160]
     try:
         with driver.session() as s:
-            s.run("RETURN 1").consume()
             names = [r["name"] for r in s.run("SHOW INDEXES YIELD name RETURN name")]
         return True, ("memory_embedding" in names), ""
     except Exception as e:
@@ -98,7 +98,7 @@ def ensure_backend(config, auto_start=True, require=None):
     is True if a soft dep (e.g. Voyage when not required) is down.
     """
     if require is None:
-        require = ([("neo4j")] if getattr(config, "require_neo4j", True) else []) + \
+        require = (["neo4j"] if getattr(config, "require_neo4j", True) else []) + \
                   (["voyage"] if getattr(config, "require_voyage", False) else [])
     neo4j_hard = "neo4j" in require
     voyage_hard = "voyage" in require

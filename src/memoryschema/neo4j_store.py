@@ -29,6 +29,33 @@ def _now_iso():
     return datetime.now(timezone.utc).isoformat()
 
 
+def connect(config=None, uri=None, user=None, password=None):
+    """Build a Neo4j driver, run a RETURN 1 liveness probe, and wrap auth failures with a friendly
+    ConnectionError. The SINGLE place driver construction + the probe live — the store, schema setup,
+    migration, and preflight all route through this instead of re-implementing it.
+    (helios local patch — re-apply on re-vendor.)"""
+    if config is None and uri is None:
+        from memoryschema.config import MemoryConfig
+        config = MemoryConfig()
+    if config is not None:
+        uri = uri or config.neo4j_uri
+        user = user or config.neo4j_user
+        password = password or config.neo4j_password
+    driver = GraphDatabase.driver(uri, auth=(user, password))
+    try:
+        with driver.session() as session:
+            session.run('RETURN 1')
+    except Exception as e:
+        driver.close()
+        err = str(e).lower()
+        if 'credentials' in err or 'unauthorized' in err or 'authentication' in err:
+            raise ConnectionError(
+                f"Neo4j auth failed at {uri}. Set NEO4J_PASSWORD env var or check "
+                f"memoryschema.toml [neo4j] section.") from e
+        raise
+    return driver
+
+
 def _neo4j_serialize_obs(obs):
     """Serialize observation for Neo4j list property. Plain string."""
     if isinstance(obs, dict):
@@ -120,25 +147,8 @@ class Neo4jMemoryStore:
         if config is None and uri is None:
             from memoryschema.config import MemoryConfig
             config = MemoryConfig()
-        if config:
-            uri = uri or config.neo4j_uri
-            user = user or config.neo4j_user
-            password = password or config.neo4j_password
-
         self.config = config  # retained for tunable scoring weights
-        self._driver = GraphDatabase.driver(uri, auth=(user, password))
-        try:
-            with self._driver.session() as session:
-                session.run('RETURN 1')
-        except Exception as e:
-            self._driver.close()
-            err = str(e).lower()
-            if 'credentials' in err or 'unauthorized' in err or 'authentication' in err:
-                raise ConnectionError(
-                    f"Neo4j auth failed at {uri}. "
-                    f"Set NEO4J_PASSWORD env var or check memoryschema.toml [neo4j] section."
-                ) from e
-            raise
+        self._driver = connect(config=config, uri=uri, user=user, password=password)
 
     def close(self):
         self._driver.close()

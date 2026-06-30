@@ -180,7 +180,12 @@ def reconcile(config, dry_run, prune, no_verify, allow_empty):
         for nm, msg in (r.get('embed_errors') or [])[:3]:
             click.echo(f"      - {nm}: {msg}", err=True)
     if r['neo4j_pushed']:
-        click.echo("Neo4j updated + associations recomputed.")
+        msg = "Neo4j updated"
+        if r.get('associations_recomputed'):
+            msg += " + associations recomputed"
+        click.echo(msg + ".")
+        if r.get('assoc_error'):
+            click.echo(f"  ⚠ associations not recomputed: {r['assoc_error']}", err=True)
     elif r.get('neo4j_push_error'):
         click.echo(f"  ⚠ Neo4j not updated: {r['neo4j_push_error']}", err=True)
 

@@ -9,8 +9,6 @@ Usage:
     setup_schema(config)
 """
 
-from neo4j import GraphDatabase
-
 
 def create_schema(driver):
     """Create all indexes and constraints.
@@ -66,14 +64,8 @@ def setup_schema(config=None):
     Args:
         config: Optional MemoryConfig instance. Uses defaults if None.
     """
-    if config is None:
-        from memoryschema.config import MemoryConfig
-        config = MemoryConfig()
-
-    driver = GraphDatabase.driver(
-        config.neo4j_uri,
-        auth=(config.neo4j_user, config.neo4j_password),
-    )
+    from memoryschema.neo4j_store import connect
+    driver = connect(config=config)      # shared driver build + RETURN 1 probe + friendly auth error
     try:
         create_schema(driver)
         return verify_schema(driver)
