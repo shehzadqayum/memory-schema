@@ -717,39 +717,60 @@ class Neo4jMemoryStore:
                      OR n.project STARTS WITH $scope_prefix
                      OR $scope_project STARTS WITH (n.project + '.'))"""
             assoc_scope = """
-                AND (n.project = $scope_project
-                     OR n.project STARTS WITH $scope_prefix
-                     OR $scope_project STARTS WITH (n.project + '.'))"""
+                AND (an.project = $scope_project
+                     OR an.project STARTS WITH $scope_prefix
+                     OR $scope_project STARTS WITH (an.project + '.'))"""
             params['scope_project'] = project
             params['scope_prefix'] = project + '.'
 
-        # One UNWIND over the frontier; a scoped CALL subquery unions the three channels per source.
+        # ONE UNWIND over the frontier; a scoped CALL subquery unions the three channels PER SOURCE
+        # (so neighbor order — hence tie-break stability — matches the per-node original). Relation/
+        # backlink rows return the full node (needed by _score_entry's multi-space relevance).
+        # ASSOCIATION rows return n=null + only the scalar fields used downstream: their embeddings are
+        # NEVER read (scored by a.score), so we avoid dragging the per-space arrays over bolt and
+        # deserializing them — the dominant recall cost (~64% of neighbors are associations).
         cypher = f"""
             UNWIND $names AS src
             MATCH (m:Memory {{name: src}})
             CALL (m) {{
                 MATCH (m)-[r]->(n:Memory)
                 WHERE type(r) IN $rel_types{scope_clause}
-                RETURN n AS n, 'relation' AS channel, type(r) AS rel_type, null AS assoc
+                RETURN n AS n, 'relation' AS channel, type(r) AS rel_type, null AS assoc,
+                       null AS aname, null AS atype, null AS aimp, null AS adesc,
+                       null AS aobs, null AS astatus, null AS aproj
               UNION
                 MATCH (n:Memory)-[r]->(m)
                 WHERE type(r) IN $rel_types{scope_clause}
-                RETURN n AS n, 'backlink' AS channel, type(r) AS rel_type, null AS assoc
+                RETURN n AS n, 'backlink' AS channel, type(r) AS rel_type, null AS assoc,
+                       null AS aname, null AS atype, null AS aimp, null AS adesc,
+                       null AS aobs, null AS astatus, null AS aproj
               UNION
-                MATCH (m)-[a:ASSOCIATED_WITH]->(n:Memory)
+                MATCH (m)-[a:ASSOCIATED_WITH]->(an:Memory)
                 WHERE true{assoc_scope}
-                RETURN n AS n, 'association' AS channel, null AS rel_type, a.score AS assoc
+                RETURN null AS n, 'association' AS channel, null AS rel_type, a.score AS assoc,
+                       an.name AS aname, an.type AS atype, an.importance AS aimp, an.description AS adesc,
+                       an.observations AS aobs, an.status AS astatus, an.project AS aproj
             }}
-            RETURN src AS s, n, channel, rel_type, assoc
+            RETURN src AS s, n, channel, rel_type, assoc, aname, atype, aimp, adesc, aobs, astatus, aproj
         """
         with self._driver.session() as session:
             for row in session.run(cypher, **params):
-                info = {'entry': self._node_to_dict(row['n']), 'channel': row['channel']}
                 if row['channel'] == 'association':
-                    info['assoc_score'] = row['assoc']
+                    obs = row['aobs'] or []
+                    entry = {
+                        'name': row['aname'], 'type': row['atype'], 'importance': row['aimp'],
+                        'description': row['adesc'],
+                        'observations': [_neo4j_deserialize_obs(o) for o in obs],
+                        'project': row['aproj'],
+                    }
+                    if row['astatus'] is not None:    # absent status -> result default 'active' (as before)
+                        entry['status'] = row['astatus']
+                    out.setdefault(row['s'], []).append(
+                        {'entry': entry, 'channel': 'association', 'assoc_score': row['assoc']})
                 else:
-                    info['rel_type'] = row['rel_type']
-                out.setdefault(row['s'], []).append(info)
+                    out.setdefault(row['s'], []).append(
+                        {'entry': self._node_to_dict(row['n']),
+                         'channel': row['channel'], 'rel_type': row['rel_type']})
         return out
 
     def _get_neighbors(self, name, project=None):
