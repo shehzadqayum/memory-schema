@@ -32,6 +32,30 @@ def test_reconcile_aborts_on_empty_md_cli(tmp_path, dead_neo4j):
     assert (mem / "store.jsonl").read_text(encoding="utf-8").count("\n") == 2   # preserved
 
 
+def test_import_hard_fails_when_neo4j_required_and_down(tmp_path, dead_neo4j):
+    """`import` is an explicit materialize command: hard-fails loud when Neo4j is required + down."""
+    from memoryschema.cli.lifecycle_cmd import import_cmd
+    src = tmp_path / "in.jsonl"
+    src.write_text('{"name":"a","schema":4}\n', encoding="utf-8")
+    cfg = dead_neo4j(project_root=str(tmp_path), require_neo4j=True)
+    r = CliRunner().invoke(import_cmd, [str(src), "--format", "jsonl"], obj=cfg)
+    assert r.exit_code != 0
+    assert "Neo4j" in r.output
+
+
+def test_write_hard_fails_when_neo4j_required_and_down(tmp_path, dead_neo4j):
+    """`write` likewise hard-fails loud rather than writing JSONL-only that drifts."""
+    from memoryschema.cli.memory_cmd import write as write_cmd
+    (tmp_path / "memory").mkdir(parents=True, exist_ok=True)
+    mdf = tmp_path / "memory" / "m.md"
+    mdf.write_text('<memory:entity schema="4" name="m">'
+                   '<memory:description>M</memory:description></memory:entity>', encoding="utf-8")
+    cfg = dead_neo4j(project_root=str(tmp_path), require_neo4j=True)
+    r = CliRunner().invoke(write_cmd, [str(mdf)], obj=cfg)
+    assert r.exit_code != 0
+    assert "Neo4j" in r.output
+
+
 def test_preflight_json_failure_cli(monkeypatch):
     """preflight --json exits non-zero and emits valid JSON with ok=False when a hard dep is down."""
     import memoryschema.preflight as pf

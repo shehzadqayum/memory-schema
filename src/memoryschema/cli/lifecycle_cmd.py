@@ -331,6 +331,16 @@ def import_cmd(config, source, fmt):
     """
     source_path = Path(source)
 
+    def _strict_store():
+        # `import` materializes into the store — hard-require Neo4j by default (like index/write).
+        from memoryschema.store import get_store
+        try:
+            return get_store(config=config, require_neo4j=config.require_neo4j)
+        except ConnectionError as e:
+            raise click.ClickException(
+                f"{e}\n`import` requires Neo4j by default. Run `memoryschema preflight`, or set "
+                f"MEMORYSCHEMA_REQUIRE_NEO4J=false to import JSONL-only (drift heals on `reconcile`).")
+
     if fmt is None:
         if source_path.suffix in ('.gz', '.tar'):
             fmt = "tar"
@@ -348,8 +358,7 @@ def import_cmd(config, source, fmt):
         click.echo(f"Imported archive to {config.project_root}")
 
     elif fmt == "jsonl":
-        from memoryschema.store import get_store
-        store = get_store(config=config)
+        store = _strict_store()
         count = 0
         with open(source, 'r', encoding='utf-8') as f:
             for line in f:
@@ -361,8 +370,7 @@ def import_cmd(config, source, fmt):
 
     elif fmt == "md":
         from memoryschema.tags import parse_memory_file
-        from memoryschema.store import get_store
-        store = get_store(config=config)
+        store = _strict_store()
         count = 0
         for f in sorted(source_path.glob("*.md")):
             memory = parse_memory_file(str(f))

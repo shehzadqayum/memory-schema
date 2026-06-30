@@ -233,8 +233,16 @@ def write(config, file_path):
     if config.generator_id:
         memory['generator'] = config.generator_id
 
-    # Embed BEFORE gate (stages 4-6 need the embedding vector)
-    store = _get_store(config)
+    # Embed BEFORE gate (stages 4-6 need the embedding vector).
+    # `write` is an explicit MATERIALIZE command — hard-require Neo4j by default (like `index`) so a
+    # missing backend fails loud instead of writing JSONL-only that drifts. (helios local patch.)
+    from memoryschema.store import get_store
+    try:
+        store = get_store(config=config, require_neo4j=config.require_neo4j)
+    except ConnectionError as e:
+        raise click.ClickException(
+            f"{e}\n`write` requires Neo4j by default. Run `memoryschema preflight`, or set "
+            f"MEMORYSCHEMA_REQUIRE_NEO4J=false to write JSONL-only (drift heals on `reconcile`).")
     if config.voyage_api_key:
         try:
             from memoryschema.embeddings import embed_text

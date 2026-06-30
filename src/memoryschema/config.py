@@ -68,8 +68,11 @@ class MemoryConfig:
     rerank_model: str = "rerank-2"
 
     # Default-mode dependency requirements (the operator's "Neo4j + Voyage up at all times").
-    # When require_neo4j is set, write-class operations FAIL LOUD rather than silently falling
-    # back to JSONL; reads warn loudly. Voyage degradation (-> keyword/BM25) is survivable by default.
+    # require_neo4j drives: (1) the preflight gate (non-zero exit when Neo4j is down), and (2) the
+    # explicit MATERIALIZE commands `index` / `write` / `import`, which hard-require Neo4j (raise)
+    # rather than silently writing JSONL-only that then drifts. The hook + reads deliberately stay on
+    # graceful-degrade-with-a-loud-banner so a routine memory Write never loses .md content-truth.
+    # Voyage degradation (-> keyword/BM25) is survivable by default. Set the env vars to override.
     # Env: MEMORYSCHEMA_REQUIRE_NEO4J / MEMORYSCHEMA_REQUIRE_VOYAGE. (helios local patch.)
     require_neo4j: bool = field(
         default_factory=lambda: os.environ.get("MEMORYSCHEMA_REQUIRE_NEO4J", "true").lower()
