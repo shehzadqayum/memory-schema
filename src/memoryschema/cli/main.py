@@ -133,7 +133,9 @@ def _maybe_preflight(config):
         return
     try:
         import time
-        marker = config.memory_dir / ".preflight_ok"
+        from pathlib import Path
+        # Runtime marker lives OUTSIDE the memory/ content dir (which holds only memory entities).
+        marker = Path(config.project_root) / ".memoryschema" / ".preflight_ok"
         if marker.exists() and (time.time() - marker.stat().st_mtime) < 60:
             return
         from memoryschema.preflight import ensure_backend
@@ -141,7 +143,7 @@ def _maybe_preflight(config):
         if r["ok"]:
             if not r["degraded"]:
                 try:                                  # only throttle when FULLY healthy — a degraded
-                    config.memory_dir.mkdir(parents=True, exist_ok=True)   # state must keep re-warning
+                    marker.parent.mkdir(parents=True, exist_ok=True)       # state must keep re-warning
                     marker.write_text("ok")
                 except Exception:
                     pass
