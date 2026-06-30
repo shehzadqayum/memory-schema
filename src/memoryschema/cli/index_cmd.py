@@ -30,7 +30,17 @@ def index(config, base_path, project_scope, do_embed):
     if project_scope is None:
         project_scope = config.project_name
 
-    store = get_store(config=config)
+    # `index` is an explicit materialize-into-store write: by default it HARD-REQUIRES
+    # Neo4j (config.require_neo4j) so a missing backend fails loud instead of silently
+    # writing a JSONL-only result that then drifts. Set MEMORYSCHEMA_REQUIRE_NEO4J=false
+    # to allow a deliberate JSONL-only degrade (reconcile pushes to Neo4j once it's back).
+    try:
+        store = get_store(config=config, require_neo4j=config.require_neo4j)
+    except ConnectionError as e:
+        raise click.ClickException(
+            f"{e}\n`index` requires Neo4j by default. Run `memoryschema preflight` to diagnose, "
+            f"or set MEMORYSCHEMA_REQUIRE_NEO4J=false to index JSONL-only (drift heals on "
+            f"`memoryschema reconcile`).")
     result = consolidate(base_path, project_scope, store, embed=do_embed)
 
     click.echo(f"Indexed:      {result['synced']} files")
