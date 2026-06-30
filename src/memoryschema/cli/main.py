@@ -38,7 +38,8 @@ Indexing & Embeddings:
 
 Migration & Data:
     migrate        Migrate between JSONL and Neo4j
-    sync           Reconcile JSONL and Neo4j stores
+    sync           Report drift (read-only) across .md / JSONL / Neo4j
+    reconcile      Fix drift: rebuild the store to the .md set, push Neo4j, prune, verify
 
 Lifecycle:
     backup         Full or selective backup
@@ -52,6 +53,7 @@ Hook Management:
     hook           Manage PostToolUse hook (install, uninstall, status, test)
 
 Diagnostics & Inheritance:
+    preflight      Verify deps are up (Docker/Neo4j/Voyage) — the always-on health gate
     doctor         21-point health check (TOML, rules inheritance, tests)
     rules          Show effective rules with inheritance markers
     config         Show effective config with inheritance chain

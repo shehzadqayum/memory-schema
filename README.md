@@ -166,10 +166,16 @@ Each external service is optional. The system degrades gracefully:
 
 | Without | Impact | How to add later |
 |---------|--------|-----------------|
-| Neo4j | JSONL store (slower for large datasets) | `memoryschema neo4j deploy` + `memoryschema migrate jsonl-to-neo4j` |
+| Neo4j | Reads degrade to the JSONL store with a loud banner; write-class commands hard-require it by default | `memoryschema neo4j deploy` + `memoryschema migrate jsonl-to-neo4j` |
 | Voyage AI | No semantic search (keyword only) | `export VOYAGE_API_KEY=...` + `memoryschema embed --all` |
 | Docker | No Neo4j (JSONL only) | Install Docker, then `memoryschema neo4j deploy` |
 | Claude Code | No auto-indexing (manual `memoryschema write`) | Install Claude Code, `memoryschema hook install` |
+
+> **Default mode (`require_neo4j`, on by default).** The always-on `memoryschema preflight` gate verifies
+> Neo4j + Voyage are up. Reads degrade *loudly* to JSONL, but the explicit MATERIALIZE commands
+> (`index` / `write` / `import`) **fail loud** rather than writing JSONL-only that then drifts. Set
+> `MEMORYSCHEMA_REQUIRE_NEO4J=false` to restore the old silent JSONL-only behaviour. Heal any drift with
+> `memoryschema reconcile`.
 
 ---
 
@@ -229,7 +235,8 @@ Each external service is optional. The system degrades gracefully:
 |---------|-------------|
 | `memoryschema migrate jsonl-to-neo4j` | JSONL to Neo4j |
 | `memoryschema migrate neo4j-to-jsonl` | Neo4j to JSONL |
-| `memoryschema sync` | Reconcile stores |
+| `memoryschema sync` | Report drift (read-only) across .md / JSONL / Neo4j |
+| `memoryschema reconcile` | Fix drift: rebuild the store to the .md set, push Neo4j, prune, verify |
 | `memoryschema backup` | Full or selective backup |
 | `memoryschema restore <archive>` | Restore from backup |
 | `memoryschema reset --confirm` | Wipe data |
@@ -240,6 +247,7 @@ Each external service is optional. The system degrades gracefully:
 ### Diagnostics & Inheritance
 | Command | Description |
 |---------|-------------|
+| `memoryschema preflight` | Verify deps are up (Docker/Neo4j/Voyage) — the always-on health gate |
 | `memoryschema doctor` | 21-point health check (includes TOML + rules inheritance) |
 | `memoryschema rules` | Show effective rules with inheritance markers |
 | `memoryschema rules --conflicts` | Show child rules overridden by parent |
@@ -250,38 +258,31 @@ All query commands support `--json` for agent consumption. All destructive comma
 
 ---
 
-## Claude Code Plugin
+## Claude Code Integration
 
-The package includes a Claude Code plugin at `.claude-plugin/` that provides hooks, rules, and skills — no MCP server required.
-
-### What the plugin adds
-
-| Component | What it does |
-|-----------|-------------|
-| **Hook** | PostToolUse Write — auto-indexes memory files (7-space embed, gate, store) |
-| **Rules** | Schema rules + working memory guidelines (loaded into prompt) |
-| **Skills** | `/recall`, `/chain-start`, `/chain-status`, `/chain-release`, `/memory-status`, `/bootstrap` |
-
-### Plugin installation
+The package integrates with Claude Code via a **PostToolUse hook** — no MCP server required. The hook
+ships inside the package (`memoryschema/hooks/hook-post-write.sh`) and is registered into your
+`~/.claude/settings.json` by the CLI:
 
 ```bash
 # 1. Install the Python package (prerequisite)
 pip install memory-schema[all]
 
-# 2. The plugin is at .claude-plugin/ in this repo
-#    Point Claude Code to it for hooks, rules, and skills
+# 2. Register the PostToolUse + Stop hooks (writes to ~/.claude/settings.json)
+memoryschema hook install
+memoryschema hook status      # verify registration
 ```
 
-The plugin is a wrapper — it contains configuration and instructions, not source code. All logic lives in the pip-installed `memoryschema` package.
+The hook fires on every Write/Edit to a `memory/*.md` file: it parses, validates, gate-checks,
+embeds across the 7 spaces, and indexes into the active store. All logic lives in the pip-installed
+`memoryschema` package; `memoryschema hook upgrade` re-points the registration after an upgrade.
 
 ### Hybrid memory scope
 
 - **Project store**: `memory/` in the project root (isolated per project)
 - **User store**: `~/.claude/memory/` (cross-project knowledge, fallback)
 
-The hook writes to the project store when available, falls back to user-level. The `/recall` skill searches both stores.
-
-See `.claude-plugin/README.md` for full plugin documentation.
+The hook writes to the project store when available, falls back to user-level.
 
 ---
 
