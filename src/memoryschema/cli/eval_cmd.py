@@ -12,8 +12,9 @@ import click
 
 
 @click.command()
-@click.option("--mode", type=click.Choice(["retrieval", "salience"]),
-              default="retrieval", help="Evaluation mode: retrieval quality or write-decision salience.")
+@click.option("--mode", type=click.Choice(["retrieval", "salience", "ablation", "backends"]),
+              default="retrieval",
+              help="retrieval quality | write-decision salience | multi-space ablation | backend benchmark.")
 @click.option("--store", "store_path", default=None, type=click.Path(),
               help="Path to store.jsonl for real-data eval. Default: configured store.")
 @click.option("--json", "as_json", is_flag=True, help="Output results as JSON.")
@@ -37,8 +38,100 @@ def eval_cmd(config, mode, store_path, as_json):
     if mode == 'salience':
         _run_salience_eval(as_json)
         return
+    if mode == 'ablation':
+        _run_ablation_eval(config, as_json)
+        return
+    if mode == 'backends':
+        _run_backend_eval(config, as_json)
+        return
 
     _run_retrieval_eval(config, store_path, as_json)
+
+
+def _run_ablation_eval(config, as_json):
+    """Move 2: single-space (default only) vs multi-space (variance-weighted) retrieval on the
+    helios gold set — does the 7-space scoring earn its keep at the current corpus size?"""
+    from memoryschema.store import MemoryStore
+    from memoryschema.eval.fixtures import build_helios_gold_set
+    from memoryschema.eval.ablation import run_ablation
+
+    entries = [e for e in MemoryStore(str(config.store_path)).list_all()
+               if e.get("embedding") and (e.get("status") or "active") == "active"]
+    try:
+        from memoryschema.embeddings import embed_text
+        def embed_fn(t):
+            return embed_text(t, config=config)
+    except Exception:
+        def embed_fn(t):
+            return None
+
+    r = run_ablation(entries, build_helios_gold_set(), embed_fn)
+    if as_json:
+        click.echo(json.dumps(r, indent=2))
+        return
+
+    click.echo("Multi-space ablation — single vs multi-space retrieval")
+    click.echo("=" * 56)
+    click.echo(f"  corpus: {r['n_entities']} active entities    queries scored: {r['n_queries']}")
+    if not r['n_queries']:
+        click.echo("  No queries scored (Voyage unavailable? gold set empty?).")
+        return
+    click.echo(f"  {'metric':<12}{'single':>10}{'multi':>10}{'delta':>11}")
+    for k in ("recall@5", "recall@10", "mrr", "ndcg@10"):
+        click.echo(f"  {k:<12}{r['single'][k]:>10.4f}{r['multi'][k]:>10.4f}{r['delta'][k]:>+11.4f}")
+    click.echo()
+    verdict = ("KEEP multi-space active" if r["keep_multispace"]
+               else "multi-space gives NO meaningful lift here — keep DORMANT")
+    click.echo(f"  MRR lift {r['mrr_lift']:+.4f} vs keep-threshold {r['threshold']:+.2f}  ->  {verdict}")
+    click.echo("  (Pre-committed threshold. Re-run at corpus milestones: 100 / 250 / 500 entities.)")
+
+
+def _run_backend_eval(config, as_json):
+    """Move 3: Neo4j vs JSONL recall — retrieval quality + latency on the helios gold set."""
+    import time
+    from statistics import median
+    from memoryschema.store import MemoryStore
+    from memoryschema.eval.fixtures import build_helios_gold_set
+    from memoryschema.eval.metrics import evaluate_all
+
+    gold = build_helios_gold_set()
+
+    def bench(store):
+        lat = []
+        for q in gold:
+            t0 = time.perf_counter()
+            store.recall(query=q["query"], project=q.get("project"), limit=20)
+            lat.append((time.perf_counter() - t0) * 1000.0)
+        quality = evaluate_all(store, gold)["averages"]
+        lat.sort()
+        p90 = lat[min(len(lat) - 1, int(len(lat) * 0.9))] if lat else 0.0
+        return {"quality": quality,
+                "median_ms": round(median(lat), 1) if lat else 0.0,
+                "p90_ms": round(p90, 1), "queries": len(gold)}
+
+    results = {}
+    try:
+        from memoryschema.neo4j_store import Neo4jMemoryStore
+        ns = Neo4jMemoryStore(config=config)
+        results["neo4j"] = bench(ns)
+        ns.close()
+    except Exception as e:
+        results["neo4j"] = {"error": str(e)[:140]}
+    results["jsonl"] = bench(MemoryStore(str(config.store_path)))
+
+    if as_json:
+        click.echo(json.dumps(results, indent=2))
+        return
+    click.echo("Backend benchmark — Neo4j vs JSONL recall (helios gold set)")
+    click.echo("=" * 58)
+    for backend in ("neo4j", "jsonl"):
+        r = results[backend]
+        if "error" in r:
+            click.echo(f"  {backend:<7} UNAVAILABLE: {r['error']}")
+            continue
+        q = r["quality"]
+        click.echo(f"  {backend:<7} mrr={q['mrr']:.3f}  recall@5={q['recall@5']:.3f}  "
+                   f"ndcg@10={q['ndcg@10']:.3f}  |  latency median={r['median_ms']}ms p90={r['p90_ms']}ms")
 
 
 def _run_retrieval_eval(config, store_path, as_json):

@@ -237,6 +237,44 @@ def build_real_data_query_set():
     ]
 
 
+def build_helios_gold_set():
+    """Helios-corpus gold set (query -> expected entity names) for the multi-space ablation + the
+    backend benchmark. Deliberately mixes VOCAB-MISMATCH queries (no shared words with the target —
+    where embeddings should matter) and exact-term queries (where keyword would tie). Names are real
+    active entities. (helios local patch — extend as the corpus grows; seed from the recall log.)
+    """
+    M = "mismatch"  # query shares little/no vocabulary with the target memory
+    X = "exact"     # query shares the target's vocabulary
+    rows = [
+        ("how much can I lose before the account is stopped out", ["account-rdd-waterline"], M),
+        ("relative drawdown waterline 5 percent of deposit", ["account-rdd-waterline"], X),
+        ("counting a profitable trade as a loss", ["win-loss-profit-basis"], M),
+        ("classify wins by dollars not the R-multiple", ["win-loss-profit-basis"], X),
+        ("where do the trades and prices actually come from", ["helios-bridge"], M),
+        ("the live read-only MT5 bridge data feed", ["helios-bridge"], X),
+        ("is the multi-space embedding scoring switched on", ["seven-space-scoring-activated"], X),
+        ("the robot that places the three scaled entry legs", ["riskparameters-ea-model"], M),
+        ("RiskParameters EA RR1 RR2 runner scaled entry", ["riskparameters-ea-model"], X),
+        ("trade times are an hour off the candle bars", ["ohlc-trade-time-offset"], M),
+        ("the broker symbols have a C suffix", ["cti-c-suffix-symbols"], X),
+        ("what happens to a memory write when the database is down", ["memory-schema-reliability-hardened"], M),
+        ("idempotent schema reconcile preflight loud degradation", ["memory-schema-reliability-hardened"], X),
+        ("is the memory system actually worth its complexity", ["memory-module-value-evaluation"], M),
+        ("plan to measure whether memory is really used", ["plan-memory-value-measurement"], X),
+        ("the MT5 terminal has to run in portable mode", ["helios-mt5-portable"], X),
+        ("daily trading discipline rules and grading", ["trading-rules"], X),
+        ("dollar is the king currency this week", ["usd-strength-20260619"], M),
+        ("round prices to the instrument's decimal digits", ["price-rounding-digits"], X),
+        ("are aurora and helios the same trading account", ["aurora-helios-relationship"], M),
+        ("redesign the day chart workspace with multi-timeframe", ["plan-chart-workspace-redesign"], X),
+        ("version control repository for the project", ["helios-git-repo"], M),
+        ("let the assistant close orders on a demo account", ["plan-order-close-capability"], M),
+        ("the upsert bug where observations could not be appended", ["neo4j-upsert-null-observations-bug"], X),
+    ]
+    return [{"query": q, "relevant": rel, "project": None, "kind": kind,
+             "description": f"[{kind}] {q}"} for (q, rel, kind) in rows]
+
+
 # Poisoning test entries
 def build_poisoning_entries():
     """Build MINJA-style poisoning test entries.
