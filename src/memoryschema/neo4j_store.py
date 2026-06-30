@@ -478,8 +478,10 @@ class Neo4jMemoryStore:
             return []
 
         visited = {}
-        queue = []
-
+        # Per-hop frontier BFS: expand a WHOLE hop level in ONE batched neighbor fetch (replaces the
+        # old per-node N+1 cascade). Each frontier node carries its OWN max score; `visited` keeps the
+        # global max. Semantics-preserving vs the prior FIFO+re-queue form (verified identical results).
+        frontier = {}  # name -> (entry, score); expand once per hop at the best score seen for it
         for seed in seeds:
             seed_score = self._score_entry(seed, query_embedding)
             if query:
@@ -501,45 +503,49 @@ class Neo4jMemoryStore:
             }
             if seed['name'] not in visited or result['score'] > visited[seed['name']]['score']:
                 visited[seed['name']] = result
-            queue.append((seed, seed_score, 0))
+            prev = frontier.get(seed['name'])
+            if prev is None or seed_score > prev[1]:
+                frontier[seed['name']] = (seed, seed_score)
 
-        while queue:
-            current, current_score, current_hop = queue.pop(0)
-            if current_hop >= depth:
-                continue
+        for _hop in range(depth):
+            if not frontier:
+                break
+            next_hop = _hop + 1
+            neighbors_by_src = self._get_neighbors_batch(list(frontier), project=project)
+            next_frontier = {}
+            for src_name, (current, current_score) in frontier.items():
+                hop_score = current_score * decay
+                for neighbor_info in neighbors_by_src.get(src_name, []):
+                    neighbor = neighbor_info['entry']
+                    channel = neighbor_info['channel']
 
-            next_hop = current_hop + 1
-            hop_score = current_score * decay
+                    if channel == 'association':
+                        n_score = hop_score * neighbor_info.get('assoc_score', 0.5)
+                    else:
+                        n_score = hop_score * self._score_entry(neighbor, query_embedding)
 
-            neighbors = self._get_neighbors(current['name'], project=project)
+                    result = {
+                        'name': neighbor['name'],
+                        'score': round(n_score, 4),
+                        'hop': next_hop,
+                        'channel': channel,
+                        'type': neighbor.get('type'),
+                        'importance': neighbor.get('importance'),
+                        'description': neighbor.get('description'),
+                        'observations': neighbor.get('observations', []),
+                        'status': neighbor.get('status', 'active'),
+                        'project': neighbor.get('project'),
+                    }
+                    if channel in ('relation', 'backlink'):
+                        result['relation_type'] = neighbor_info.get('rel_type')
 
-            for neighbor_info in neighbors:
-                neighbor = neighbor_info['entry']
-                channel = neighbor_info['channel']
-
-                if channel == 'association':
-                    n_score = hop_score * neighbor_info.get('assoc_score', 0.5)
-                else:
-                    n_score = hop_score * self._score_entry(neighbor, query_embedding)
-
-                result = {
-                    'name': neighbor['name'],
-                    'score': round(n_score, 4),
-                    'hop': next_hop,
-                    'channel': channel,
-                    'type': neighbor.get('type'),
-                    'importance': neighbor.get('importance'),
-                    'description': neighbor.get('description'),
-                    'observations': neighbor.get('observations', []),
-                    'status': neighbor.get('status', 'active'),
-                    'project': neighbor.get('project'),
-                }
-                if channel in ('relation', 'backlink'):
-                    result['relation_type'] = neighbor_info.get('rel_type')
-
-                if neighbor['name'] not in visited or result['score'] > visited[neighbor['name']]['score']:
-                    visited[neighbor['name']] = result
-                    queue.append((neighbor, n_score, next_hop))
+                    nname = neighbor['name']
+                    if nname not in visited or result['score'] > visited[nname]['score']:
+                        visited[nname] = result
+                        prev = next_frontier.get(nname)
+                        if prev is None or n_score > prev[1]:
+                            next_frontier[nname] = (neighbor, n_score)
+            frontier = next_frontier
 
         # Filter to active entries unless include_inactive (traversable-not-returned)
         if not include_inactive:
@@ -693,62 +699,62 @@ class Neo4jMemoryStore:
                     entries.append(entry)
                 return entries
 
-    def _get_neighbors(self, name, project=None):
-        neighbors = []
+    def _get_neighbors_batch(self, names, project=None):
+        """Neighbors for a WHOLE frontier in ONE round-trip (vs _get_neighbors per node — the recall
+        N+1 cascade). Returns {src_name: [neighbor_info, ...]} with the SAME neighbor_info shape as
+        _get_neighbors (channel relation/backlink carry rel_type; association carries assoc_score).
+        (helios local patch — re-apply on re-vendor.)"""
+        out = {n: [] for n in names}
+        if not names:
+            return out
         scope_clause = ""
-        scope_params = {}
+        assoc_scope = ""
+        params = {'names': list(names), 'rel_types': list(_RELATION_TYPES)}
         if project is not None:
             scope_clause = """
                 AND (n.project IS NULL
                      OR n.project = $scope_project
                      OR n.project STARTS WITH $scope_prefix
                      OR $scope_project STARTS WITH (n.project + '.'))"""
-            scope_params = {'scope_project': project, 'scope_prefix': project + '.'}
+            assoc_scope = """
+                AND (n.project = $scope_project
+                     OR n.project STARTS WITH $scope_prefix
+                     OR $scope_project STARTS WITH (n.project + '.'))"""
+            params['scope_project'] = project
+            params['scope_prefix'] = project + '.'
 
-        with self._driver.session() as session:
-            result = session.run(f"""
-                MATCH (m:Memory {{name: $name}})-[r]->(n:Memory)
+        # One UNWIND over the frontier; a scoped CALL subquery unions the three channels per source.
+        cypher = f"""
+            UNWIND $names AS src
+            MATCH (m:Memory {{name: src}})
+            CALL (m) {{
+                MATCH (m)-[r]->(n:Memory)
                 WHERE type(r) IN $rel_types{scope_clause}
-                RETURN n, type(r) AS rel_type
-            """, name=name, rel_types=list(_RELATION_TYPES), **scope_params)
-            for r in result:
-                neighbors.append({
-                    'entry': self._node_to_dict(r['n']),
-                    'channel': 'relation',
-                    'rel_type': r['rel_type'],
-                })
-
-            result = session.run(f"""
-                MATCH (n:Memory)-[r]->(m:Memory {{name: $name}})
+                RETURN n AS n, 'relation' AS channel, type(r) AS rel_type, null AS assoc
+              UNION
+                MATCH (n:Memory)-[r]->(m)
                 WHERE type(r) IN $rel_types{scope_clause}
-                RETURN n, type(r) AS rel_type
-            """, name=name, rel_types=list(_RELATION_TYPES), **scope_params)
-            for r in result:
-                neighbors.append({
-                    'entry': self._node_to_dict(r['n']),
-                    'channel': 'backlink',
-                    'rel_type': r['rel_type'],
-                })
-
-            assoc_scope = ""
-            if project is not None:
-                assoc_scope = """
-                    AND (n.project = $scope_project
-                         OR n.project STARTS WITH $scope_prefix
-                         OR $scope_project STARTS WITH (n.project + '.'))"""
-            result = session.run(f"""
-                MATCH (m:Memory {{name: $name}})-[a:ASSOCIATED_WITH]->(n:Memory)
+                RETURN n AS n, 'backlink' AS channel, type(r) AS rel_type, null AS assoc
+              UNION
+                MATCH (m)-[a:ASSOCIATED_WITH]->(n:Memory)
                 WHERE true{assoc_scope}
-                RETURN n, a.score AS score
-            """, name=name, **scope_params)
-            for r in result:
-                neighbors.append({
-                    'entry': self._node_to_dict(r['n']),
-                    'channel': 'association',
-                    'assoc_score': r['score'],
-                })
+                RETURN n AS n, 'association' AS channel, null AS rel_type, a.score AS assoc
+            }}
+            RETURN src AS s, n, channel, rel_type, assoc
+        """
+        with self._driver.session() as session:
+            for row in session.run(cypher, **params):
+                info = {'entry': self._node_to_dict(row['n']), 'channel': row['channel']}
+                if row['channel'] == 'association':
+                    info['assoc_score'] = row['assoc']
+                else:
+                    info['rel_type'] = row['rel_type']
+                out.setdefault(row['s'], []).append(info)
+        return out
 
-        return neighbors
+    def _get_neighbors(self, name, project=None):
+        """Single-node neighbors — thin wrapper over the batched fetch (kept for callers/tests)."""
+        return self._get_neighbors_batch([name], project=project).get(name, [])
 
     def _score_entry(self, entry, query_embedding=None, mode='semantic'):
         recency = 0.5
