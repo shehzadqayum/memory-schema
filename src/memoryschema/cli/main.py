@@ -77,6 +77,7 @@ from memoryschema.config import MemoryConfig
 @click.pass_context
 def cli(ctx, project, root):
     """Memory schema system for Claude Code."""
+    _load_project_env(root)
     from memoryschema.inheritance import find_toml_config
     toml_path = find_toml_config(root)
     if toml_path is not None:
@@ -87,6 +88,36 @@ def cli(ctx, project, root):
     else:
         ctx.obj = MemoryConfig(project_name=project, project_root=root)
     _maybe_preflight(ctx.obj)
+
+
+def _load_project_env(root):
+    """Auto-load the project .env so NEO4J_*/VOYAGE_API_KEY are present for EVERY CLI invocation —
+    mirroring the PostToolUse hook. Without this, a shell that didn't manually `source .env` silently
+    degrades to JSONL (auth failure), undermining the "deps up at all times" default. Never overrides
+    an already-set var (an explicit export wins); searches `root` then its parents. (helios local patch.)"""
+    import os
+    from pathlib import Path
+    try:
+        start = Path(root).resolve()
+        envf = next((d / ".env" for d in [start, *start.parents] if (d / ".env").is_file()), None)
+        if envf is None:
+            return
+        try:
+            from dotenv import load_dotenv
+            load_dotenv(envf, override=False)
+            return
+        except Exception:
+            pass  # python-dotenv absent — fall back to a minimal parser
+        for line in envf.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            k, _, v = line.partition("=")
+            k = k.strip()
+            if k and k not in os.environ:
+                os.environ[k] = v.strip().strip('"').strip("'")
+    except Exception:
+        pass  # env autoload must never break the CLI
 
 
 def _maybe_preflight(config):
@@ -106,12 +137,13 @@ def _maybe_preflight(config):
         from memoryschema.preflight import ensure_backend
         r = ensure_backend(config, auto_start=True)
         if r["ok"]:
-            try:
-                config.memory_dir.mkdir(parents=True, exist_ok=True)
-                marker.write_text("ok")
-            except Exception:
-                pass
-            if r["degraded"]:
+            if not r["degraded"]:
+                try:                                  # only throttle when FULLY healthy — a degraded
+                    config.memory_dir.mkdir(parents=True, exist_ok=True)   # state must keep re-warning
+                    marker.write_text("ok")
+                except Exception:
+                    pass
+            else:
                 warn = "; ".join(f"{c['name']} {c['detail']}" for c in r["warnings"])
                 click.echo(f"⚠ memory (degraded): {warn}", err=True)
         else:

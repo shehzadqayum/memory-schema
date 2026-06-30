@@ -106,7 +106,9 @@ def sync(config):
     from memoryschema.reconcile import diff as _diff
 
     d = _diff(config)
-    click.echo(f".md: {d['md_count']:,}    JSONL: {d['jsonl_count']:,}    Neo4j: {d['neo4j_count']:,}")
+    _nc = d['neo4j_count']
+    click.echo(f".md: {d['md_count']:,}    JSONL: {d['jsonl_count']:,}    "
+               f"Neo4j: {('unreachable' if _nc is None else format(_nc, ','))}")
     if d.get('neo4j_error'):
         click.echo(f"  ⚠ Neo4j unreachable: {d['neo4j_error']}", err=True)
 
@@ -130,8 +132,10 @@ def sync(config):
 @click.option("--prune/--no-prune", default=True,
               help="Delete JSONL/Neo4j entries with no backing .md (default: prune).")
 @click.option("--no-verify", "no_verify", is_flag=True, help="Skip the name-set verification pass.")
+@click.option("--allow-empty", "allow_empty", is_flag=True,
+              help="Bypass the safety guard that refuses to reconcile a collapsed/empty .md set.")
 @click.pass_obj
-def reconcile(config, dry_run, prune, no_verify):
+def reconcile(config, dry_run, prune, no_verify, allow_empty):
     """Reconcile memory/*.md with the JSONL store and the Neo4j projection.
 
     Idempotent + comprehensive: reuses JSONL embeddings where the content is unchanged,
@@ -146,8 +150,13 @@ def reconcile(config, dry_run, prune, no_verify):
     """
     from memoryschema.reconcile import reconcile as _reconcile
 
-    r = _reconcile(config, dry_run=dry_run, prune=prune, verify=not no_verify)
-    click.echo(f".md: {r['md_count']:,}    JSONL: {r['jsonl_count']:,}    Neo4j: {r['neo4j_count']:,}")
+    r = _reconcile(config, dry_run=dry_run, prune=prune, verify=not no_verify, allow_empty=allow_empty)
+    if r.get('aborted'):
+        click.echo(f"ABORTED: {r['aborted']}", err=True)
+        sys.exit(1)
+    _nc = r['neo4j_count']
+    click.echo(f".md: {r['md_count']:,}    JSONL: {r['jsonl_count']:,}    "
+               f"Neo4j: {('unreachable' if _nc is None else format(_nc, ','))}")
     if r.get('neo4j_error'):
         click.echo(f"  ⚠ Neo4j unreachable: {r['neo4j_error']}", err=True)
 
@@ -168,6 +177,8 @@ def reconcile(config, dry_run, prune, no_verify):
                f"Neo4j pruned: {r['neo4j_pruned']:,}")
     if r['embed_failed']:
         click.echo(f"  ⚠ {r['embed_failed']} entitie(s) not embedded (Voyage unavailable or no text)", err=True)
+        for nm, msg in (r.get('embed_errors') or [])[:3]:
+            click.echo(f"      - {nm}: {msg}", err=True)
     if r['neo4j_pushed']:
         click.echo("Neo4j updated + associations recomputed.")
     elif r.get('neo4j_push_error'):

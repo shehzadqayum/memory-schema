@@ -23,10 +23,32 @@ reported unreachable. helios local patch — re-apply on re-vendor.
 """
 import json
 import os
+import tempfile
 
 from memoryschema.discovery import discover_memory_files
 from memoryschema.store import MemoryStore
 from memoryschema.tags import parse_memory_file
+
+# Safety: refuse to reconcile (which rewrites store.jsonl to EXACTLY the .md set and prunes Neo4j)
+# when the parsed .md set has collapsed below this fraction of the existing JSONL — a misconfigured
+# root or a parse regression would otherwise WIPE the store. Override per-call with allow_empty.
+_SHRINK_GUARD_FRACTION = 0.5
+
+
+def _atomic_write_jsonl(path, entries):
+    """Write `entries` to `path` atomically: a sibling tmp file + os.replace, so a crash mid-write
+    can never leave a truncated/half-written store."""
+    d = os.path.dirname(path) or "."
+    os.makedirs(d, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=d, prefix=".store.", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            for e in entries:
+                f.write(json.dumps(e, ensure_ascii=False) + "\n")
+        os.replace(tmp, path)
+    finally:
+        if os.path.exists(tmp):
+            os.remove(tmp)
 
 
 def _embed_text(entry):
@@ -61,36 +83,59 @@ def diff(config):
     md = set(_parse_md(config.memory_dir))
     jsonl = {e["name"] for e in MemoryStore(str(config.store_path)).list_all(include_inactive=True)}
     neo4j_store, neo4j, neo4j_err = _neo4j_names(config)
+    reachable = neo4j_store is not None      # explicit flag — never reuse a closed handle for this
     if neo4j_store:
         neo4j_store.close()
     return {
-        "md_count": len(md), "jsonl_count": len(jsonl), "neo4j_count": len(neo4j),
-        "neo4j_error": neo4j_err,
+        "md_count": len(md), "jsonl_count": len(jsonl),
+        "neo4j_count": (len(neo4j) if reachable else None),    # None, not 0 — "down" != "empty"
+        "neo4j_reachable": reachable, "neo4j_error": neo4j_err,
         "missing_from_jsonl": sorted(md - jsonl),
         "jsonl_orphans": sorted(jsonl - md),
-        "neo4j_orphans": sorted(neo4j - md) if neo4j_store else [],
-        "in_sync": (md == jsonl) and (neo4j_store is None or neo4j == md),
+        "neo4j_orphans": (sorted(neo4j - md) if reachable else None),
+        "in_sync": (md == jsonl) and (not reachable or neo4j == md),
     }
 
 
-def reconcile(config, dry_run=False, prune=True, verify=True):
-    """Make .md / JSONL / Neo4j agree exactly. Returns a result dict."""
+def reconcile(config, dry_run=False, prune=True, verify=True, allow_empty=False):
+    """Make .md / JSONL / Neo4j agree exactly. Returns a result dict.
+
+    allow_empty: bypass the shrink/empty safety guard (only when an empty-or-collapsed .md set
+    is genuinely intended, e.g. a deliberate bulk delete).
+    """
     md_entities = _parse_md(config.memory_dir)
     md = set(md_entities)
     jstore = MemoryStore(str(config.store_path))
     jsonl_by_name = {e["name"]: e for e in jstore.list_all(include_inactive=True)}
     jsonl_names = set(jsonl_by_name)
     neo4j_store, neo4j_names, neo4j_err = _neo4j_names(config)
+    neo4j_reachable = neo4j_store is not None
 
     result = {
-        "md_count": len(md), "jsonl_count": len(jsonl_names), "neo4j_count": len(neo4j_names),
-        "neo4j_error": neo4j_err,
+        "md_count": len(md), "jsonl_count": len(jsonl_names),
+        "neo4j_count": (len(neo4j_names) if neo4j_reachable else None),
+        "neo4j_reachable": neo4j_reachable, "neo4j_error": neo4j_err,
         "missing_from_jsonl": sorted(md - jsonl_names),
         "jsonl_orphans": sorted(jsonl_names - md),
-        "neo4j_orphans": sorted(neo4j_names - md),
+        "neo4j_orphans": (sorted(neo4j_names - md) if neo4j_reachable else None),
         "reembedded": 0, "embed_failed": 0, "jsonl_pruned": 0, "neo4j_pruned": 0,
         "neo4j_pushed": False, "dry_run": dry_run,
     }
+
+    # SAFETY GUARD: reconcile rewrites store.jsonl to EXACTLY the .md set and prunes Neo4j orphans,
+    # so an empty/collapsed .md set (wrong root, missing dir, parse regression) would WIPE the store.
+    # Refuse unless the collapse is explicitly intended.
+    if not dry_run and not allow_empty:
+        shrunk = bool(jsonl_names) and len(md) < int(len(jsonl_names) * _SHRINK_GUARD_FRACTION)
+        if not md or shrunk:
+            result["aborted"] = (
+                f"refusing to reconcile: {len(md)} .md entit(ies) vs {len(jsonl_names)} in JSONL — "
+                f"{'empty .md set' if not md else 'shrank past the safety guard'}. "
+                f"If intended, re-run with --allow-empty."
+            )
+            if neo4j_store is not None:
+                neo4j_store.close()
+            return result
 
     if dry_run:
         # report which entities would be re-embedded (new or content-changed)
@@ -125,18 +170,16 @@ def reconcile(config, dry_run=False, prune=True, verify=True):
                     result["reembedded"] += 1
                 else:
                     result["embed_failed"] += 1                 # no embeddable text
-            except Exception:
+            except Exception as ex:
                 result["embed_failed"] += 1                     # Voyage down -> degraded, not a crash
+                result.setdefault("embed_errors", []).append((name, str(ex)[:120]))
             if j and j.get("created_at"):
                 e["created_at"] = j["created_at"]
         final.append(e)
 
     # --- 3: rewrite store.jsonl to EXACTLY the .md set (prunes JSONL residuals + applies edits) ---
     result["jsonl_pruned"] = len(jsonl_names - md)
-    os.makedirs(os.path.dirname(str(config.store_path)) or ".", exist_ok=True)
-    with open(str(config.store_path), "w", encoding="utf-8") as f:
-        for e in final:
-            f.write(json.dumps(e, ensure_ascii=False) + "\n")
+    _atomic_write_jsonl(str(config.store_path), final)          # tmp + os.replace (crash-safe)
 
     # --- 4+5: push JSONL -> Neo4j (idempotent MERGE) + prune Neo4j orphans ---
     if neo4j_store is not None:
