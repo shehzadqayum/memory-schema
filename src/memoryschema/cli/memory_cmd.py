@@ -94,6 +94,12 @@ def recall(config, query, limit, project, include_inactive, as_json):
             except (ValueError, TypeError):
                 pass
 
+    # Telemetry: record that this recall happened (Move 1 — measure whether memory is read).
+    # Best-effort + separate from scoring; never breaks recall.
+    from memoryschema.recall_log import log_recall
+    backend = type(store).__name__
+    log_recall(config, query, results, backend=backend, degraded=(backend != "Neo4jMemoryStore"))
+
     if as_json:
         click.echo(json.dumps(results, indent=2))
     else:
@@ -118,6 +124,37 @@ def recall(config, query, limit, project, include_inactive, as_json):
                     click.echo(f"         [VERIFIED {int(age_days)}d ago]")
             if r.get('description'):
                 click.echo(f"         {r['description'][:100]}")
+
+
+@click.command("recall-stats")
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON.")
+@click.option("--strong", default=0.5, type=float, help="Top-score threshold for a 'strong' hit.")
+@click.pass_obj
+def recall_stats(config, as_json, strong):
+    """Summarise recall usage from the telemetry log — is memory actually being READ?
+
+    Reports recall frequency, strong-hit rate, most-surfaced memories, and never-surfaced
+    (dead-weight) entities. Populated by `memoryschema recall`. (Move 1 of the value-measurement plan.)
+    """
+    from memoryschema.recall_log import compute_stats
+    store = _get_store(config)
+    known = {e.get("name") for e in store.list_all(include_inactive=True)}
+    s = compute_stats(config, strong=strong, known_names=known)
+    if as_json:
+        click.echo(json.dumps(s, indent=2))
+        return
+    if not s["events"]:
+        click.echo("No recall events logged yet — run `memoryschema recall` a few times, then re-check.")
+        return
+    click.echo(f"Recall events:        {s['events']}  (over {s['distinct_days']} day(s), ~{s['recalls_per_day']}/day)")
+    click.echo(f"Returned results:     {s['with_results']}")
+    click.echo(f"Strong hits (>={strong}):  {s['strong_hits']}  ({s['strong_hit_rate']:.0%})")
+    click.echo(f"Degraded recalls:     {s['degraded']}")
+    click.echo(f"Never-surfaced:       {s.get('never_surfaced_count','?')} of {len(known)} entities (dead-weight candidates)")
+    if s["top_surfaced"]:
+        click.echo("Most-surfaced memories:")
+        for name, c in s["top_surfaced"]:
+            click.echo(f"  {c:3d}  {name}")
 
 
 @click.command()

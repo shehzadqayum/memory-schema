@@ -56,6 +56,20 @@ def test_write_hard_fails_when_neo4j_required_and_down(tmp_path, dead_neo4j):
     assert "Neo4j" in r.output
 
 
+def test_recall_stats_cli(tmp_path, dead_neo4j, monkeypatch):
+    """recall-stats reads the telemetry log and reports usage."""
+    from memoryschema.cli.memory_cmd import recall_stats
+    from memoryschema import recall_log
+    monkeypatch.delenv("MEMORYSCHEMA_RECALL_LOG", raising=False)   # re-enable for this test
+    (tmp_path / "memory").mkdir(parents=True, exist_ok=True)
+    cfg = dead_neo4j(project_root=str(tmp_path))
+    recall_log.log_recall(cfg, "q", [{"name": "alpha", "score": 0.8, "channel": "seed"}],
+                          backend="Neo4jMemoryStore", now="2026-06-30T10:00:00+00:00")
+    r = CliRunner().invoke(recall_stats, [], obj=cfg)
+    assert r.exit_code == 0
+    assert "Recall events:" in r.output
+
+
 def test_preflight_json_failure_cli(monkeypatch):
     """preflight --json exits non-zero and emits valid JSON with ok=False when a hard dep is down."""
     import memoryschema.preflight as pf

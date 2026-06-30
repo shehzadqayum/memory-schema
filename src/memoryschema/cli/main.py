@@ -12,6 +12,7 @@ Setup & Deployment:
 Memory Operations:
     status         Show store backend, node count, embedding coverage
     recall         Semantic search across memories
+    recall-stats   Recall-usage telemetry — is memory actually being read?
     get            Retrieve a single entity by name
     list           List entities with filters
     write          Parse, validate, embed, and index a memory file
@@ -311,7 +312,7 @@ cli.add_command(reconcile)
 # --- Register individual commands ---
 
 from memoryschema.cli.memory_cmd import (
-    status, recall, get, list_cmd, write, delete, archive, unarchive,
+    status, recall, recall_stats, get, list_cmd, write, delete, archive, unarchive,
     reactivate, search, quarantine, force_cmd, decline_cmd,
 )
 from memoryschema.cli.validate_cmd import validate
@@ -322,6 +323,7 @@ from memoryschema.cli.lifecycle_cmd import (
 
 cli.add_command(status)
 cli.add_command(recall)
+cli.add_command(recall_stats)
 cli.add_command(get)
 cli.add_command(list_cmd, name="list")
 cli.add_command(write)

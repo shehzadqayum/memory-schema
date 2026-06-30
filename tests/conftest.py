@@ -57,6 +57,7 @@ def _isolate_from_live_backend(request, monkeypatch):
     # the absent Neo4j, and don't run the CLI preflight (which would shell out to docker).
     monkeypatch.setenv("MEMORYSCHEMA_REQUIRE_NEO4J", "false")
     monkeypatch.setenv("MEMORYSCHEMA_SKIP_PREFLIGHT", "1")
+    monkeypatch.setenv("MEMORYSCHEMA_RECALL_LOG", "0")   # don't write recall telemetry during tests
 
 
 @pytest.fixture
