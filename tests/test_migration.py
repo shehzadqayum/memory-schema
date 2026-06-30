@@ -106,3 +106,60 @@ class TestMigrate:
         assert result["jsonl_count"] == 3
         assert result["neo4j_count"] == 3
         assert result["match"] is True
+
+
+class TestMigrateNodesIdempotent:
+    """P1 regression: migrate_nodes must MERGE (not CREATE) on the unique name so re-running the
+    import against existing nodes is idempotent (no ConstraintError on memory_name_unique).
+    Mirrors the P0 schema-idempotency test. (helios local patch — re-apply on re-vendor.)"""
+
+    def _capturing_driver(self, statements):
+        drv = MagicMock()
+        sess = MagicMock()
+        drv.session.return_value.__enter__ = MagicMock(return_value=sess)
+        drv.session.return_value.__exit__ = MagicMock(return_value=False)
+        sess.run.side_effect = lambda q, **kw: statements.append(q) or MagicMock()
+        return drv
+
+    def test_uses_merge_not_create(self):
+        from memoryschema.migration import migrate_nodes
+        stmts = []
+        entries = [{"name": "a", "schema": 4, "description": "A", "embedding": [0.1] * 4},
+                   {"name": "b", "schema": 4, "description": "B"}]
+        migrate_nodes(self._capturing_driver(stmts), entries)
+        joined = "\n".join(stmts).upper()
+        assert "MERGE (M:MEMORY {NAME:" in joined          # idempotent upsert
+        assert "CREATE (M:MEMORY" not in joined            # the old non-idempotent form is gone
+        assert "CREATE (N:MEMORY" not in joined
+
+    def test_idempotent_against_already_exists(self):
+        """A FakeSession that raises (like Neo4j's memory_name_unique) for an UNGUARDED CREATE of a
+        node run twice. With MERGE, running migrate_nodes twice must not raise."""
+        from memoryschema.migration import migrate_nodes
+
+        class ConstraintError(Exception):
+            pass
+
+        seen = set()
+
+        class Sess:
+            def run(self, q, **kw):
+                up = q.upper()
+                if "CREATE (M:MEMORY" in up or "CREATE (N:MEMORY" in up:
+                    key = q.strip()
+                    if key in seen:
+                        raise ConstraintError("memory_name_unique violated")
+                    seen.add(key)
+                return MagicMock()
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *a):
+                return False
+
+        drv = MagicMock()
+        drv.session.return_value = Sess()
+        entries = [{"name": "a", "schema": 4, "description": "A", "embedding": [0.1] * 4}]
+        migrate_nodes(drv, entries)
+        migrate_nodes(drv, entries)   # the regression would raise here on a bare CREATE

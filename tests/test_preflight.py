@@ -59,3 +59,16 @@ def test_container_autostart_attempted_when_stopped(monkeypatch):
     r = pf.ensure_backend(_cfg(), auto_start=True, require=["neo4j"])
     assert calls["start"] == 1                                    # auto-recovery attempted
     assert r["ok"] is True
+
+
+def test_container_autostart_failure_is_loud(monkeypatch):
+    """Auto-start ran but bolt never came up: must FAIL loud (ok=False), not silently 'ok'."""
+    monkeypatch.setattr(pf, "_docker_engine_up", lambda: True)
+    monkeypatch.setattr(pf, "_container_running", lambda c: False)        # stopped
+    monkeypatch.setattr(pf, "_start_container", lambda c: (True, ""))     # start "succeeds"...
+    monkeypatch.setattr(pf, "_wait_bolt", lambda c, timeout=40: (False, "bolt never came up"))  # ...but bolt doesn't
+    monkeypatch.setattr(pf, "_voyage_ok", lambda c: (True, "ok"))
+    r = pf.ensure_backend(_cfg(), auto_start=True, require=["neo4j"])
+    assert r["ok"] is False                                               # the anti-silent guarantee
+    assert any(c["name"] == "neo4j_container" and not c["ok"] for c in r["failures"])
+    assert "FAIL" in pf.format_report(r)

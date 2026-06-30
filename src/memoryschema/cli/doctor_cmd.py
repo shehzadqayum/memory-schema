@@ -302,6 +302,12 @@ def run_checks(config):
 
     # 18. Tests (run package tests, not consumer project tests)
     def check_tests():
+        import os
+        # Don't recursively run the suite when doctor is itself invoked BY the suite (the inner run
+        # would re-run everything per doctor test — minutes of wasted work). A real shell invocation
+        # has no PYTEST_CURRENT_TEST and still runs the full check. (helios local patch.)
+        if os.environ.get("PYTEST_CURRENT_TEST"):
+            return True, "skipped (running under pytest)", None
         try:
             import memoryschema
             pkg_root = Path(memoryschema.__file__).parent.parent.parent

@@ -44,3 +44,23 @@ def test_index_command_degrades_when_neo4j_not_required(tmp_path):
     cfg = MemoryConfig(project_root=str(tmp_path), require_neo4j=False, **_DOWN)
     result = CliRunner().invoke(index, [], obj=cfg)
     assert result.exit_code == 0                       # JSONL-only degrade permitted
+
+
+def test_degraded_banner_printed_to_stderr(tmp_path, capsys, monkeypatch):
+    """The JSONL fallback must be LOUD: a DEGRADED banner reaches stderr when degrading."""
+    monkeypatch.delenv("MEMORYSCHEMA_SKIP_PREFLIGHT", raising=False)   # un-quiet it for this test
+    (tmp_path / "memory").mkdir(parents=True, exist_ok=True)
+    cfg = MemoryConfig(project_root=str(tmp_path), **_DOWN)
+    get_store(config=cfg, require_neo4j=False)
+    err = capsys.readouterr().err
+    assert "DEGRADED" in err and "Neo4j unreachable" in err
+
+
+def test_degraded_banner_suppressed_under_skip_preflight(tmp_path, capsys, monkeypatch):
+    """Self-checking contexts (tests/hooks) set SKIP_PREFLIGHT — the banner is then suppressed."""
+    monkeypatch.setenv("MEMORYSCHEMA_SKIP_PREFLIGHT", "1")
+    (tmp_path / "memory").mkdir(parents=True, exist_ok=True)
+    cfg = MemoryConfig(project_root=str(tmp_path), **_DOWN)
+    get_store(config=cfg, require_neo4j=False)
+    err = capsys.readouterr().err
+    assert "DEGRADED" not in err

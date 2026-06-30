@@ -69,3 +69,64 @@ def test_reconcile_is_idempotent(tmp_path, monkeypatch):
     assert r2["jsonl_pruned"] == 0
     assert r2["verify_jsonl_ok"] is True
     assert _jsonl_names(cfg) == {"alpha", "beta"}
+
+
+def test_reconcile_empty_md_aborts_and_preserves(tmp_path):
+    """SAFETY: an empty .md set (wrong root / parse regression) must ABORT, not wipe the store."""
+    mem = tmp_path / "memory"
+    mem.mkdir(parents=True, exist_ok=True)
+    with open(mem / "store.jsonl", "w", encoding="utf-8") as f:        # populated, but NO .md files
+        for n in ("a", "b", "c"):
+            f.write(json.dumps({"name": n, "description": n, "schema": 4}) + "\n")
+    cfg = MemoryConfig(project_root=str(tmp_path),
+                       neo4j_uri="bolt://127.0.0.1:59999", neo4j_password="x")
+    r = reconcile(cfg)                                                 # default allow_empty=False
+    assert r.get("aborted")
+    assert _jsonl_names(cfg) == {"a", "b", "c"}                        # store preserved, not wiped
+
+
+def test_reconcile_voyage_down_degrades_not_crashes(tmp_path, monkeypatch):
+    """Voyage down mid-reconcile: embed_failed is counted + captured in embed_errors, the name-set
+    still heals (entity written without an embedding), and reconcile does not raise."""
+    cfg = _setup(tmp_path, monkeypatch)                               # md={alpha,beta}, jsonl={alpha,ghost}
+    monkeypatch.setattr(spaces, "embed_all_spaces",
+                        lambda *a, **k: (_ for _ in ()).throw(RuntimeError("voyage down")))
+    r = reconcile(cfg, prune=True, verify=True)
+    assert r["embed_failed"] >= 1
+    assert r.get("embed_errors")                                       # captured, not a silent counter
+    assert _jsonl_names(cfg) == {"alpha", "beta"}                      # name-set still healed
+    assert r["verify_jsonl_ok"] is True
+
+
+def test_reconcile_prunes_neo4j_orphan(tmp_path, monkeypatch):
+    """Neo4j reachable with an orphan (no .md): reconcile deletes it (no-residuals) and pushes."""
+    import memoryschema.migration as mig
+    import memoryschema.neo4j_store as ns
+    cfg = _setup(tmp_path, monkeypatch)                               # md={alpha,beta}
+
+    class _FakeNeo4j:
+        def __init__(self, names):
+            self._names = set(names)
+            self.deleted = []
+
+        def list_all(self, include_inactive=False):
+            return [{"name": n} for n in sorted(self._names)]
+
+        def delete(self, name):
+            self._names.discard(name)
+            self.deleted.append(name)
+
+        def compute_associations(self):
+            pass
+
+        def close(self):
+            pass
+
+    fake = _FakeNeo4j({"alpha", "ghost_neo"})                         # ghost_neo = Neo4j orphan
+    monkeypatch.setattr(ns, "Neo4jMemoryStore", lambda config=None, **kw: fake)
+    monkeypatch.setattr(mig, "migrate", lambda **kw: {"nodes_created": 0})
+    r = reconcile(cfg, prune=True, verify=False)
+    assert r["neo4j_reachable"] is True
+    assert r["neo4j_pruned"] == 1
+    assert "ghost_neo" in fake.deleted
+    assert r["neo4j_pushed"] is True

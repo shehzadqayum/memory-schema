@@ -19,6 +19,10 @@ live memory store. The suite behaves exactly as it does in a pristine shell.
 
 import pytest
 
+# A guaranteed-dead bolt endpoint: a non-integration test that builds a default-config store must
+# connect HERE (fast connection-refused -> JSONL fallback), never the developer's live localhost:7687.
+DEAD_NEO4J_URI = "bolt://127.0.0.1:59999"
+
 # Env vars that, if present, route a test at a *live* backend or leak ambient project config.
 _LIVE_BACKEND_ENV = (
     "NEO4J_URI",
@@ -45,7 +49,19 @@ def _isolate_from_live_backend(request, monkeypatch):
         return
     for var in _LIVE_BACKEND_ENV:
         monkeypatch.delenv(var, raising=False)
+    # Stripping NEO4J_URI alone is NOT enough: MemoryConfig's default-factory then resolves to the
+    # live localhost:7687, so the suite would connect to (and stall on) a running container. Point it
+    # at a guaranteed-dead endpoint so get_store always fails fast to JSONL regardless of host state.
+    monkeypatch.setenv("NEO4J_URI", DEAD_NEO4J_URI)
     # Force the default-mode dependency gates OFF for hermetic unit tests: don't hard-require
     # the absent Neo4j, and don't run the CLI preflight (which would shell out to docker).
     monkeypatch.setenv("MEMORYSCHEMA_REQUIRE_NEO4J", "false")
     monkeypatch.setenv("MEMORYSCHEMA_SKIP_PREFLIGHT", "1")
+
+
+@pytest.fixture
+def dead_neo4j():
+    """A MemoryConfig pointed at the guaranteed-dead bolt endpoint — for tests that need an explicit
+    'Neo4j is down' config without hardcoding the port. Pairs with the autouse isolation above."""
+    from memoryschema.config import MemoryConfig
+    return lambda **kw: MemoryConfig(neo4j_uri=DEAD_NEO4J_URI, neo4j_password="x", **kw)

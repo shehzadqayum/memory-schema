@@ -28,6 +28,7 @@ dev = [
     "pytest>=7.0",
     "pytest-cov",
     "pytest-mock",
+    "pytest-timeout",
 ]
 
 [project.scripts]
@@ -41,7 +42,9 @@ memoryschema = ["templates/*", "hooks/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-q -m 'not integration'"
+# --timeout converts any accidental live/stalled Neo4j connection from a multi-minute hang into a
+# fast, attributable failure (thread method works on Windows where SIGALRM is unavailable).
+addopts = "-q -m 'not integration' --timeout=30 --timeout-method=thread"
 markers = [
     "integration: requires external services (Neo4j, Voyage) — run with pytest -m integration",
 ]
