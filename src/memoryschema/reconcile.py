@@ -246,6 +246,19 @@ def reconcile(config, dry_run=False, prune=True, verify=True, allow_empty=False)
             result["verify_extra"] = sorted(jset - md)
             result["verify_missing"] = sorted(md - jset)
 
+    # --- 7: rebuild MEMORY.md (L0) from the now-authoritative JSONL active set. Reconcile is the
+    # guaranteed L0 self-heal: it makes all FOUR layers agree (.md / JSONL / Neo4j / MEMORY.md),
+    # status-filtered so superseded/archived entries never linger in the always-in-context index.
+    try:
+        from memoryschema.l0_budget import rebuild_index
+        active = MemoryStore(str(config.store_path)).list_all(include_inactive=False)
+        r_l0 = rebuild_index(str(config.memory_index_path), entries=active,
+                             token_budget=getattr(config, "l0_token_budget", 2000))
+        result["l0_kept"] = r_l0.get("kept")
+        result["l0_dropped"] = r_l0.get("dropped", [])
+    except Exception as ex:
+        result["l0_error"] = str(ex)[:160]
+
     if neo4j_store is not None:
         neo4j_store.close()
     return result

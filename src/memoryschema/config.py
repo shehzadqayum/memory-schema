@@ -93,8 +93,11 @@ class MemoryConfig:
     valid_types: tuple = tuple(sorted(VALID_TYPES))
     valid_relation_types: tuple = tuple(sorted(ALL_RELATION_TYPES))
 
-    # L0 budget
-    l0_token_budget: int = 2000
+    # L0 budget — MEMORY.md is a full status-filtered index regenerated from the store (rebuild_index),
+    # not append-only, so this bounds the always-in-context index; only the lowest-importance ACTIVE
+    # entries are dropped, and only when over budget. Raised 2000->3000 to hold the current active
+    # corpus with headroom (helios local patch; re-apply on re-vendor).
+    l0_token_budget: int = 3000
 
     # Retrieval
     recency_decay: float = 0.995

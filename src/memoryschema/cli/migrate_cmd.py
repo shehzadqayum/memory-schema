@@ -196,6 +196,14 @@ def reconcile(config, dry_run, prune, no_verify, allow_empty):
     elif r.get('neo4j_push_error'):
         click.echo(f"  ⚠ Neo4j not updated: {r['neo4j_push_error']}", err=True)
 
+    if r.get('l0_kept') is not None:
+        msg = f"L0 index: {r['l0_kept']} active entities written to MEMORY.md"
+        if r.get('l0_dropped'):
+            msg += f" ({len(r['l0_dropped'])} lowest-importance dropped for the token budget)"
+        click.echo(msg)
+    elif r.get('l0_error'):
+        click.echo(f"  ⚠ L0 index (MEMORY.md) not rebuilt: {r['l0_error']}", err=True)
+
     if 'verify_ok' in r:
         ok = r['verify_ok']
         click.echo(f"\nVerify: {'PASS — .md / JSONL / Neo4j name-sets match' if ok else 'FAIL'}")

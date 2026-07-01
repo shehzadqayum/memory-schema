@@ -238,39 +238,20 @@ if not indexed:
 if not indexed:
     sys.exit(2)
 
-# Update MEMORY.md
+# Rebuild MEMORY.md (L0) as a faithful, status-filtered index of the store's ACTIVE set.
+# A full REGENERATE — not an append — so superseded/archived entries drop out and any
+# previously-evicted active entries come back (fixes the drift where the append-only index
+# lingered stale entries and lost active ones). Read from the SAME store just written to
+# (Neo4j when up, JSONL otherwise) so the just-written memory is included even though
+# store.jsonl can lag Neo4j between reconciles.
 name = memory.get('name', '')
 if name:
     try:
-        memory_dir = os.path.dirname(filepath)
-        index_path = os.path.join(memory_dir, 'MEMORY.md')
-        desc = memory.get('description', name)
-        filename = os.path.basename(filepath)
-        entry = f'- [{name}]({filename}) — {desc}'
-        existing = ''
-        if os.path.exists(index_path):
-            with open(index_path, 'r') as f:
-                existing = f.read()
-        if f'[{name}]' not in existing:
-            existing = existing.rstrip('\n') + '\n' + entry + '\n'
-            with open(index_path, 'w') as f:
-                f.write(existing)
-        # Enforce L0 token budget (evict lowest-scoring entries)
-        try:
-            from memoryschema.l0_budget import enforce_budget
-            result = enforce_budget(index_path, store_path)
-            if result['evicted']:
-                print(f'hook: L0 evicted {len(result[\"evicted\"])} entries '
-                      f'({result[\"tokens_before\"]}→{result[\"tokens_after\"]} tokens)',
-                      file=sys.stderr)
-        except Exception:
-            pass  # Budget enforcement failure does not block
-        # Progressive disclosure: group entries by type
-        try:
-            from memoryschema.l0_budget import categorize_index
-            categorize_index(index_path, store_path)
-        except Exception:
-            pass  # Categorization failure does not block
+        index_path = os.path.join(os.path.dirname(filepath), 'MEMORY.md')
+        budget = getattr(hook_config, 'l0_token_budget', 2000) if hook_config else 2000
+        active = store.list_all(include_inactive=False)
+        from memoryschema.l0_budget import rebuild_index
+        rebuild_index(index_path, entries=active, token_budget=budget)
     except Exception:
         pass  # MEMORY.md update failure does not block indexing
 "
