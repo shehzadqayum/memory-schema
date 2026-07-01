@@ -98,6 +98,50 @@ def test_reconcile_voyage_down_degrades_not_crashes(tmp_path, monkeypatch):
     assert r["verify_jsonl_ok"] is True
 
 
+_MALFORMED = ('<memory:entity schema="4" name="alpha">'
+              '<memory:description>has a raw & ampersand which breaks XML parse</memory:description>'
+              '</memory:entity>')
+
+
+def test_reconcile_aborts_on_malformed_md_no_prune(tmp_path):
+    """CORRUPTION GUARD: a .md that exists but fails to parse must ABORT reconcile and NOT prune its
+    entity (a parse failure is not a deletion). Regression for the raw-& silent-prune bug."""
+    mem = tmp_path / "memory"
+    mem.mkdir(parents=True, exist_ok=True)
+    (mem / "store.jsonl").write_text(
+        json.dumps({"name": "alpha", "description": "A", "schema": 4}) + "\n", encoding="utf-8")
+    (mem / "alpha.md").write_text(_MALFORMED, encoding="utf-8")     # exists, but won't parse
+    cfg = MemoryConfig(project_root=str(tmp_path),
+                       neo4j_uri="bolt://127.0.0.1:59999", neo4j_password="x")
+    r = reconcile(cfg)
+    assert r.get("aborted")
+    assert "alpha.md" in r["malformed"]
+    assert _jsonl_names(cfg) == {"alpha"}                          # entity PRESERVED, not pruned
+
+
+def test_diff_reports_malformed(tmp_path):
+    mem = tmp_path / "memory"
+    mem.mkdir(parents=True, exist_ok=True)
+    (mem / "store.jsonl").write_text(
+        json.dumps({"name": "alpha", "schema": 4}) + "\n", encoding="utf-8")
+    (mem / "alpha.md").write_text(_MALFORMED, encoding="utf-8")
+    cfg = MemoryConfig(project_root=str(tmp_path),
+                       neo4j_uri="bolt://127.0.0.1:59999", neo4j_password="x")
+    d = diff(cfg)
+    assert "alpha.md" in d["malformed"]
+    assert d["in_sync"] is False
+
+
+def test_non_entity_md_not_flagged(tmp_path, monkeypatch):
+    """A .md without a memory-entity tag (notes, README) is NOT corruption — skipped, not aborted."""
+    cfg = _setup(tmp_path, monkeypatch)                            # md={alpha,beta}, jsonl={alpha,ghost}
+    (tmp_path / "memory" / "notes.md").write_text("# just notes, not an entity\nhello", encoding="utf-8")
+    r = reconcile(cfg, prune=True, verify=True)
+    assert not r.get("malformed")
+    assert not r.get("aborted")
+    assert _jsonl_names(cfg) == {"alpha", "beta"}                  # heals normally
+
+
 def test_reconcile_prunes_neo4j_orphan(tmp_path, monkeypatch):
     """Neo4j reachable with an orphan (no .md): reconcile deletes it (no-residuals) and pushes."""
     import memoryschema.migration as mig

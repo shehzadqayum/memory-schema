@@ -111,6 +111,10 @@ def sync(config):
                f"Neo4j: {('unreachable' if _nc is None else format(_nc, ','))}")
     if d.get('neo4j_error'):
         click.echo(f"  ⚠ Neo4j unreachable: {d['neo4j_error']}", err=True)
+    if d.get('malformed'):
+        click.echo(f"  ⚠ {len(d['malformed'])} UNPARSEABLE .md file(s) (corruption — NOT counted; "
+                   f"reconcile will REFUSE until fixed): {', '.join(d['malformed'][:8])} "
+                   f"— fix the XML (unescaped & / < / >) or rm the file", err=True)
 
     def _line(label, names):
         if names:
@@ -159,6 +163,9 @@ def reconcile(config, dry_run, prune, no_verify, allow_empty):
                f"Neo4j: {('unreachable' if _nc is None else format(_nc, ','))}")
     if r.get('neo4j_error'):
         click.echo(f"  ⚠ Neo4j unreachable: {r['neo4j_error']}", err=True)
+    if r.get('malformed'):    # dry-run reaches here with malformed set (a real run aborts above)
+        click.echo(f"  ⚠ {len(r['malformed'])} UNPARSEABLE .md file(s) (corruption): "
+                   f"{', '.join(r['malformed'][:8])} — fix before a real reconcile", err=True)
 
     def _line(label, names):
         if names:

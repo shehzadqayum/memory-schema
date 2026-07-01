@@ -58,13 +58,25 @@ def _embed_text(entry):
 
 
 def _parse_md(memory_dir):
-    """{name: parsed entity} from the canonical .md files (non-entity files skipped)."""
-    out = {}
+    """({name: parsed entity}, [malformed_entity_files]) from the canonical .md files.
+
+    Non-entity .md files are skipped silently. A file that DECLARES a memory entity (contains a
+    `<memory:entity` tag) but fails to parse is CORRUPTION (e.g. an unescaped & / < / >) — it is
+    collected separately so reconcile can REFUSE to prune its entity: a parse failure must never be
+    mistaken for an intentional deletion."""
+    out, malformed = {}, []
     for fp in discover_memory_files(str(memory_dir)):
         m = parse_memory_file(fp)
         if m and m.get("name"):
             out[m["name"]] = m
-    return out
+            continue
+        try:
+            text = open(fp, encoding="utf-8", errors="replace").read()
+        except Exception:
+            text = ""
+        if "<memory:entity" in text:   # an entity file that won't parse = corruption, not a non-entity .md
+            malformed.append(fp)
+    return out, malformed
 
 
 def _neo4j_names(config):
@@ -80,7 +92,8 @@ def _neo4j_names(config):
 
 def diff(config):
     """Read-only drift report across .md / JSONL / Neo4j (the real `sync`)."""
-    md = set(_parse_md(config.memory_dir))
+    md_map, malformed = _parse_md(config.memory_dir)
+    md = set(md_map)
     jsonl = {e["name"] for e in MemoryStore(str(config.store_path)).list_all(include_inactive=True)}
     neo4j_store, neo4j, neo4j_err = _neo4j_names(config)
     reachable = neo4j_store is not None      # explicit flag — never reuse a closed handle for this
@@ -90,10 +103,11 @@ def diff(config):
         "md_count": len(md), "jsonl_count": len(jsonl),
         "neo4j_count": (len(neo4j) if reachable else None),    # None, not 0 — "down" != "empty"
         "neo4j_reachable": reachable, "neo4j_error": neo4j_err,
+        "malformed": [os.path.basename(f) for f in malformed],
         "missing_from_jsonl": sorted(md - jsonl),
         "jsonl_orphans": sorted(jsonl - md),
         "neo4j_orphans": (sorted(neo4j - md) if reachable else None),
-        "in_sync": (md == jsonl) and (not reachable or neo4j == md),
+        "in_sync": (not malformed) and (md == jsonl) and (not reachable or neo4j == md),
     }
 
 
@@ -103,7 +117,7 @@ def reconcile(config, dry_run=False, prune=True, verify=True, allow_empty=False)
     allow_empty: bypass the shrink/empty safety guard (only when an empty-or-collapsed .md set
     is genuinely intended, e.g. a deliberate bulk delete).
     """
-    md_entities = _parse_md(config.memory_dir)
+    md_entities, malformed = _parse_md(config.memory_dir)
     md = set(md_entities)
     jstore = MemoryStore(str(config.store_path))
     jsonl_by_name = {e["name"]: e for e in jstore.list_all(include_inactive=True)}
@@ -120,7 +134,22 @@ def reconcile(config, dry_run=False, prune=True, verify=True, allow_empty=False)
         "neo4j_orphans": (sorted(neo4j_names - md) if neo4j_reachable else None),
         "reembedded": 0, "embed_failed": 0, "jsonl_pruned": 0, "neo4j_pruned": 0,
         "neo4j_pushed": False, "dry_run": dry_run,
+        "malformed": [os.path.basename(f) for f in malformed],
     }
+
+    # MALFORMED GUARD (always on; precedes the empty/shrink guard; NOT overridable): a file that EXISTS
+    # but fails to parse is CORRUPTION, not a deletion — reconciling would PRUNE its entity from
+    # JSONL+Neo4j (the silent-loss bug this fixes). Refuse + name the files; the operator fixes the XML
+    # (commonly an unescaped & / < / >) or deletes the file (an intentional removal), then re-runs.
+    if malformed and not dry_run:
+        result["aborted"] = (
+            f"refusing to reconcile: {len(malformed)} memory file(s) exist but FAILED TO PARSE "
+            f"(corruption, not deletion) — reconciling would prune their entities. Fix the XML "
+            f"(commonly an unescaped & / < / >), or delete the file for an intentional removal, "
+            f"then re-run. Files: " + ", ".join(result["malformed"][:10]))
+        if neo4j_store is not None:
+            neo4j_store.close()
+        return result
 
     # SAFETY GUARD: reconcile rewrites store.jsonl to EXACTLY the .md set and prunes Neo4j orphans,
     # so an empty/collapsed .md set (wrong root, missing dir, parse regression) would WIPE the store.
