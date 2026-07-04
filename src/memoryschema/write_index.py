@@ -325,9 +325,67 @@ def _append_chain_step_v5(filepath, content, original, step_text,
     return step_no
 
 
+def set_lifecycle(filepath, status=None, superseded_at=None, superseded_by=None,
+                  valid_from=None):
+    """Deterministically update LIFECYCLE frontmatter on a v5 entity .md —
+    the file-first fix for the archive-reverts-on-reconcile bug: status and
+    temporal fields must live in the source of truth or reconcile (which
+    rebuilds the stores FROM the .md set) silently resurrects entities.
+
+    This is metadata-only mutation (never content), performed by code — the
+    lifecycle analogue of the archive/supersession machinery, exempt from the
+    active-chain content-authorization model.
+    """
+    from memoryschema.format_v5 import is_v5_content, parse_v5_content, serialize_v5
+    with open(filepath, "r", encoding="utf-8") as f:
+        content = f.read()
+    if not is_v5_content(content):
+        raise ValueError("set_lifecycle requires a v5 entity: %s" % filepath)
+    mem = parse_v5_content(content, filepath=filepath)
+    if mem is None:
+        raise ValueError("v5 parse failed for %s" % filepath)
+    if status is not None:
+        mem["status"] = status
+    if superseded_at is not None:
+        mem["superseded_at"] = superseded_at
+    if superseded_by is not None:
+        mem["superseded_by"] = superseded_by
+    if valid_from is not None:
+        mem["valid_from"] = valid_from
+    new_content = serialize_v5(mem)
+    if parse_v5_content(new_content, filepath=filepath) is None:
+        raise ValueError("lifecycle serialize round-trip failed — file unchanged")
+    with open(filepath, "w", encoding="utf-8", newline="") as f:
+        f.write(new_content)
+    return mem
+
+
+def find_active_by_key(store_path, fact_key, exclude=None):
+    """Find the ACTIVE entity holding fact `key` (deterministic supersession
+    lookup — no LLM judgment, exact key match only)."""
+    import json as _json
+    if not fact_key or not os.path.exists(store_path):
+        return None
+    with open(store_path, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                e = _json.loads(line)
+            except Exception:
+                continue
+            if (e.get("key") == fact_key
+                    and (e.get("status") or "active") == "active"
+                    and e.get("name") != exclude):
+                return e.get("name")
+    return None
+
+
 def create_entity_file(filepath, name, description, observations,
                        importance=None, mtype=None, reasoning=None,
-                       relations=None, project=None, body=None):
+                       relations=None, project=None, body=None,
+                       fact_key=None, valid_from=None):
     """Generate a well-formed entity .md from plain-text parts.
 
     Emits v5 (YAML frontmatter + markdown body) when MEMORYSCHEMA_V5=1,
@@ -349,6 +407,12 @@ def create_entity_file(filepath, name, description, observations,
             mem["reasoning"] = reasoning.strip()
         if project:
             mem["project"] = project
+        if fact_key:
+            mem["key"] = fact_key
+            from datetime import date
+            mem["valid_from"] = valid_from or date.today().isoformat()
+        elif valid_from:
+            mem["valid_from"] = valid_from
         content = serialize_v5(mem)
         if parse_v5_content(content, filepath=filepath) is None:
             raise ValueError("generated v5 entity failed to parse — refusing to write")

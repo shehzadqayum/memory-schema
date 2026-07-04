@@ -56,8 +56,11 @@ def status(config, as_json):
 @click.option("--include-inactive", is_flag=True, default=False,
               help="Include archived/superseded/quarantined entries.")
 @click.option("--json", "as_json", is_flag=True, help="Output as JSON for agent consumption.")
+@click.option("--as-of", "as_of", default=None,
+              help="Point-in-time recall (ISO date): facts valid AT that date, "
+                   "including since-superseded ones (valid_from <= date < superseded_at).")
 @click.pass_obj
-def recall(config, query, limit, project, include_inactive, as_json):
+def recall(config, query, limit, project, include_inactive, as_of, as_json):
     """Semantic search across memories.
 
     Finds seed memories via vector similarity, then cascades through
@@ -73,10 +76,42 @@ def recall(config, query, limit, project, include_inactive, as_json):
     """
     store = _get_store(config)
     results = store.recall(
-        query=query, limit=limit, project=project,
-        include_inactive=include_inactive,
+        query=query, limit=limit if not as_of else max(limit * 4, 20), project=project,
+        include_inactive=include_inactive or bool(as_of),
         max_inherit_depth=config.max_inherit_depth,
     )
+    if as_of:
+        # Temporal filter: keep entries valid AT the date — valid_from <= as_of and
+        # not yet superseded then. Recall results are a projected subset without
+        # temporal fields, so enrich from the JSONL metadata (the same local source
+        # find_active_by_key uses — backend-independent). Fallback: created_at.
+        import json as _json
+        meta = {}
+        try:
+            with open(str(config.store_path), "r", encoding="utf-8") as _f:
+                for _line in _f:
+                    _line = _line.strip()
+                    if not _line:
+                        continue
+                    try:
+                        _e = _json.loads(_line)
+                        meta[_e.get("name")] = _e
+                    except Exception:
+                        continue
+        except OSError:
+            pass
+        def _valid_at(r):
+            e = meta.get(r.get("name"), r)
+            if (e.get("status") or "active") not in ("active", "superseded"):
+                return False
+            vf = e.get("valid_from") or (e.get("created_at") or "")[:10]
+            sa = e.get("superseded_at")
+            if vf and vf > as_of:
+                return False
+            if sa and sa <= as_of:
+                return False
+            return True
+        results = [r for r in results if _valid_at(r)][:limit]
 
     # Annotate staleness for entries with verified_at
     from datetime import datetime, timezone
@@ -386,6 +421,15 @@ def archive(config, name):
     store = _get_store(config)
     archived = store.archive(name)
     if archived:
+        # File-first: persist status into the .md frontmatter, or the next reconcile
+        # (which rebuilds the stores FROM the .md set) silently resurrects the entity
+        # — the bug that reverted 7 step-72 archives.
+        try:
+            import os as _os
+            from memoryschema.write_index import set_lifecycle
+            set_lifecycle(_os.path.join(str(config.memory_dir), f"{name}.md"), status="archived")
+        except (ValueError, OSError) as e:
+            click.echo(f"  warn: status not persisted to .md ({e}) — will revert on reconcile", err=True)
         if _remove_from_memory_index(config, name):
             click.echo(f"Removed from MEMORY.md")
         click.echo(f"Archived: {name}")
@@ -408,6 +452,12 @@ def unarchive(config, name):
     store = _get_store(config)
     result = store.unarchive(name)
     if result:
+        try:
+            import os as _os
+            from memoryschema.write_index import set_lifecycle
+            set_lifecycle(_os.path.join(str(config.memory_dir), f"{name}.md"), status="active")
+        except (ValueError, OSError):
+            pass  # store updated; .md persistence is best-effort on unarchive
         click.echo(f"Unarchived: {name}")
     else:
         click.echo(f"Error: Entity '{name}' not found or not archived.", err=True)
@@ -642,10 +692,14 @@ def decline_cmd(config, reason, name_hint):
 @click.option("--informs", multiple=True, help="INFORMS relation target (repeatable).")
 @click.option("--supersedes", multiple=True, help="SUPERSEDES relation target (repeatable).")
 @click.option("--body", default=None, help="Markdown body after the entity block.")
+@click.option("--key", "fact_key", default=None,
+              help="Fact identity (e.g. EURUSD.bias): an ACTIVE memory holding the same key "
+                   "is deterministically superseded — bi-temporal, non-lossy, no LLM judgment.")
+@click.option("--valid-from", default=None, help="Validity start (ISO date; default today when --key given).")
 @click.option("--no-index", is_flag=True, help="Write the file only; skip indexing.")
 @click.pass_obj
 def remember_cmd(config, name, desc, obs, mtype, importance, reasoning,
-                 uses, informs, supersedes, body, no_index):
+                 uses, informs, supersedes, body, fact_key, valid_from, no_index):
     """Create a NEW standalone memory — plain text in, valid entity out.
 
     The deterministic standalone-write path: code generates the entity file
@@ -660,23 +714,54 @@ def remember_cmd(config, name, desc, obs, mtype, importance, reasoning,
             --obs "5s timeout + one retry resolves it" \
             --uses helios-bridge --importance 7
     """
-    from memoryschema.write_index import create_entity_file, index_memory
+    from memoryschema.write_index import (create_entity_file, find_active_by_key,
+                                          index_memory, set_lifecycle)
 
     project_root = str(config.project_root) if config and config.project_root else '.'
     import os
     filepath = os.path.join(project_root, "memory", f"{name}.md")
+    store_path = os.path.join(project_root, "memory", "store.jsonl")
+
+    # Deterministic write-time supersession (plan-memory-direction-2026): an ACTIVE
+    # entity holding the same fact key is invalidated by this write — bi-temporal
+    # (interval closed, nothing deleted), keyed exact-match only, no LLM judgment.
+    old_holder = find_active_by_key(store_path, fact_key, exclude=name) if fact_key else None
+
     relations = ([("USES", t) for t in uses]
                  + [("INFORMS", t) for t in informs]
-                 + [("SUPERSEDES", t) for t in supersedes])
+                 + [("SUPERSEDES", t) for t in supersedes]
+                 + ([("SUPERSEDES", old_holder)] if old_holder else []))
     try:
         create_entity_file(filepath, name, desc, list(obs),
                            importance=importance, mtype=mtype, reasoning=reasoning,
                            relations=relations or None,
-                           project=getattr(config, "project_name", None), body=body)
+                           project=getattr(config, "project_name", None), body=body,
+                           fact_key=fact_key, valid_from=valid_from)
     except (FileExistsError, ValueError, OSError) as e:
         click.echo(f"Error: {e}", err=True)
         raise SystemExit(1)
-    click.echo(f"Created: memory/{name}.md ({len(obs)} observation(s))")
+    click.echo(f"Created: memory/{name}.md ({len(obs)} observation(s))"
+               + (f" · key={fact_key}" if fact_key else ""))
+
+    # Persist supersession FILE-FIRST for both paths (keyed auto-supersession AND
+    # explicit --supersedes): the store-side status flip alone reverts on reconcile.
+    _to_supersede = ([old_holder] if old_holder else []) + [t for t in supersedes if t != old_holder]
+    if _to_supersede:
+        from datetime import date
+        for _old in _to_supersede:
+            old_path = os.path.join(project_root, "memory", f"{_old}.md")
+            if not os.path.exists(old_path):
+                click.echo(f"  warn: supersede target {_old} has no .md file", err=True)
+                continue
+            try:
+                set_lifecycle(old_path, status="superseded",
+                              superseded_at=date.today().isoformat(), superseded_by=name)
+                res_old = index_memory(old_path, config=config, require_active_chain_auth=False)
+                _sup_note = "re-indexed" if res_old.ok else "REINDEX FAILED: " + "; ".join(res_old.errors)
+                _why = f"key={fact_key}" if _old == old_holder else "explicit"
+                click.echo(f"  superseded: {_old} ({_why}) — {_sup_note}")
+            except (ValueError, OSError) as e:
+                click.echo(f"  warn: could not supersede {_old}: {e}", err=True)
 
     if not no_index:
         res = index_memory(filepath, config=config)
