@@ -116,6 +116,29 @@ from memoryschema.tags import parse_memory_file
 
 memory = parse_memory_file(filepath)
 if memory is None:
+    # Distinguish CORRUPTION (an entity file that fails to parse — e.g. an unescaped '<' or '&'
+    # in prose, the M14 class that silently truncated the store twice) from a genuine
+    # not-a-memory-entity file. validator.validate already separates the two: V1 = no entity
+    # element (skip quietly), V9 = XML parse error with ElementTree's line/column (fail LOUD:
+    # exit 2 feeds stderr straight back to the agent in the same turn so it can fix the escape).
+    try:
+        from memoryschema.validator import validate as _validate
+        with open(filepath, 'r', encoding='utf-8') as _f:
+            _content = _f.read()
+        _errs = _validate(_content, filepath=filepath)   # returns a list of (rule_id, message) tuples
+        _parse_errs = [e for e in _errs if str(e[0] if isinstance(e, (list, tuple)) else e).startswith('V9')
+                       or 'parse error' in str(e).lower() or 'Unclosed' in str(e)]
+        if _parse_errs:
+            print('memoryschema hook: MEMORY FILE CORRUPTED — XML parse failed and the entity was '
+                  'NOT indexed (store keeps the stale version). Fix the file (likely an unescaped '
+                  '< or & in prose; XML-escape as &lt; &amp;). Details: '
+                  + '; '.join(str(e) for e in _parse_errs[:3]) + ' [file: ' + filepath + ']',
+                  file=sys.stderr)
+            sys.exit(2)
+    except SystemExit:
+        raise
+    except Exception:
+        pass  # never let the corruption-check itself break the hook
     # Not a memory entity file (e.g., YAML frontmatter, plain markdown) — skip
     sys.exit(0)
 
