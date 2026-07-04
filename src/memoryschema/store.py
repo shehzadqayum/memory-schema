@@ -146,6 +146,8 @@ class MemoryStore:
                 try:
                     entry = json.loads(line)
                     self._deserialize_observations(entry)
+                    from memoryschema.vector_sidecar import rehydrate, sidecar_dir
+                    rehydrate(entry, sidecar_dir(self._path))
                     entries.append(entry)
                 except json.JSONDecodeError:
                     continue
@@ -189,8 +191,11 @@ class MemoryStore:
         )
         try:
             with os.fdopen(fd, 'w', encoding='utf-8') as f:
+                from memoryschema.vector_sidecar import externalize, sidecar_dir
+                sdir = sidecar_dir(self._path)
                 for entry in entries:
-                    f.write(json.dumps(self._serialize_entry(entry), ensure_ascii=False) + '\n')
+                    slim = externalize(self._serialize_entry(entry), sdir)
+                    f.write(json.dumps(slim, ensure_ascii=False) + '\n')
             os.replace(tmp_path, self._path)
             self._cache = None
         except BaseException:

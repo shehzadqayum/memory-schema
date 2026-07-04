@@ -43,8 +43,11 @@ def _atomic_write_jsonl(path, entries):
     fd, tmp = tempfile.mkstemp(dir=d, prefix=".store.", suffix=".tmp")
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
+            from memoryschema.vector_sidecar import externalize, prune_orphans, sidecar_dir
+            sdir = sidecar_dir(path)
             for e in entries:
-                f.write(json.dumps(e, ensure_ascii=False) + "\n")
+                f.write(json.dumps(externalize(e, sdir), ensure_ascii=False) + '\n')
+            prune_orphans(sdir, [e.get("name") for e in entries])
         os.replace(tmp, path)
     finally:
         if os.path.exists(tmp):
