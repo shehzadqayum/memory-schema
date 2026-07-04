@@ -313,7 +313,7 @@ cli.add_command(reconcile)
 
 from memoryschema.cli.memory_cmd import (
     status, recall, recall_stats, get, list_cmd, write, delete, archive, unarchive,
-    reactivate, search, quarantine, force_cmd, decline_cmd,
+    reactivate, search, quarantine, force_cmd, decline_cmd, remember_cmd,
 )
 from memoryschema.cli.validate_cmd import validate
 from memoryschema.cli.index_cmd import index, embed, associations
@@ -333,6 +333,7 @@ cli.add_command(unarchive)
 cli.add_command(reactivate)
 cli.add_command(search)
 cli.add_command(quarantine)
+cli.add_command(remember_cmd, name="remember")
 cli.add_command(force_cmd, name="force")
 cli.add_command(decline_cmd, name="decline")
 cli.add_command(validate)

@@ -85,6 +85,30 @@ def gate_pipeline(memory, store=None, strict=False, config=None):
     if not description:
         warnings.append('Missing description')
 
+    # Quality nudges (warn-only; plan-memory-v5-sota-alignment step 2).
+    # Chains are exempt from the description-length rule until v5 splits the
+    # evolving summary into its own field — the v4 chain protocol REQUIRES a
+    # growing description, so warning on it would just teach warning-blindness.
+    is_chain = str(name).startswith('chain-')
+    if description and not is_chain and len(description) > 120:
+        warnings.append('description is %d chars (aim <=120 — one line; move detail '
+                        'to observations/reasoning)' % len(description))
+    imp = memory.get('importance')
+    if imp is not None and store is not None:
+        try:
+            entries = store.list_all(include_inactive=False)
+            if len(entries) >= 10:
+                from collections import Counter
+                dist = Counter(e.get('importance') for e in entries
+                               if e.get('importance') is not None)
+                mode, mode_n = dist.most_common(1)[0]
+                if imp == mode and mode_n / max(sum(dist.values()), 1) > 0.4:
+                    warnings.append('importance=%s is the store mode (%d%% of entries) '
+                                    '— vary it or omit for default' %
+                                    (imp, round(100 * mode_n / sum(dist.values()))))
+        except Exception:
+            pass  # nudge failure is never blocking
+
     # Stage 2: Consistency probe (strict mode)
     if strict and store is not None and memory.get('embedding'):
         try:

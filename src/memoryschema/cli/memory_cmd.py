@@ -625,3 +625,63 @@ def decline_cmd(config, reason, name_hint):
     audit_path = str(config.memory_dir / 'audit.jsonl')
     log_decline(audit_path, name_hint=name_hint, reason=reason)
     click.echo(f"Decline recorded: {reason}")
+
+
+@click.command("remember")
+@click.argument("name")
+@click.option("--desc", required=True, help="One-line description (aim <=120 chars).")
+@click.option("--obs", multiple=True, required=True,
+              help="An atomic observation (repeatable). Plain text — escaping is automatic.")
+@click.option("--type", "mtype", default="semantic",
+              type=click.Choice(["semantic", "episodic", "procedural"]),
+              help="Memory type (default semantic).")
+@click.option("--importance", default=None, type=click.IntRange(1, 10),
+              help="Salience 1-10 (omit for default).")
+@click.option("--reasoning", default=None, help="Narrative reasoning (optional).")
+@click.option("--uses", multiple=True, help="USES relation target (repeatable).")
+@click.option("--informs", multiple=True, help="INFORMS relation target (repeatable).")
+@click.option("--supersedes", multiple=True, help="SUPERSEDES relation target (repeatable).")
+@click.option("--body", default=None, help="Markdown body after the entity block.")
+@click.option("--no-index", is_flag=True, help="Write the file only; skip indexing.")
+@click.pass_obj
+def remember_cmd(config, name, desc, obs, mtype, importance, reasoning,
+                 uses, informs, supersedes, body, no_index):
+    """Create a NEW standalone memory — plain text in, valid entity out.
+
+    The deterministic standalone-write path: code generates the entity file
+    (XML escaping automatic — raw '<'/'&' in prose are safe), validates it
+    parses, then runs the full index pipeline (embed, gate, Neo4j+JSONL
+    dual-write, L0 rebuild). Refuses to overwrite an existing entity.
+
+    Example:
+        memoryschema remember bridge-timeout-fix \
+            --desc "Bridge reads must use a 5s timeout (hangs observed)" \
+            --obs "MT5 copy_rates_range hangs when the terminal dialog is open" \
+            --obs "5s timeout + one retry resolves it" \
+            --uses helios-bridge --importance 7
+    """
+    from memoryschema.write_index import create_entity_file, index_memory
+
+    project_root = str(config.project_root) if config and config.project_root else '.'
+    import os
+    filepath = os.path.join(project_root, "memory", f"{name}.md")
+    relations = ([("USES", t) for t in uses]
+                 + [("INFORMS", t) for t in informs]
+                 + [("SUPERSEDES", t) for t in supersedes])
+    try:
+        create_entity_file(filepath, name, desc, list(obs),
+                           importance=importance, mtype=mtype, reasoning=reasoning,
+                           relations=relations or None,
+                           project=getattr(config, "project_name", None), body=body)
+    except (FileExistsError, ValueError, OSError) as e:
+        click.echo(f"Error: {e}", err=True)
+        raise SystemExit(1)
+    click.echo(f"Created: memory/{name}.md ({len(obs)} observation(s))")
+
+    if not no_index:
+        res = index_memory(filepath, config=config)
+        for w in res.warnings:
+            click.echo(f"  warn: {w}", err=True)
+        click.echo(f"  {res.summary()}")
+        if not res.ok:
+            raise SystemExit(1)
