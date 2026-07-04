@@ -231,13 +231,19 @@ def append_chain_step(filepath, step_text, desc=None, reasoning=None, uses=None)
     """Append one auto-numbered step to a chain entity, with optional description
     replacement, reasoning append (after a '---' separator) and USES relations.
 
-    All text arguments are PLAIN TEXT — escaping happens here. The result is
+    All text arguments are PLAIN TEXT — v4 files get escaping here; v5 files
+    need none (prose never enters the structured layer). The result is
     parse-validated; on any structural failure the file is rolled back.
     Returns the step number written.
     """
     with open(filepath, "r", encoding="utf-8") as f:
         content = f.read()
     original = content
+
+    from memoryschema.format_v5 import is_v5_content
+    if is_v5_content(content):
+        return _append_chain_step_v5(filepath, content, original, step_text,
+                                     desc=desc, reasoning=reasoning, uses=uses)
 
     # Auto-number: continue from the highest existing "Step N:" (falls back to the
     # observation count when no step-prefixed observations exist yet). Numbering by
@@ -279,16 +285,76 @@ def append_chain_step(filepath, step_text, desc=None, reasoning=None, uses=None)
     return step_no
 
 
+def _append_chain_step_v5(filepath, content, original, step_text,
+                          desc=None, reasoning=None, uses=None):
+    """v5 chain append: parse -> mutate -> serialize (the serializer IS the
+    well-formedness guarantee; nothing to escape)."""
+    from memoryschema.format_v5 import parse_v5_content, serialize_v5
+    mem = parse_v5_content(content, filepath=filepath)
+    if mem is None:
+        raise ValueError("v5 parse failed for %s" % filepath)
+    log = list(mem.get("log") or [])
+    steps = [int(m) for entry in log
+             for m in re.findall(r"^Step\s+(\d+)\s*:", str(entry))]
+    step_no = (max(steps) if steps else len(log)) + 1
+    text = step_text.strip()
+    if not re.match(r"^(Step\s+\d+|Conclusion)\s*:", text, re.IGNORECASE):
+        text = "Step %d: %s" % (step_no, text)
+    text = " ".join(text.split())               # single-line bullet (markdown list item)
+    log.append(text)
+    obs_atomic = [o for o in (mem.get("observations") or []) if o not in (mem.get("log") or [])]
+    mem["log"] = log
+    mem["observations"] = obs_atomic + log
+    if desc is not None:
+        mem["summary"] = desc.strip()           # the evolving summary lives in ## Summary in v5
+    if reasoning is not None:
+        prev = mem.get("reasoning") or ""
+        mem["reasoning"] = (prev + "\n\n---\n" + reasoning.strip()).strip()
+    rels = list(mem.get("relations") or [])
+    for target in (uses or []):
+        if not any(r.get("target") == target and r.get("type") == "USES" for r in rels):
+            rels.append({"type": "USES", "target": target})
+    mem["relations"] = rels
+
+    new_content = serialize_v5(mem)
+    from memoryschema.format_v5 import parse_v5_content as _reparse
+    if _reparse(new_content, filepath=filepath) is None:
+        raise ValueError("v5 serialize round-trip failed — file left unchanged")
+    with open(filepath, "w", encoding="utf-8", newline="") as f:
+        f.write(new_content)
+    return step_no
+
+
 def create_entity_file(filepath, name, description, observations,
                        importance=None, mtype=None, reasoning=None,
                        relations=None, project=None, body=None):
-    """Generate a well-formed v4 entity .md from plain-text parts.
+    """Generate a well-formed entity .md from plain-text parts.
 
-    relations: list of (TYPE, target) tuples. All text escaped here.
-    Refuses to overwrite an existing file.
+    Emits v5 (YAML frontmatter + markdown body) when MEMORYSCHEMA_V5=1,
+    else v4 XML (the default until the corpus migrates). relations: list of
+    (TYPE, target) tuples. Refuses to overwrite an existing file.
     """
     if os.path.exists(filepath):
         raise FileExistsError("%s already exists — entities are created once" % filepath)
+
+    if os.environ.get("MEMORYSCHEMA_V5") == "1":
+        from memoryschema.format_v5 import parse_v5_content, serialize_v5
+        mem = {"schema": 5, "name": name, "description": description.strip(),
+               "observations": list(observations),
+               "type": mtype or "semantic",
+               "relations": [{"type": t, "target": tg} for t, tg in (relations or [])]}
+        if importance is not None:
+            mem["importance"] = int(importance)
+        if reasoning:
+            mem["reasoning"] = reasoning.strip()
+        if project:
+            mem["project"] = project
+        content = serialize_v5(mem)
+        if parse_v5_content(content, filepath=filepath) is None:
+            raise ValueError("generated v5 entity failed to parse — refusing to write")
+        with open(filepath, "w", encoding="utf-8", newline="") as f:
+            f.write(content)
+        return filepath
     attrs = 'schema="4" name="%s"' % escape_text(name)
     if mtype:
         attrs += ' type="%s"' % escape_text(mtype)

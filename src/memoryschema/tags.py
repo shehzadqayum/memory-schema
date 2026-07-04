@@ -80,6 +80,12 @@ def parse_memory_content(content, filepath=None):
     Returns:
         Dict with all schema fields, or None if content cannot be parsed.
     """
+    # v5 dispatch: a frontmatter-fenced file is the YAML+markdown format —
+    # no XML anywhere, nothing to escape (plan-memory-v5-sota-alignment).
+    from memoryschema.format_v5 import is_v5_content, parse_v5_content
+    if is_v5_content(content):
+        return parse_v5_content(content, filepath=filepath)
+
     entity_xml, body = extract_entity_block(content)
     if entity_xml is None:
         return None

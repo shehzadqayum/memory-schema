@@ -67,7 +67,8 @@ def compose_embedding_text(entry, space='default', max_chars=DEFAULT_MAX_CHARS):
         Composed text string ready for embedding.
     """
     if space == 'default':
-        head_parts = [entry.get('name', ''), entry.get('description', '')]
+        head_parts = [entry.get('name', ''), entry.get('description', ''),
+                      entry.get('summary', '') or '']   # v5: the evolving summary
         head = ' '.join(p for p in head_parts if p).strip()
         head = head[:max_chars]
         budget = max_chars - len(head) - 1
@@ -97,9 +98,11 @@ def compose_embedding_text(entry, space='default', max_chars=DEFAULT_MAX_CHARS):
 
     if space == 'description':
         desc = entry.get('description', '')
-        if not desc:
+        summary = entry.get('summary') or ''            # v5: summary shares the description space
+        text = (desc + ' ' + summary).strip() if summary else desc
+        if not text:
             return ''
-        return desc[:max_chars]
+        return text[:max_chars]
 
     if space == 'observations':
         obs = entry.get('observations', [])
@@ -140,6 +143,7 @@ def compose_full_text(entry):
     parts = [
         entry.get('name', '') or '',
         entry.get('description', '') or '',
+        entry.get('summary', '') or '',
         '\x1f'.join(str(o) for o in entry.get('observations', []) or []),
         entry.get('prompt', '') or '',
         entry.get('reasoning', '') or '',
