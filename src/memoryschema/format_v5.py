@@ -166,6 +166,7 @@ def parse_v5_content(content, filepath=None):
         "relations": relations,
         "type": meta.get("type") or "semantic",
         "status": meta.get("status") or "active",
+        "body": sections.get("notes") or None,   # trailing human notes (v4 body-after-entity parity)
     }
     if meta.get("importance"):
         try:
@@ -217,4 +218,5 @@ def serialize_v5(memory):
     section("Reasoning", memory.get("reasoning"))
     section("Prompt", memory.get("prompt"))
     section("Chain", memory.get("chain"))
+    section("Notes", memory.get("body"))
     return NL.join(out).rstrip() + NL
