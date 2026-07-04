@@ -234,10 +234,14 @@ class TestEmbedWithConfig:
         old_cache = emb_mod._cached_client
         emb_mod._cached_client = None
         try:
-            with patch.object(emb_mod.voyageai, 'Client', return_value=mock_client) as mock_cls:
+            # voyageai is imported lazily inside get_client (plan Phase 2f) —
+            # mock at the sys.modules layer.
+            mock_module = MagicMock()
+            mock_module.Client.return_value = mock_client
+            with patch.dict('sys.modules', {'voyageai': mock_module}):
                 result = emb_mod.embed_text('test text', config=config)
             assert len(result) == 1024
-            mock_cls.assert_called_once_with(api_key='test-key-123')
+            mock_module.Client.assert_called_once_with(api_key='test-key-123')
         finally:
             emb_mod._cached_client = old_cache
 

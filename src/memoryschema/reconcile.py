@@ -51,6 +51,19 @@ def _atomic_write_jsonl(path, entries):
             os.remove(tmp)
 
 
+def _embeddings_current(j, e):
+    """True iff the stored derived layer in j was computed from e's CURRENT content.
+
+    Uses the embed-time provenance hash (embed_input_hash over the FULL untruncated
+    content). A missing hash (pre-hash store) is treated as STALE — forcing a one-time
+    re-embed that populates it (the natural backfill/migration path). The old key was
+    the truncated composed text, which never changed once a field saturated the cap —
+    the 'Re-embedded: 0 on changed chains' defect."""
+    from memoryschema.embedding_input import embed_input_hash
+    stored = j.get("embed_input_hash")
+    return bool(stored) and stored == embed_input_hash(e)
+
+
 def _embed_text(entry):
     """The default-space embedding-input text — the change-detection key."""
     from memoryschema.embedding_input import compose_embedding_text
@@ -171,7 +184,7 @@ def reconcile(config, dry_run=False, prune=True, verify=True, allow_empty=False)
         changed = 0
         for name, e in md_entities.items():
             j = jsonl_by_name.get(name)
-            if not (j and j.get("embedding") and _embed_text(j) == _embed_text(e)):
+            if not (j and j.get("embedding") and _embeddings_current(j, e)):
                 changed += 1
         result["would_reembed"] = changed
         if neo4j_store:
@@ -180,13 +193,13 @@ def reconcile(config, dry_run=False, prune=True, verify=True, allow_empty=False)
 
     # --- 1+2: build the exact .md set, reusing the JSONL derived layer where unchanged ---
     from memoryschema.spaces import apply_full_embeddings
-    DERIVED = ("embedding", "embeddings", "divergence_profile",
+    DERIVED = ("embedding", "embeddings", "divergence_profile", "embed_input_hash",
                "created_at", "access_count", "last_accessed", "associations")
     final = []
     for name, e in md_entities.items():
         out = dict(e)                                           # fresh dict — keep parsed .md pristine
         j = jsonl_by_name.get(name)
-        if j and j.get("embedding") and _embed_text(j) == _embed_text(e):
+        if j and j.get("embedding") and _embeddings_current(j, e):
             for k in DERIVED:                                   # reuse derived layer (full multi-space)
                 if k in j and j[k] is not None:
                     out[k] = j[k]

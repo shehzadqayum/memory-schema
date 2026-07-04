@@ -104,4 +104,10 @@ def __getattr__(name):
     if name in ("embed_text", "embed_batch", "rerank"):
         import memoryschema.embeddings as _emb
         return getattr(_emb, name)
+    if name == "embeddings":
+        # PEP 562 lazy submodule: lets mock.patch("memoryschema.embeddings.x")
+        # resolve regardless of import order (resolve_name uses getattr chains,
+        # which otherwise only work if the submodule happens to be imported).
+        import memoryschema.embeddings as _emb
+        return _emb
     raise AttributeError(f"module 'memoryschema' has no attribute {name}")

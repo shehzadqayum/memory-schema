@@ -16,8 +16,11 @@ def mock_voyageai():
         MagicMock(document="doc1", relevance_score=0.95, index=0),
         MagicMock(document="doc2", relevance_score=0.80, index=1),
     ])
-    with patch("memoryschema.embeddings.voyageai") as mock_module:
-        mock_module.Client.return_value = mock_client
+    # voyageai is imported LAZILY inside get_client (plan Phase 2f), so mock it
+    # at the sys.modules layer — the lazy `import voyageai` resolves through it.
+    mock_module = MagicMock()
+    mock_module.Client.return_value = mock_client
+    with patch.dict("sys.modules", {"voyageai": mock_module}):
         # Reset cached client
         import memoryschema.embeddings as emb
         emb._cached_client = None

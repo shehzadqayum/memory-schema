@@ -131,8 +131,8 @@ def compute_divergence_profile(embeddings, round_ndigits=4):
     return profile
 
 
-def embed_all_spaces(entry, config=None, embed_fn=None, max_chars=2000):
-    """Embed an entry across all registered spaces.
+def embed_all_spaces(entry, config=None, embed_fn=None, max_chars=None):
+    """Embed an entry across all registered spaces — ONE batched API call.
 
     Returns (embeddings, divergence_profile):
       - embeddings: {space_name -> vector}, always including 'default', plus each
@@ -140,25 +140,34 @@ def embed_all_spaces(entry, config=None, embed_fn=None, max_chars=2000):
       - divergence_profile: computed via compute_divergence_profile.
     Returns ({}, {}) if the entry has no embeddable 'default' text.
 
-    embed_fn(text) -> vector lets tests inject a deterministic embedder; by default
-    it uses memoryschema.embeddings.embed_text(text, config=config).
+    embed_fn(text) -> vector lets tests inject a deterministic embedder (called
+    per text); the default path composes every space text first and embeds them
+    in a SINGLE embed_batch call (was 7 sequential HTTP round-trips ≈ 2.1s per
+    index; batched ≈ 0.25s — plan-memory-system-improvement Phase 2a).
     """
-    if embed_fn is None:
-        from memoryschema.embeddings import embed_text
-        def embed_fn(text):
-            return embed_text(text, config=config)
+    from memoryschema.embedding_input import DEFAULT_MAX_CHARS
+    if max_chars is None:
+        max_chars = DEFAULT_MAX_CHARS
 
     default_text = compose_embedding_text(entry, space='default', max_chars=max_chars)
     if not default_text:
         return {}, {}
 
-    embeddings = {'default': embed_fn(default_text)}
+    texts = {'default': default_text}
     for space in get_registry():
         if space == 'default':
             continue
         text = compose_embedding_text(entry, space=space, max_chars=max_chars)
         if text:
-            embeddings[space] = embed_fn(text)
+            texts[space] = text
+
+    if embed_fn is not None:
+        embeddings = {space: embed_fn(text) for space, text in texts.items()}
+    else:
+        from memoryschema.embeddings import embed_batch
+        spaces_order = list(texts.keys())
+        vectors = embed_batch([texts[s] for s in spaces_order], config=config)
+        embeddings = dict(zip(spaces_order, vectors))
 
     return embeddings, compute_divergence_profile(embeddings)
 
@@ -175,4 +184,10 @@ def apply_full_embeddings(entry, config=None):
     entry['embedding'] = embeddings.get('default')
     if divergence:
         entry['divergence_profile'] = divergence
+    # Provenance: hash of the FULL untruncated content at embed time. Reconcile
+    # compares this against the current content hash to detect stale embeddings
+    # (the old drift key was the truncated composed text, which saturated fields
+    # never changed — the 'Re-embedded: 0 on changed chains' defect).
+    from memoryschema.embedding_input import embed_input_hash
+    entry['embed_input_hash'] = embed_input_hash(entry)
     return True

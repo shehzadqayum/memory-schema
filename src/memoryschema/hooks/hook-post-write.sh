@@ -203,12 +203,14 @@ if voyage_key:
         # two cannot drift). Computes the 'default' blend + each non-empty field space
         # and the divergence profile (1 - cosine to default).
         from memoryschema.spaces import embed_all_spaces
+        from memoryschema.embedding_input import embed_input_hash
         embeddings, div_profile = embed_all_spaces(memory, config=hook_config)
         if embeddings:
             memory['embedding'] = embeddings.get('default')
             memory['embeddings'] = embeddings
             if div_profile:
                 memory['divergence_profile'] = div_profile
+            memory['embed_input_hash'] = embed_input_hash(memory)
     except Exception:
         pass  # Embedding failure does not block — stages 4-6 skip gracefully
 

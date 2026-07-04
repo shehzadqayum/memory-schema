@@ -126,12 +126,14 @@ def index_memory(filepath, config=None, require_active_chain_auth=True):
     if voyage_key:
         try:
             from memoryschema.spaces import embed_all_spaces
+            from memoryschema.embedding_input import embed_input_hash
             embeddings, div_profile = embed_all_spaces(memory, config=config)
             if embeddings:
                 memory["embedding"] = embeddings.get("default")
                 memory["embeddings"] = embeddings
                 if div_profile:
                     memory["divergence_profile"] = div_profile
+                memory["embed_input_hash"] = embed_input_hash(memory)
                 res.embedded = True
         except Exception as e:
             res.warnings.append("embedding failed (indexed unembedded): %s" % e)

@@ -9,9 +9,6 @@ Usage:
     vector = embed_text("hello world")  # 1024-dim list of floats
 """
 
-import voyageai
-
-
 _cached_client = None
 
 
@@ -35,6 +32,10 @@ def get_client(api_key=None, config=None):
     if api_key is None and config:
         api_key = config.voyage_api_key
 
+    # Lazy import (plan Phase 2f): voyageai transitively pulls numpy/aiohttp
+    # (~1.5s) — only embedding paths should pay it, and module-level import made
+    # every CLI call (and sys.modules-patching tests) pay/trip it.
+    import voyageai
     client = voyageai.Client(api_key=api_key)
 
     if config is not None:

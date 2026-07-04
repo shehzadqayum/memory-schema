@@ -110,8 +110,14 @@ def chain_step(config, text, use_stdin, desc, reasoning, uses, no_index):
 
     if not no_index:
         res = index_memory(chain_path, config=config)
-        for w in res.warnings:
+        _probe = [w for w in res.warnings if '[numeric-probe-hit]' in str(w)]
+        _other = [w for w in res.warnings if '[numeric-probe-hit]' not in str(w)]
+        for w in _other[:5]:
             click.echo(f"  warn: {w}", err=True)
+        if len(_other) > 5:
+            click.echo(f"  warn: (+{len(_other)-5} more)", err=True)
+        if _probe:  # the v4 numeric probe is noisy on number-dense chain prose — summarize
+            click.echo(f"  warn: numeric-probe: {len(_probe)} cross-entity number mismatches (advisory)", err=True)
         click.echo(f"  {res.summary()}")
         if not res.ok:
             raise SystemExit(1)

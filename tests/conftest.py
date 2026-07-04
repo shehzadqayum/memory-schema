@@ -60,6 +60,53 @@ def _isolate_from_live_backend(request, monkeypatch):
     monkeypatch.setenv("MEMORYSCHEMA_RECALL_LOG", "0")   # don't write recall telemetry during tests
 
 
+@pytest.fixture(autouse=True, scope="session")
+def _live_neo4j_wipe_tripwire():
+    """Snapshot the LIVE Neo4j Memory-node count at session start; scream at session end
+    if it dropped. On 2026-07-04 a failure-cascade suite run (numpy eviction via
+    patch.dict(sys.modules) breaking isolation) wiped the live store to 0 nodes with no
+    test identifying itself. The .md/JSONL layers made it recoverable (reconcile), but a
+    silent wipe must never be silent again. Runs at session scope, BEFORE the per-test
+    env strip, so it sees the real environment when the developer shell has .env loaded."""
+    import os
+    import sys
+    uri = os.environ.get("NEO4J_URI")
+    pwd = os.environ.get("NEO4J_PASSWORD")
+
+    def _count():
+        from neo4j import GraphDatabase
+        d = GraphDatabase.driver(uri, auth=(os.environ.get("NEO4J_USER", "neo4j"), pwd))
+        try:
+            with d.session() as sess:
+                return sess.run("MATCH (m:Memory) RETURN count(m) AS c").single()["c"]
+        finally:
+            d.close()
+
+    before = None
+    if uri and pwd and DEAD_NEO4J_URI not in uri:
+        try:
+            before = _count()
+        except Exception:
+            before = None
+    yield
+    if before:
+        try:
+            after = _count()
+        except Exception:
+            return
+        if after < before:
+            banner = "*" * 78
+            msg = (
+                banner
+                + chr(10) + "*** LIVE NEO4J TRIPWIRE: Memory nodes %d -> %d during this" % (before, after)
+                + chr(10) + "*** test session - a test touched the LIVE store. Restore with"
+                + chr(10) + "*** 'memoryschema reconcile' and hunt the leaking test before"
+                + chr(10) + "*** trusting the suite again."
+                + chr(10) + banner
+            )
+            print(chr(10) + msg, file=sys.stderr)
+
+
 @pytest.fixture
 def dead_neo4j():
     """A MemoryConfig pointed at the guaranteed-dead bolt endpoint — for tests that need an explicit
