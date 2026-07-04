@@ -94,8 +94,15 @@ def chain_step(config, text, use_stdin, desc, reasoning, uses, no_index):
 
     chain_path = os.path.join(project_root, "memory", f"{active}.md")
     if not os.path.exists(chain_path):
-        click.echo(f"Error: active chain file missing: {chain_path}", err=True)
-        raise SystemExit(1)
+        # Bootstrap: chain start only authorises the NAME; the first step creates
+        # the file (v5 skeleton). Mirrors the old first-Write-creates-it protocol.
+        from memoryschema.format_v5 import serialize_v5
+        skeleton = serialize_v5({"schema": 5, "name": active,
+                                 "description": desc or f"Working chain {active}.",
+                                 "log": [], "observations": []})
+        with open(chain_path, "w", encoding="utf-8", newline="") as f:
+            f.write(skeleton)
+        click.echo(f"{active}: chain file created")
 
     try:
         step_no = append_chain_step(chain_path, text, desc=desc,

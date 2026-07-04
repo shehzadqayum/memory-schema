@@ -190,3 +190,23 @@ class TestRememberV5:
         m = parse_memory_file(str(tmp_path / "memory" / "cli-v5.md"))
         assert m["schema"] == 5
         assert m["observations"] == ["raw < & obs"]
+
+
+class TestChainStepBootstrap:
+    def test_first_step_creates_v5_file(self, tmp_path):
+        """chain start authorises the NAME only — the first chain step must
+        bootstrap the file (found live: the dream-pass rotation left the new
+        successor chain with no file and step errored)."""
+        from click.testing import CliRunner
+        from memoryschema.cli.main import cli
+        from memoryschema.tags import parse_memory_file
+        (tmp_path / "memory").mkdir()
+        (tmp_path / "memory" / ".active_chain").write_text("chain-fresh", encoding="utf-8")
+        runner = CliRunner()
+        res = runner.invoke(cli, ["--root", str(tmp_path), "chain", "step",
+                                  "first step text", "--desc", "fresh chain"])
+        assert res.exit_code == 0, res.output
+        assert "chain file created" in res.output
+        m = parse_memory_file(str(tmp_path / "memory" / "chain-fresh.md"))
+        assert m is not None and m["schema"] == 5
+        assert m["log"] == ["Step 1: first step text"]
