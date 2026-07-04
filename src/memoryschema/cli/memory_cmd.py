@@ -776,3 +776,58 @@ def remember_cmd(config, name, desc, obs, mtype, importance, reasoning,
         click.echo(f"  {res.summary()}")
         if not res.ok:
             raise SystemExit(1)
+
+
+@click.command("dream")
+@click.option("--json", "as_json", is_flag=True, help="Machine-readable report.")
+@click.pass_obj
+def dream_cmd(config, as_json):
+    """Dream-pass candidate report (read-only) — the discovery half of the
+    consolidation loop.
+
+    Lists released-undistilled chains, the oversized active chain, stale keyed
+    facts, never-surfaced entities, and near-duplicate pairs. The dream SESSION
+    (the /dream-pass skill) supplies judgment and acts via the safe primitives
+    (remember / --supersedes / archive). This command never writes.
+    """
+    from memoryschema.chain_state import get_active_chain
+    from memoryschema.dream_report import build_report
+
+    project_root = str(config.project_root) if config and config.project_root else '.'
+    active_chain = get_active_chain(project_root)
+    report = build_report(config, active_chain=active_chain)
+
+    if as_json:
+        import json as _json
+        click.echo(_json.dumps(report, indent=1))
+        return
+
+    click.echo("Dream-pass candidates (%s)" % report["generated"])
+    click.echo("=" * 50)
+    counts = report["counts"]
+    total = sum(counts.values())
+    if total == 0:
+        click.echo("Store is consolidated — nothing to dream about.")
+        return
+    for section, title in (("chains", "Released chains to distill"),
+                           ("oversized", "Active chain past rotation threshold"),
+                           ("stale_keyed", "Stale keyed facts (review validity)"),
+                           ("never_surfaced", "Never surfaced (archival candidates)"),
+                           ("duplicates", "Near-duplicate pairs (merge candidates)")):
+        items = report[section]
+        if not items:
+            continue
+        click.echo("")
+        click.echo("%s (%d):" % (title, len(items)))
+        for it in items:
+            if section == "duplicates":
+                click.echo("  %.3f  %s <-> %s" % (it["cosine"], it["a"], it["b"]))
+            elif section == "stale_keyed":
+                click.echo("  %3dd  %s  (key=%s, since %s)"
+                           % (it["age_days"], it["name"], it["key"], it["valid_from"]))
+            elif section in ("chains", "oversized"):
+                click.echo("  %4d obs  %s" % (it["observations"], it["name"]))
+            else:
+                click.echo("  %s — %s" % (it["name"], it.get("description", "")[:70]))
+    click.echo("")
+    click.echo("Act via: the /dream-pass skill (judgment + safe primitives).")
