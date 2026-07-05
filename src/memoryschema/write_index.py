@@ -326,7 +326,7 @@ def _append_chain_step_v5(filepath, content, original, step_text,
 
 
 def set_lifecycle(filepath, status=None, superseded_at=None, superseded_by=None,
-                  valid_from=None):
+                  valid_from=None, promoted_to=None):
     """Deterministically update LIFECYCLE frontmatter on a v5 entity .md —
     the file-first fix for the archive-reverts-on-reconcile bug: status and
     temporal fields must live in the source of truth or reconcile (which
@@ -352,6 +352,8 @@ def set_lifecycle(filepath, status=None, superseded_at=None, superseded_by=None,
         mem["superseded_by"] = superseded_by
     if valid_from is not None:
         mem["valid_from"] = valid_from
+    if promoted_to is not None:
+        mem["promoted_to"] = promoted_to
     new_content = serialize_v5(mem)
     if parse_v5_content(new_content, filepath=filepath) is None:
         raise ValueError("lifecycle serialize round-trip failed — file unchanged")

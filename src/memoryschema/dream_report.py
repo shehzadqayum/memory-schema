@@ -26,6 +26,7 @@ from datetime import date, datetime, timezone
 DUP_COSINE = 0.80
 STALE_DAYS = 14
 CHAIN_OBS_ROTATION = 40
+NEVER_SURFACED_GRACE_DAYS = 7   # fresh entities haven't had a chance to surface
 
 
 def _load_entries(store_path):
@@ -74,7 +75,8 @@ def build_report(config, active_chain=None, today=None):
     active = [e for e in entries if (e.get("status") or "active") == "active"]
 
     report = {"generated": today, "counts": {}, "chains": [], "oversized": [],
-              "stale_keyed": [], "never_surfaced": [], "duplicates": []}
+              "stale_keyed": [], "never_surfaced": [], "duplicates": [],
+              "attribution_review": [], "promotion_candidates": []}
 
     # 1. Released-but-active chains -> distillation candidates
     for e in active:
@@ -124,12 +126,23 @@ def build_report(config, active_chain=None, today=None):
         if events:
             for e in active:
                 name = e.get("name", "")
-                if name and name not in surfaced and not name.startswith("chain-"):
-                    report["never_surfaced"].append({
-                        "name": name,
-                        "description": (e.get("description") or "")[:120],
-                        "note": "zero recall appearances in the logged window — "
-                                "archive if resolved/expired, keep if reference"})
+                if not name or name in surfaced or name.startswith("chain-"):
+                    continue
+                # Grace period: a freshly created entity (e.g. this session's
+                # distillates) has had no chance to surface — not dead weight.
+                created = e.get("created_at") or ""
+                try:
+                    age = (datetime.fromisoformat(today)
+                           - datetime.fromisoformat(created[:10])).days
+                    if age < NEVER_SURFACED_GRACE_DAYS:
+                        continue
+                except ValueError:
+                    pass
+                report["never_surfaced"].append({
+                    "name": name,
+                    "description": (e.get("description") or "")[:120],
+                    "note": "zero recall appearances in the logged window — "
+                            "archive if resolved/expired, keep if reference"})
     except Exception:
         pass
 
@@ -144,6 +157,42 @@ def build_report(config, active_chain=None, today=None):
                     "note": "high overlap — merge (new entity --supersedes both) "
                             "or link if genuinely distinct"})
     report["duplicates"].sort(key=lambda d: -d["cosine"])
+
+    # 5. Attribution review: recalled often, never cited (noise vs ambient)
+    att = None
+    try:
+        from memoryschema.attribution import compute_attribution
+        att = compute_attribution(config)
+        active_names = {e.get("name") for e in active}
+        for n in att["summary"]["recalled_never_cited"]:
+            if n in active_names:
+                report["attribution_review"].append({
+                    "name": n, "recalls": att["memories"][n]["recalls"],
+                    "note": "recalled repeatedly, never cited - retrieval noise "
+                            "(archive/refine) or ambient value (leave, note it)"})
+    except Exception:
+        pass
+
+    # 6. Promotion candidates: procedural knowledge behaving like a rule -
+    #    explicitly procedural or repeatedly cited - not yet promoted into a
+    #    standing instruction surface (kernel / CLAUDE.md / skill).
+    cite_counts = {}
+    if att:
+        for n, m in att["memories"].items():
+            cite_counts[n] = m["citations"]
+    for e in active:
+        name = e.get("name", "")
+        if not name or name.startswith("chain-") or e.get("promoted_to"):
+            continue
+        procedural = (e.get("type") == "procedural")
+        much_cited = cite_counts.get(name, 0) >= 3
+        if procedural or much_cited:
+            report["promotion_candidates"].append({
+                "name": name, "type": e.get("type"),
+                "citations": cite_counts.get(name, 0),
+                "note": "promote into a standing surface (kernel line / "
+                        "CLAUDE.md / skill), then mark promoted_to via "
+                        "set_lifecycle so it drops from this list"})
 
     report["counts"] = {k: len(v) for k, v in report.items()
                         if isinstance(v, list)}

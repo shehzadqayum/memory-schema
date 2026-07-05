@@ -178,7 +178,7 @@ def parse_v5_content(content, filepath=None):
     # Temporal validity + fact-key (plan-memory-direction-2026): key = the fact
     # identity for deterministic write-time supersession; valid_from/superseded_at
     # bound the validity interval; superseded_by names the successor.
-    for tk in ("key", "valid_from", "superseded_at", "superseded_by"):
+    for tk in ("key", "valid_from", "superseded_at", "superseded_by", "promoted_to"):
         if meta.get(tk):
             memory[tk] = meta[tk]
     # drop empty optionals for dict-shape parity with the v4 parser
@@ -191,7 +191,7 @@ def serialize_v5(memory):
     NL = "\n"
     out = [FRONTMATTER_OPEN, "schema: 5"]
     for key in ("type", "importance", "status", "project",
-                "key", "valid_from", "superseded_at", "superseded_by"):
+                "key", "valid_from", "superseded_at", "superseded_by", "promoted_to"):
         val = memory.get(key)
         if val is not None and val != "" and not (key == "type" and val == "semantic") \
                 and not (key == "status" and val == "active"):

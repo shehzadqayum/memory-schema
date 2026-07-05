@@ -740,6 +740,10 @@ def remember_cmd(config, name, desc, obs, mtype, importance, reasoning,
     except (FileExistsError, ValueError, OSError) as e:
         click.echo(f"Error: {e}", err=True)
         raise SystemExit(1)
+    _cites = list(uses) + list(informs)
+    if _cites:
+        from memoryschema.attribution import log_citation
+        log_citation(config, source=name, targets=_cites, context="remember")
     click.echo(f"Created: memory/{name}.md ({len(obs)} observation(s))"
                + (f" · key={fact_key}" if fact_key else ""))
 
@@ -813,8 +817,10 @@ def dream_cmd(config, as_json):
                            ("oversized", "Active chain past rotation threshold"),
                            ("stale_keyed", "Stale keyed facts (review validity)"),
                            ("never_surfaced", "Never surfaced (archival candidates)"),
-                           ("duplicates", "Near-duplicate pairs (merge candidates)")):
-        items = report[section]
+                           ("duplicates", "Near-duplicate pairs (merge candidates)"),
+                           ("attribution_review", "Recalled but never cited (noise vs ambient)"),
+                           ("promotion_candidates", "Promotion candidates (rule-like knowledge)")):
+        items = report.get(section, [])
         if not items:
             continue
         click.echo("")
@@ -827,7 +833,51 @@ def dream_cmd(config, as_json):
                            % (it["age_days"], it["name"], it["key"], it["valid_from"]))
             elif section in ("chains", "oversized"):
                 click.echo("  %4d obs  %s" % (it["observations"], it["name"]))
+            elif section == "attribution_review":
+                click.echo("  %s (%d recalls, 0 citations)" % (it["name"], it["recalls"]))
+            elif section == "promotion_candidates":
+                click.echo("  %s (type=%s, %d citations)"
+                           % (it["name"], it.get("type") or "semantic", it["citations"]))
             else:
                 click.echo("  %s — %s" % (it["name"], it.get("description", "")[:70]))
     click.echo("")
     click.echo("Act via: the /dream-pass skill (judgment + safe primitives).")
+
+
+@click.command("attribution")
+@click.option("--json", "as_json", is_flag=True, help="Machine-readable output.")
+@click.pass_obj
+def attribution_cmd(config, as_json):
+    """Attribution report: which recalled memories actually influence work.
+
+    Joins the recall log against the citation log (chain step --uses /
+    remember --uses|--informs log at the moment they happen). A recalled-
+    then-cited memory has PROVEN utility; recalled-never-cited is retrieval
+    noise or ambient value. Feeds the dream pass + importance decisions.
+    """
+    from memoryschema.attribution import compute_attribution
+    rep = compute_attribution(config)
+    if as_json:
+        import json as _json
+        click.echo(_json.dumps(rep, indent=1))
+        return
+    mems = rep["memories"]
+    if not mems:
+        click.echo("No recall/citation telemetry yet.")
+        return
+    click.echo("Attribution (recall x citation join)")
+    click.echo("=" * 46)
+    rows = sorted(mems.items(), key=lambda kv: -(kv[1]["recalls"] + kv[1]["citations"]))
+    click.echo("%-42s %7s %6s %5s" % ("memory", "recalls", "cites", "rate"))
+    for name, m in rows[:25]:
+        if m["attribution_rate"] is not None:
+            rate = "%d%%" % round(100 * m["attribution_rate"])
+        else:
+            rate = "-"
+        click.echo("%-42s %7d %6d %5s" % (name[:42], m["recalls"], m["citations"], rate))
+    summ = rep["summary"]
+    if summ["recalled_never_cited"]:
+        click.echo("")
+        click.echo("Recalled >=3x, never cited (noise or ambient - dream-pass review):")
+        for n in summ["recalled_never_cited"][:8]:
+            click.echo("  %s (%d recalls)" % (n, mems[n]["recalls"]))

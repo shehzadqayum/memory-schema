@@ -110,6 +110,9 @@ def chain_step(config, text, use_stdin, desc, reasoning, uses, no_index):
     except (ValueError, OSError) as e:
         click.echo(f"Error: {e}", err=True)
         raise SystemExit(1)
+    if uses:
+        from memoryschema.attribution import log_citation
+        log_citation(config, source=active, targets=list(uses), context="chain-step")
     click.echo(f"{active}: step {step_no} written"
                + (" · desc updated" if desc else "")
                + (" · reasoning appended" if reasoning else "")

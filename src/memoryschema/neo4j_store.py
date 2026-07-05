@@ -163,11 +163,15 @@ class Neo4jMemoryStore:
 
         now = _now_iso()
 
-        # Mutable props (applied on both CREATE and MATCH)
+        # Mutable props (applied on both CREATE and MATCH). Includes the
+        # lifecycle/temporal fields — set_lifecycle + re-index updates an
+        # EXISTING node, so omitting them here drops them from Neo4j entirely.
         props = {}
         for key in ('schema', 'type', 'status', 'description',
                      'importance', 'body', 'filepath', 'prompt',
-                     'reasoning', 'project'):
+                     'reasoning', 'project',
+                     'key', 'valid_from', 'superseded_at', 'superseded_by',
+                     'promoted_to'):
             if key in memory_dict and memory_dict[key] is not None:
                 props[key] = memory_dict[key]
 

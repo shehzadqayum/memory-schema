@@ -303,9 +303,15 @@ class MemoryStore:
         # Capture prior state for audit
         prior_snapshot = dict(existing)
 
-        # Merge (schema, filepath, project are immutable after creation)
+        # Merge (schema, filepath, project are immutable after creation).
+        # Lifecycle/temporal fields (key, valid_from, superseded_*, promoted_to)
+        # MUST merge too — they arrive via set_lifecycle + re-index on EXISTING
+        # entities, so a whitelist miss silently drops them until the next
+        # reconcile rebuild (found live: promoted_to vanished on first use).
         for key in ('type', 'status', 'description', 'importance',
                      'body', 'prompt', 'chain', 'confidence',
+                     'key', 'valid_from', 'superseded_at', 'superseded_by',
+                     'promoted_to',
                      'embedding', 'embeddings', 'divergence_profile'):
             if key in memory_dict and memory_dict[key] is not None:
                 existing[key] = memory_dict[key]
