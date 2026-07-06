@@ -18,65 +18,43 @@ Use the recalled memories as context for your response. If a recalled memory dir
 
 ## Active Chain
 
-Every session has ONE active chain entity that accumulates reasoning steps. This is the primary memory mechanism.
+Every session has ONE active chain entity that accumulates reasoning steps. This is the primary memory mechanism. The active chain name is stored in `memory/.active_chain`.
 
 ### Lifecycle
 
-1. **Start** — `memoryschema chain start <name>` authorises the entity for writes. Create the memory file on first response.
-2. **Update** — on every subsequent response, UPSERT the same chain entity (authorised = writable). All other memories are read-only (unauthorised).
-3. **Release** — `memoryschema chain release` makes it read-only permanently. Append a "Conclusion:" observation before releasing.
-4. **New chain** — only one chain authorised at a time. Release first, then start a new one.
+1. **Start** — `memoryschema chain start <name>` authorises the name (only one chain at a time; kebab-case, `chain-` prefix).
+2. **Step** — after each substantive response, record what happened via the CLI (below). The first step bootstraps the file.
+3. **Release** — conclude with a `Conclusion:` step, then `memoryschema chain release`; immediately `chain start` a successor (the store should never sit without an active chain).
 
-After release, all memories are read-only until a new chain is started. The active chain name is stored in `memory/.active_chain`.
+### How to update — the deterministic write path
 
-### How to update
+```bash
+memoryschema chain step --stdin [--desc "evolving summary"] [--reasoning TEXT] [--uses <evidence-memory>] <<'EOF'
+What happened, decisions, results. Raw < > & are SAFE here — code does the structuring.
+EOF
+```
 
-**Edit** (not Write) the SAME `memory/<chain-name>.md` file on every response.
-NEVER use Write on an existing chain file — it replaces the entire file, risking observation loss.
+Plain text in; code auto-numbers the step, validates the file round-trip, indexes to both stores, and rebuilds the MEMORY.md index. `--desc` replaces the evolving summary; `--reasoning` appends narrative after a `---` separator; `--uses` links evidence (and logs a citation).
 
-Three targeted Edits per update:
-1. **Append** new `<memory:observation>` before `</memory:observations>`
-2. **Replace** `<memory:description>` content
-3. **Append** to `<memory:reasoning>` — add new narrative after a `---` separator, preserving prior reasoning
+**Do NOT hand-edit the chain file as the normal path.** Hand-editing `memory/*.md` is the fallback only (the PostToolUse hook indexes it, but hand-authored structure caused store corruption historically — the CLI path makes that impossible). If you must hand-edit, use Edit (not Write) and check `memoryschema sync` after.
 
-The upsert semantics at the index layer handle accumulation (only works because the chain is authorised):
-- Observations are APPENDED (each step adds to the list)
-- Description is REPLACED (summary evolves)
-- Reasoning is REPLACED (narrative updated with latest thinking)
-- Relations are MERGED (USES links to evidence accumulate)
-- Embedding is re-computed on every Write or Edit (stays current as chain grows)
+### Standalone memories — durable facts
 
-### What each step captures
+```bash
+memoryschema remember <kebab-name> --desc "<one line, <=120 chars>" \
+  --obs "atomic fact" [--obs "..."] [--uses <target>] [--supersedes <outdated>] \
+  [--key DOMAIN.fact] [--importance N]
+```
 
-- `<memory:observation>` — "Step N: <what happened in this response>"
-- `<memory:description>` — updated one-line summary of the chain so far
-- `<memory:reasoning>` — updated narrative connecting all steps so far
-- `<memory:prompt>` — the original trigger question (set on create, kept on updates)
-- `<memory:relations>` — USES links to any evidence memories referenced
-
-### Additional standalone memories
-
-The active chain is the default. Additionally write standalone memories when:
-- A durable fact is established (semantic — persists beyond the chain)
-- A reusable pattern is validated (procedural — reinforced by access)
-- A critical decision or correction occurs (high importance, standalone)
-
-Standalone memories are immediately read-only after write (unauthorised). They should be linked from the chain via USES relations.
-
----
+Write standalone memories when: a durable fact is established (semantic), a reusable pattern is validated (procedural), or a critical decision/correction occurs. `--key` gives a fact identity — a later `remember` with the same key deterministically supersedes the old holder (point-in-time recall via `recall --as-of`). Standalone memories are read-only after creation; link them from the chain via `--uses`.
 
 ## What to capture
 
-The thinking, not just the conclusion. A future session should be able to reconstruct the reasoning path, not just the outcome.
-
-- `<memory:prompt>` — what was asked (set on chain creation)
-- `<memory:reasoning>` — why this approach, what alternatives, what connections (updated each step)
-- `<memory:observation>` — "Step N: <specific facts and actions>"
-- `<memory:chain>` — reasoning chain context: what investigation this memory belongs to (same text for all memories in the same chain — enables clustering via chain-space similarity)
+The thinking, not just the conclusion. A future session should be able to reconstruct the reasoning path, not just the outcome: what was asked (prompt), why this approach and what alternatives (reasoning), specific facts and actions (observations/steps), and what investigation it belongs to (chain context).
 
 ## Importance
 
-Importance means **salience** — how important this memory is for future sessions. Use the full 1-10 range:
+Importance means **salience** — how important this memory is for future sessions. Use the full 1-10 range (the write gate nudges you if you always pick the store's mode):
 
 | Range | Use for |
 |-------|---------|
@@ -86,21 +64,10 @@ Importance means **salience** — how important this memory is for future sessio
 
 Scope (which project sees a memory) is handled by the `project` field, not importance.
 
-## File path
+## Health
 
-Write to `memory/<name>.md` where `<name>` is kebab-case and describes the content.
-
-## Chain entities
-
-After multi-step reasoning, create a **chain entity** (see Rule 9 in memory-schema.md) that captures the full sequence from trigger to conclusion. Chain entities:
-
-- Distill episodic steps into a persistent semantic summary
-- Link to evidence via USES relations (cascade brings in details on recall)
-- Are named with `chain-` prefix for discoverability
-- Should be created when: an investigation concludes, an experiment produces results, debugging resolves an issue, or a design decision is reached through alternatives
-
-Prefer one chain entity over multiple disconnected episodic memories when the reasoning forms a coherent sequence.
+`memoryschema preflight` (dependency gate) · `sync` (read-only drift report) · `reconcile` (heals all layers to the `memory/*.md` set). Run `sync` if anything looks inconsistent.
 
 ## Compact resilience
 
-The PostToolUse hook automatically appends working memory entries to MEMORY.md. After a `/compact` event, all working memory remains visible in context via the MEMORY.md index. L0 budget enforcement evicts lowest-scoring entries when the index exceeds the configured token limit.
+The write path and hook REGENERATE `MEMORY.md` as a token-budgeted index of the active set on every write. After a `/compact` event, working memory stays visible via that index; lowest-importance entries are dropped first when over budget (the header says how many).

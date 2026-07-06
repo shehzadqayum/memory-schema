@@ -68,6 +68,20 @@ class TestEntryToNodeProps:
         assert props["observations"] == []
         assert props["observations_text"] == ""
 
+    def test_lifecycle_fields_carried(self):
+        """reconcile rebuilds Neo4j through this function — dropping the
+        lifecycle/temporal fields makes the projection lossy (the third
+        whitelist of the class that bit store.py and neo4j_store.py)."""
+        entry = {"name": "t", "key": "EURUSD.bias", "valid_from": "2026-07-01",
+                 "superseded_at": "2026-07-05", "superseded_by": "successor",
+                 "promoted_to": "CLAUDE.md#x"}
+        props = entry_to_node_props(entry)
+        assert props["key"] == "EURUSD.bias"
+        assert props["valid_from"] == "2026-07-01"
+        assert props["superseded_at"] == "2026-07-05"
+        assert props["superseded_by"] == "successor"
+        assert props["promoted_to"] == "CLAUDE.md#x"
+
 
 class TestMigrate:
     def test_dry_run(self, jsonl_file):

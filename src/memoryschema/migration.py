@@ -33,11 +33,19 @@ def load_jsonl(path):
 
 
 def entry_to_node_props(entry):
-    """Convert JSONL entry to Neo4j node properties."""
+    """Convert JSONL entry to Neo4j node properties.
+
+    Must carry the lifecycle/temporal fields (key, valid_from, superseded_at,
+    superseded_by, promoted_to) — reconcile rebuilds Neo4j THROUGH this function,
+    so a whitelist miss here makes the "rebuildable projection" lossy even when
+    the store upsert whitelists are correct (the third whitelist of this class).
+    """
     props = {}
     for key in ('name', 'schema', 'type', 'status', 'description', 'importance',
                  'body', 'source', 'filepath', 'prompt', 'reasoning',
-                 'project', 'created_at', 'last_accessed', 'access_count'):
+                 'project', 'created_at', 'last_accessed', 'access_count',
+                 'key', 'valid_from', 'superseded_at', 'superseded_by',
+                 'promoted_to'):
         if key in entry and entry[key] is not None:
             props[key] = entry[key]
 

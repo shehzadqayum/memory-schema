@@ -6,11 +6,7 @@
 
 ## What to capture
 
-Source content — documents, posts, tweets, articles. The entity is a container for someone else's words. No reasoning is involved.
-
-- `<memory:observation>` — holds the source text (one observation per discrete fact or paragraph)
-- No `<memory:prompt>` (there was no prompt — the content already existed)
-- No `<memory:reasoning>` (there was no decision — the content was imported as-is)
+Source content — documents, posts, tweets, articles. The entity is a container for someone else's words. No reasoning is involved: observations hold the source text (one per discrete fact or paragraph); no prompt (there was no prompt — the content already existed); no reasoning (nothing was decided — the content was imported as-is).
 
 ## Importance
 
@@ -27,7 +23,7 @@ All corpus memory is `semantic` — facts and content that persist indefinitely.
 
 Write an ingest script that:
 1. Reads source files (any format)
-2. Converts each to a `<memory:entity>` with observations holding the content
+2. Builds one entity per item — current format is schema v5 via `write_index.create_entity_file` with `MEMORYSCHEMA_V5=1` (the shipped example scripts still emit legacy v4 XML, which parses fine); see `docs/memory-system-specification.md` §3 for the format
 3. Embeds in batches via Voyage AI
 4. Writes `.md` files to `memory/<subdir>/`
 5. Bulk-writes to store (Neo4j or JSONL)
