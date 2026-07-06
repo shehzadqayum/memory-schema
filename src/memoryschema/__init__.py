@@ -1,5 +1,5 @@
 """
-memoryschema — XML-based memory entity system.
+memoryschema — file-first memory entity system (schema v5; legacy v4 XML parses).
 
 Install:
     pip install memory-schema[all]

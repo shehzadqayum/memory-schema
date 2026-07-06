@@ -1,5 +1,8 @@
 # Phase 7 — Session Report Sequencing Amendments
 
+> **HISTORICAL** — an operator patch specification for the shared session-workflow
+> skills (June 2026). Retained as an implementation-history record.
+
 **Status:** Patch specification for operator review and application.
 **Reason:** The session-workflow skills (checkpoint, session-close) are shared infrastructure in `~/.claude/skills/`, used by every project on this machine. Direct editing carries regression risk for unrelated projects. This patch specification documents the exact changes for the operator to apply.
 

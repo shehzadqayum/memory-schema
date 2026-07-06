@@ -55,7 +55,7 @@ Hook Management:
 
 Diagnostics & Inheritance:
     preflight      Verify deps are up (Docker/Neo4j/Voyage) — the always-on health gate
-    doctor         21-point health check (TOML, rules inheritance, tests)
+    doctor         Full health-check suite (TOML, rules inheritance, tests)
     rules          Show effective rules with inheritance markers
     config         Show effective config with inheritance chain
 """

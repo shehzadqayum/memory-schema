@@ -2,6 +2,63 @@
 
 ## [Unreleased]
 
+### Added (2026-07-01..05 — Schema v5 & the deterministic write path)
+- **Schema v5**: YAML frontmatter (machine scalars + `relations:` block) + markdown body
+  (description lead, `## Summary/Observations/Log/Reasoning/Prompt/Chain/Notes`) —
+  `format_v5.py`; `schema: 5` discriminator; name from filename; prose never enters a
+  structured layer (the M14 XML-corruption class is impossible by construction). v4 XML
+  still parses via `tags.py` dispatch; v5 creation gated on `MEMORYSCHEMA_V5=1`; the
+  Helios corpus fully migrated.
+- **Deterministic write path** (`write_index.py`): `memoryschema remember` (--desc/--obs/
+  --type/--importance/--reasoning/--uses/--informs/--supersedes/--key/--valid-from) and
+  `memoryschema chain step --stdin [--desc][--reasoning][--uses]` — plain text in; code
+  escapes, auto-numbers, serializes with round-trip validation/rollback, and self-indexes
+  with **dual-write to Neo4j AND JSONL** (replaces the hook's either/or drift). First
+  chain step bootstraps the chain file (v5 skeleton).
+- **Temporal validity**: fact keys (`--key`) with deterministic write-time supersession
+  (`find_active_by_key`), `valid_from`/`superseded_at`/`superseded_by` interval fields,
+  `recall --as-of` point-in-time filtering, and **file-first lifecycle**
+  (`set_lifecycle` writes status/temporal/`promoted_to` into frontmatter so `reconcile`
+  cannot resurrect archived/superseded entities).
+- **Vector sidecar** (`vector_sidecar.py`): embeddings externalized to
+  `memory/.embeddings/<name>.npz` (store.jsonl was 8.4 MB / 91.5% vector JSON →
+  ~0.7 MB); hash-gated rewrite; transparent rehydration; pure-inline fallback sans numpy.
+- **Recency-biased embedding composition** (`embedding_input.py`): `DEFAULT_MAX_CHARS`
+  2000→8000; observations/reasoning truncate from the tail (newest first, first-obs
+  anchor); `embed_input_hash` provenance (sha256 of the full untruncated composition)
+  drives sidecar skip-if-unchanged and reconcile stale-detection; all 7 spaces embedded
+  in ONE batched Voyage call.
+- **Dream pass** (`dream_report.py`, `memoryschema dream`): read-only consolidation
+  candidate report — released chains, oversized active chain (>40 obs), stale keyed
+  facts (≥14 d), never-surfaced (7-day grace), near-duplicates (cosine ≥0.80),
+  attribution review, promotion candidates. Judgment + actions live in the /dream-pass
+  skill.
+- **Attribution sampling** (`attribution.py`, `memoryschema attribution`): citation log
+  (`.memoryschema/citation_log.jsonl`) written the moment `--uses`/`--informs` execute;
+  joined against the recall log (24 h window) → per-memory attribution_rate; recall
+  telemetry (`recall_log.py`, `memoryschema recall-stats`).
+- **Skill promotion**: `promoted_to` frontmatter field via `set_lifecycle`; both store
+  merge whitelists extended with the five lifecycle/temporal fields (a whitelist miss
+  silently dropped them on updates to existing entities — found live, fixed with
+  regression tests).
+- **Ops**: `memoryschema preflight` dependency gate (+ implicit throttled CLI gate,
+  container auto-start), `sync` read-only name-set drift, `reconcile` three-layer heal
+  (malformed + shrink guards, provenance-hash re-embed, atomic writes, L0 rebuild);
+  `l0_budget.rebuild_index` full-regenerate replaces append+evict; `.env` autoload in
+  CLI and hook; hook Windows-path patch; injection kernel rewrite (~534 tokens).
+
+### Changed (2026-07-05 — Documentation audit)
+- `docs/memory-system-specification.md` rebuilt as **the single source of truth**
+  (rebuildable-from-scratch spec: schema, write path, storage, retrieval, telemetry,
+  consolidation, ops, config, complete CLI, test map).
+- Deleted `docs/schema.md`, `docs/technical-reference.md`, `docs/implementation-guide.md`,
+  `docs/system-overview.md` (superseded by the specification; see git history).
+- README rewritten (v5 quickstart; fixed the `init --project` invocation, hook-pipeline
+  order, degradation claims, test counts); `docs/design/` + `docs/plans/` bannered
+  historical; hierarchy-and-inheritance updated (max_inherit_depth=3, Neo4j depth
+  post-filter, escalating over-fetch); hook comments now cite the spec §9.4;
+  doctor "21-point" labels and the pyproject "XML-based" description corrected.
+
 ### Fixed (Consumer Project Compatibility)
 - Hook Python path: replaced hardcoded user-specific path with portable resolution chain (argument > env var > auto-detect > bare python3). `hook install` and `plugin deploy` embed `sys.executable` in the hook command.
 - Doctor test check: now targets the memory-schema package's own tests instead of the consumer project's tests when invoked from another project. Excludes `test_cli_doctor.py` from the subprocess pytest to prevent infinite recursion.

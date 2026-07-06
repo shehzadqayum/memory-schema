@@ -39,7 +39,7 @@ Merges iterative working memory files into consolidated clusters.
 ```bash
 python consolidate_working.py \
   --memory-dir /path/to/memory \
-  --clusters clusters.json
+  [--output-dir DIR] [--min-group 2] [--dry-run]
 ```
 
 ## Writing Your Own Ingest Script
@@ -49,7 +49,9 @@ python consolidate_working.py \
    ```python
    memory = {
        'name': 'source-123',
-       'schema': 3,
+       'schema': 4,   # the scripts emit v4 XML files (still parses); current entity
+                      # creation is schema v5 via write_index.create_entity_file
+                      # with MEMORYSCHEMA_V5=1 — see docs/memory-system-specification.md §3
        'type': 'semantic',
        'importance': 5,
        'description': 'One-line summary',

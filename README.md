@@ -1,386 +1,150 @@
 # memory-schema
 
-XML-based memory entity system with JSONL/Neo4j storage, Voyage AI embeddings, hierarchical agent nesting, and Claude Code integration.
+File-first memory system for LLM agents — schema v5 entities (YAML frontmatter +
+markdown body), a deterministic CLI write path, JSONL/Neo4j dual storage, Voyage AI
+multi-space embeddings, and Claude Code hook integration.
+
+> **The single source of truth for how this system works is
+> [`docs/memory-system-specification.md`](docs/memory-system-specification.md).**
+> This README is a quickstart; on any divergence, the specification wins.
 
 ## Quickstart
 
 ```bash
-pip install memory-schema[all]
+pip install memory-schema[all]          # in Helios: vendored, installed in .venv only
 cd ~/Projects/my-project
-memoryschema init --project my-project --scopes working --with-neo4j
+memoryschema --project my-project init --scopes working --with-neo4j
 memoryschema hook install
-export VOYAGE_API_KEY=voy-xxxxx
-memoryschema status
+export VOYAGE_API_KEY=voy-xxxxx        # or put it in .env — auto-loaded by CLI and hook
+export MEMORYSCHEMA_V5=1               # author schema-v5 entities (recommended)
+memoryschema preflight && memoryschema status
 ```
 
-Done. Claude Code will now selectively write memory entities when decisions, corrections, or novel facts are established.
+Note `--project` is a **group-level** option — it comes before the subcommand.
 
----
+## The write path (how memories are created)
 
-## Install
+Plain text in; code does the structuring, escaping, numbering, and indexing
+(spec §4 — hand-authored markup corrupting the store is impossible by construction):
 
 ```bash
-# Minimal (JSONL store, no embeddings, no Neo4j)
-pip install memory-schema
+# working memory: one active chain, steps auto-numbered into the v5 ## Log
+memoryschema chain start chain-my-investigation
+memoryschema chain step --stdin --desc "evolving summary" <<'EOF'
+What happened, decisions, results. Raw < > & are safe here.
+EOF
+memoryschema chain release
 
-# With Neo4j graph store
-pip install memory-schema[neo4j]
+# durable facts
+memoryschema remember eurusd-support-zone \
+  --desc "EURUSD support at 1.0850 (weekly)" \
+  --obs "three weekly rejections since March" \
+  --importance 6 --uses chain-my-investigation
 
-# With Voyage AI embeddings
-pip install memory-schema[embeddings]
-
-# Everything
-pip install memory-schema[all]
-
-# Development
-pip install memory-schema[all,dev]
+# temporal facts: same --key => deterministic supersession + point-in-time recall
+memoryschema remember eurusd-bias-july --desc "..." --obs "..." --key EURUSD.bias
+memoryschema recall "eurusd bias" --as-of 2026-06-15
 ```
 
-**Dependencies:**
-- `click` — CLI framework (always installed)
-- `neo4j` — Neo4j Python driver (optional: `[neo4j]`)
-- `voyageai` — Voyage AI embeddings API (optional: `[embeddings]`)
-- `numpy` — vectorized scoring (optional: `[numpy]`, graceful fallback to pure Python)
+Every write parses → authorizes (active-chain model) → embeds (7 spaces, one batched
+call) → gates (reject/quarantine) → **dual-writes Neo4j AND JSONL** → regenerates the
+`MEMORY.md` L0 index. Hand-editing `memory/*.md` still works — the PostToolUse hook
+indexes it — but is the fallback path, not the primary one.
 
----
-
-## Initialize Project
+## Retrieval
 
 ```bash
-memoryschema init --project my-project --scopes working,corpus --with-neo4j
+memoryschema recall "query" --limit 5      # semantic cascade + rerank + telemetry
+memoryschema search "keyword"              # plain keyword/fulltext
+memoryschema get <name>  ·  list  ·  status
 ```
 
-Creates:
-```
-my-project/
-├── memory/
-│   └── MEMORY.md                      # L0 index (auto-loaded by Claude Code)
-├── docker-compose.yml                 # Neo4j container config
-├── .env.example                       # Environment variable reference
-└── .claude/rules/
-    ├── memory-schema.md               # Schema rules (auto-loaded)
-    ├── memory-working.md              # Working memory guidelines (selective write)
-    └── memory-corpus.md               # Corpus guidelines (importance 4-7)
-```
+Scoring blends recency, importance, and variance-weighted multi-space relevance;
+results cascade through relations, backlinks, and k-NN associations (spec §6).
 
-### Without Neo4j (JSONL only)
+## Consolidation & telemetry
 
 ```bash
-memoryschema init --project my-project --scopes working
+memoryschema dream          # read-only candidate report (distill/merge/stale/promote)
+memoryschema attribution    # which recalled memories actually get cited
+memoryschema recall-stats   # retrieval telemetry
 ```
 
-Works immediately. Add Neo4j later with `memoryschema neo4j deploy`.
+The dream pass: code discovers candidates, an LLM session judges, safe primitives act
+(spec §7–8).
 
-### TOML Configuration
-
-`memoryschema init` generates a `memoryschema.toml` config file. For nested agents, config inherits upward — parent TOML values override child on conflict:
+## Health
 
 ```bash
-# Parent agent
-memoryschema --project org init
-
-# Child agent (inside parent)
-cd projects/team-alpha
-memoryschema --project org.team-alpha init
-
-# Inspect inheritance
-memoryschema config --chain
-memoryschema rules --conflicts
+memoryschema preflight      # dependency gate (auto-starts a stopped Neo4j container)
+memoryschema sync           # read-only three-layer drift report
+memoryschema reconcile      # heal JSONL + Neo4j + L0 to the memory/*.md set
+memoryschema doctor         # full diagnostic suite
 ```
 
----
+## Install extras
 
-## Register Hook
+| extra | provides |
+|-------|----------|
+| *(none)* | JSONL store, keyword search — stdlib + click only |
+| `[neo4j]` | Neo4j graph store (neo4j ≥ 5.0) |
+| `[embeddings]` | Voyage AI embeddings (voyageai ≥ 0.3, lazy-imported) |
+| `[numpy]` | vectorized scoring + the `.npz` vector sidecar (pure-Python fallback without) |
+| `[all]` / `[all,dev]` | everything / + pytest toolchain |
 
-```bash
-memoryschema hook install
-```
+## Degradation model
 
-Adds the PostToolUse and Stop hooks to `~/.claude/settings.json`. The install command embeds the current Python interpreter path in the hook command, so the hook always uses the correct Python regardless of shell environment. The PostToolUse hook:
-1. Fires on every Write or Edit to `memory/*.md`
-2. Parses the `<memory:entity>` XML
-3. Runs write gate pipeline (REJECT / QUARANTINE / ACCEPT)
-4. Embeds via Voyage AI (if key set, non-blocking on failure)
-5. Indexes to Neo4j (primary) or JSONL (fallback)
-6. L0: update MEMORY.md index (token-budget enforced)
-7. Appends to MEMORY.md (compact resilience)
-8. L0 budget enforcement (evicts lowest-scoring entries if over token limit)
+| dependency down | behavior |
+|-----------------|----------|
+| Neo4j | reads degrade to JSONL with a **loud stderr banner**; `index`/`write`/`import` hard-fail by default (`MEMORYSCHEMA_REQUIRE_NEO4J=false` to relax); `remember`/`chain step` degrade to the JSONL leg with a warning; heal drift with `reconcile` |
+| Voyage | indexed unembedded (warning); recall degrades to keyword/structure |
+| Docker engine | as Neo4j; preflight reports "start Docker Desktop" (never auto-started) |
+| numpy | vectors inline in store.jsonl; pure-Python scoring |
 
----
+Nothing degrades silently (spec §9 + per-layer matrices).
 
-## Configure Voyage AI
+## Hooks (Claude Code)
 
-```bash
-export VOYAGE_API_KEY=voy-xxxxx
-memoryschema voyage status
-```
+`memoryschema hook install` registers the PostToolUse (Write|Edit matcher, 10 s) and
+Stop (5 s) hooks in `~/.claude/settings.json` with the current interpreter path
+embedded. `hook status / check / scan / upgrade` manage them. ⚠ In Helios the installed
+PostToolUse script carries two local patches (Windows path normalization + project
+`.env` autoload) — **re-apply them after any `hook upgrade`** (spec §9.4).
 
-Get your key at [dash.voyageai.com](https://dash.voyageai.com/).
-
-Without a key, the system works but without semantic search — structured queries only.
-
----
-
-## Verify Deployment
-
-```bash
-memoryschema status
-```
-
-Output:
-```
-Backend: Neo4jMemoryStore
-Nodes:   0
-Store:   /path/to/memory/store.jsonl
-URI:     bolt://localhost:7687
-```
-
----
-
-## First Memory
-
-Write a memory file:
-
-```xml
-<memory:entity schema="4" name="first-memory" type="semantic" importance="7">
-  <memory:description>My first memory entity</memory:description>
-  <memory:reasoning>Testing the memory system</memory:reasoning>
-</memory:entity>
-```
-
-Index it:
-```bash
-memoryschema write memory/first-memory.md
-```
-
-Query it:
-```bash
-memoryschema recall "first memory"
-```
-
----
-
-## Graceful Degradation
-
-Each external service is optional. The system degrades gracefully:
-
-| Without | Impact | How to add later |
-|---------|--------|-----------------|
-| Neo4j | Reads degrade to the JSONL store with a loud banner; write-class commands hard-require it by default | `memoryschema neo4j deploy` + `memoryschema migrate jsonl-to-neo4j` |
-| Voyage AI | No semantic search (keyword only) | `export VOYAGE_API_KEY=...` + `memoryschema embed --all` |
-| Docker | No Neo4j (JSONL only) | Install Docker, then `memoryschema neo4j deploy` |
-| Claude Code | No auto-indexing (manual `memoryschema write`) | Install Claude Code, `memoryschema hook install` |
-
-> **Default mode (`require_neo4j`, on by default).** The always-on `memoryschema preflight` gate verifies
-> Neo4j + Voyage are up. Reads degrade *loudly* to JSONL, but the explicit MATERIALIZE commands
-> (`index` / `write` / `import`) **fail loud** rather than writing JSONL-only that then drifts. Set
-> `MEMORYSCHEMA_REQUIRE_NEO4J=false` to restore the old silent JSONL-only behaviour. Heal any drift with
-> `memoryschema reconcile`.
-
----
-
-## CLI Reference
-
-### Setup
-| Command | Description |
-|---------|-------------|
-| `memoryschema init` | Initialize project (memory dir, docker-compose, rules) |
-| `memoryschema neo4j deploy` | Full Neo4j deployment (pull, start, schema, verify) |
-| `memoryschema neo4j up/down` | Start/stop Neo4j container |
-| `memoryschema neo4j status` | Container state, connectivity, node count |
-| `memoryschema neo4j schema` | Create/verify indexes (idempotent) |
-| `memoryschema neo4j reset --confirm` | Drop all data, recreate schema |
-| `memoryschema neo4j logs` | Stream container logs |
-| `memoryschema neo4j shell` | Open Cypher shell |
-| `memoryschema voyage status` | Check API key, test embed |
-| `memoryschema voyage test <text>` | Embed text, show vector stats |
-| `memoryschema hook install` | Register PostToolUse and Stop hooks |
-| `memoryschema hook uninstall` | Remove PostToolUse and Stop hooks |
-| `memoryschema hook status` | Show version, staleness, registration |
-| `memoryschema hook upgrade` | Upgrade stale hooks to current version (v2) |
-| `memoryschema hook check` | Run 8 diagnostic checks on hook scripts |
-| `memoryschema hook scan` | Find all hook installations across projects |
-| `memoryschema hook test` | Test hook execution on a memory file |
-
-### Operations
-| Command | Description |
-|---------|-------------|
-| `memoryschema status` | Backend, node count, store path |
-| `memoryschema recall <query> [--project]` | Semantic search with cascade (scoped to hierarchy) |
-| `memoryschema get <name>` | Retrieve single entity |
-| `memoryschema list` | List entities with filters |
-| `memoryschema write <file>` | Parse, validate, embed, index |
-| `memoryschema delete <name> --confirm` | Remove entity |
-| `memoryschema search <text> [--project]` | Keyword search (scoped to subtree) |
-| `memoryschema validate [path]` | Schema validation |
-| `memoryschema archive <name>` | Set status=archived (exclude from recall) |
-| `memoryschema unarchive <name>` | Restore archived → active |
-| `memoryschema reactivate <name>` | Restore superseded → active |
-| `memoryschema quarantine list\|review\|release\|reject` | Review quarantined entries |
-| `memoryschema force --type world-change --target NAME` | Record typed force event |
-| `memoryschema decline --reason "..."` | Record write decline (salience instrumentation) |
-
-### Indexing
-| Command | Description |
-|---------|-------------|
-| `memoryschema index` | Batch index un-indexed files |
-| `memoryschema embed --prefix/--all` | Re-embed entries |
-| `memoryschema embed --coverage` | Embedding coverage stats |
-| `memoryschema associations` | Show/recompute k-NN |
-| `memoryschema reflect` | Cluster episodic → semantic summaries |
-| `memoryschema eval` | Retrieval quality evaluation (recall@k, MRR, nDCG) |
-
-### Data
-| Command | Description |
-|---------|-------------|
-| `memoryschema migrate jsonl-to-neo4j` | JSONL to Neo4j |
-| `memoryschema migrate neo4j-to-jsonl` | Neo4j to JSONL |
-| `memoryschema sync` | Report drift (read-only) across .md / JSONL / Neo4j |
-| `memoryschema reconcile` | Fix drift: rebuild the store to the .md set, push Neo4j, prune, verify |
-| `memoryschema backup` | Full or selective backup |
-| `memoryschema restore <archive>` | Restore from backup |
-| `memoryschema reset --confirm` | Wipe data |
-| `memoryschema clean --confirm` | Complete removal |
-| `memoryschema export` | Portable archive |
-| `memoryschema import <source>` | Import from archive |
-
-### Diagnostics & Inheritance
-| Command | Description |
-|---------|-------------|
-| `memoryschema preflight` | Verify deps are up (Docker/Neo4j/Voyage) — the always-on health gate |
-| `memoryschema doctor` | 21-point health check (includes TOML + rules inheritance) |
-| `memoryschema rules` | Show effective rules with inheritance markers |
-| `memoryschema rules --conflicts` | Show child rules overridden by parent |
-| `memoryschema config` | Show effective config |
-| `memoryschema config --chain` | Show config inheritance chain with sources |
-
-All query commands support `--json` for agent consumption. All destructive commands require `--confirm`.
-
----
-
-## Claude Code Integration
-
-The package integrates with Claude Code via a **PostToolUse hook** — no MCP server required. The hook
-ships inside the package (`memoryschema/hooks/hook-post-write.sh`) and is registered into your
-`~/.claude/settings.json` by the CLI:
-
-```bash
-# 1. Install the Python package (prerequisite)
-pip install memory-schema[all]
-
-# 2. Register the PostToolUse + Stop hooks (writes to ~/.claude/settings.json)
-memoryschema hook install
-memoryschema hook status      # verify registration
-```
-
-The hook fires on every Write/Edit to a `memory/*.md` file: it parses, validates, gate-checks,
-embeds across the 7 spaces, and indexes into the active store. All logic lives in the pip-installed
-`memoryschema` package; `memoryschema hook upgrade` re-points the registration after an upgrade.
-
-### Hybrid memory scope
-
-- **Project store**: `memory/` in the project root (isolated per project)
-- **User store**: `~/.claude/memory/` (cross-project knowledge, fallback)
-
-The hook writes to the project store when available, falls back to user-level.
-
----
-
-## Architecture
-
-**Source of truth:** `docs/schema.md` — the memory schema document.
-
-**Delivery:** Schema rules deploy to `.claude/rules/memory-schema.md` (auto-loaded, no CLAUDE.md conflict).
-
-**Enforcement:** Correlates with importance attribute (1-10):
-- **8-10** (working memory): selective — write on decisions, corrections, novel facts
-- **4-7** (corpus): standard — batch imported
-- **1-3** (advisory): write when significant
-
-**Storage:** 5 layers with graceful degradation:
-```
-L0: MEMORY.md → L1a: Markdown files → L1b: JSONL → L2a: Embeddings → L2b: Neo4j
-```
-
-**Hierarchical Inheritance:** Projects nest as agents via dot-notation (`parent.child`). Parent's config and rules override child's on conflict. Config via `memoryschema.toml` files with upward chain walking. CLI > env vars > parent TOML > child TOML > defaults. See `docs/system-overview.md` for details.
-
----
-
-## Graceful Degradation
-
-| Component | If unavailable | Behavior | Fix |
-|-----------|---------------|----------|-----|
-| Neo4j | JSONL fallback | Silent, automatic — `get_store()` tries Neo4j first | `memoryschema neo4j deploy` |
-| Voyage AI | No embeddings | Keyword search only, entries indexed without vectors | `export VOYAGE_API_KEY=...` |
-| Docker | No Neo4j available | JSONL only — all features except graph traversal | Install Docker |
-| Hook | No auto-indexing | Manual indexing via `memoryschema write <file>` | `memoryschema hook install` |
-
----
-
-## Troubleshooting
-
-| Problem | Cause | Fix |
-|---------|-------|-----|
-| `memoryschema: command not found` | Not installed or not on PATH | `pip install memory-schema` |
-| Neo4j connection refused | Container not running | `memoryschema neo4j up` |
-| No semantic search results | VOYAGE_API_KEY not set | `export VOYAGE_API_KEY=voy-xxxxx` |
-| Hook not firing | Not registered | `memoryschema hook install` |
-| `ImportError: neo4j` | Optional dep not installed | `pip install memory-schema[neo4j]` |
-| `ImportError: voyageai` | Optional dep not installed | `pip install memory-schema[embeddings]` |
-| Schema validation errors | Invalid entity XML | `memoryschema validate memory/file.md` |
-| MEMORY.md not updating | Hook timeout or failure | Check `memoryschema hook status` |
-
----
+Hybrid scope: the hook writes to the project's `memory/` when the written file is under
+one, falling back to `~/.claude/memory/` for user-level knowledge.
 
 ## Testing
 
 ```bash
-# Install dev dependencies
-pip install memory-schema[all,dev]
-
-# Run tests
-pytest tests/ -v
-
-# Run with coverage
-pytest tests/ --cov=memoryschema --cov-report=term-missing
-
-# Run specific test file
-pytest tests/test_store.py -v
+cd packages/memory-schema && python -m pytest tests/    # env-free, hermetic
 ```
 
-**707 tests** across 36 test files covering all modules:
+~870 tests across 56 files; external services mocked; a conftest tripwire guards the
+live Neo4j store when real credentials are present. The suite is the
+rebuild-verification map (spec §13). `memoryschema doctor` verifies a live deployment.
 
-| Category | Files | Tests | What's tested |
-|----------|------:|------:|---------------|
-| Core modules | 7 | 236 | config, discovery, validator, tags, store, consolidation, hierarchy |
-| Mocked deps | 5 | 48 | embeddings, neo4j_store, schema, migration, reembed |
-| Lazy imports | 1 | 23 | __init__.py public API, __getattr__, __all__ |
-| CLI commands | 13 | 116 | All CLI modules via Click CliRunner (hook, plugin, chain, etc.) |
-| Shared utils | 1 | 25 | _hooks_util: registration, removal, settings I/O, constants |
-| Plugin deploy | 1 | 19 | deploy, uninstall, status commands + manifest |
-| Integration | 2 | 76 | inheritance (config chain), write_gate, eval harness |
+## Troubleshooting
 
-**Mocking strategy:** External dependencies (voyageai, neo4j, Docker) are mocked with `unittest.mock.patch` — no real API calls, containers, or network required to run tests.
-
-**Diagnostics:** `memoryschema doctor` runs 22 health checks against the live system (always tests the memory-schema package, not the consumer project). Use it to verify a real deployment:
-
-```bash
-memoryschema doctor          # Human-readable status report
-memoryschema doctor --json   # Machine-readable for agents
-memoryschema doctor --fix    # Auto-remediation suggestions
-```
-
----
+| Problem | Fix |
+|---------|-----|
+| `memoryschema: command not found` | `pip install memory-schema` (Helios: activate `.venv`) |
+| Neo4j connection refused | `memoryschema preflight` (auto-starts the container) or `neo4j up` |
+| No semantic search results | set `VOYAGE_API_KEY` (`.env`), then `memoryschema embed --all` |
+| Hook not firing | `memoryschema hook status` / `hook check` |
+| Unicode crash on Windows console | `export PYTHONUTF8=1 PYTHONIOENCODING=utf-8` |
+| Layers disagree / stale entries | `memoryschema sync` then `memoryschema reconcile` |
 
 ## Documentation
 
-- `docs/schema.md` — Memory schema specification (source of truth)
-- `docs/hierarchy-and-inheritance.md` — Agent hierarchy and config/rules inheritance reference
-- `docs/implementation-guide.md` — Step-by-step deployment guide
-- `docs/system-overview.md` — Conceptual overview
-- `docs/technical-reference.md` — Architecture, API, configuration
-
----
+- [`docs/memory-system-specification.md`](docs/memory-system-specification.md) — **the
+  single source of truth** (schema, write path, storage, retrieval, telemetry,
+  consolidation, ops, config, complete CLI, test map)
+- [`docs/hierarchy-and-inheritance.md`](docs/hierarchy-and-inheritance.md) — project
+  nesting + config/rules inheritance deep-dive (non-normative)
+- [`docs/design/`](docs/design/), [`docs/plans/`](docs/plans/),
+  [`docs/reports/`](docs/reports/) — historical design records and session reports
+- [`CHANGELOG.md`](CHANGELOG.md) — change history
 
 ## License
 

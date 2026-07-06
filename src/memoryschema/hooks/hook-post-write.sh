@@ -10,7 +10,7 @@
 # Output format (PostToolUse event):
 #   PostToolUse hooks support hookSpecificOutput with additionalContext.
 #   This hook returns no stdout JSON (pass-through via exit code only).
-#   See docs/technical-reference.md § Hook Output Formats.
+#   See docs/memory-system-specification.md §9.4 (hook output formats).
 #
 # Exit codes:
 #   0 — success (or non-memory write, silently ignored)

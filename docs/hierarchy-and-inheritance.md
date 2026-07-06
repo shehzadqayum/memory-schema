@@ -1,5 +1,9 @@
 # Agent Hierarchy and Inheritance
 
+> Feature deep-dive (non-normative). The single source of truth is
+> [`memory-system-specification.md`](memory-system-specification.md) — see §10.4 for the
+> normative summary; on divergence, the specification wins.
+
 ## Overview
 
 Two independent but complementary features:
@@ -7,7 +11,7 @@ Two independent but complementary features:
 - **Hierarchy** (`hierarchy.py`) — dot-notation project names encode parent/child relationships. Controls which memories an agent can see.
 - **Inheritance** (`inheritance.py`) — TOML config files and `.claude/rules/` directories cascade from parent to child. Parent always wins on conflict.
 
-Both are backward compatible. Flat project names and env-var-only config still work unchanged. Schema is v4 — dot-notation is a naming convention, not a structural schema change.
+Both are backward compatible. Flat project names and env-var-only config still work unchanged. Dot-notation is a naming convention, not a structural schema change (it predates and survives schema v5).
 
 ---
 
@@ -86,9 +90,9 @@ An agent at `org.team` running `recall` sees:
 
 | Value | Behavior |
 |-------|----------|
-| `None` (default) | Unlimited — full ancestor/descendant traversal |
+| `None` | Unlimited — full ancestor/descendant traversal (the low-level `project_matches_scope` default) |
+| `3` | **The recall default** — `MemoryConfig.max_inherit_depth = 3` (TOML key `retrieval.max_inherit_depth`); the CLI threads it into every recall |
 | `1` | Direct parent/child only |
-| `2` | Up to grandparent/grandchild |
 | `0` | Exact match only (but unscoped still visible) |
 
 ### 2.3 Filter Mode (Subtree-Only) — search(), list_all()
@@ -132,9 +136,9 @@ WHERE node.project IS NULL
    OR $project STARTS WITH (node.project + '.')
 ```
 
-Vector search over-fetches 3x then post-filters (the vector index doesn't support property pre-filtering).
+Vector search over-fetches then post-filters (the vector index doesn't support property pre-filtering) — escalating multipliers 3×, 9×, then 100× of `top_k` until enough results survive the scope predicate.
 
-**Known limitation:** `max_depth` is not honored in Neo4j queries. All Neo4j queries use unlimited depth.
+Depth bounding in Neo4j: the Cypher `STARTS WITH` traversal can't enforce depth, so `Neo4jStore.recall` applies a Python-side post-filter — `project_matches_scope(entry, project, max_depth=max_inherit_depth)` — after the query. (The old "Neo4j ignores max_depth" limitation is fixed.)
 
 ---
 
@@ -150,7 +154,7 @@ Highest to lowest precedence:
 4. **Child `memoryschema.toml`**
 5. **Dataclass defaults** — hardcoded fallbacks in `MemoryConfig`
 
-Env vars are applied via `setattr` after instance construction in `from_toml()`, ensuring they override everything.
+Env vars are layer 2: they override both TOML layers and the defaults, but CLI overrides are applied last and beat env (matching the precedence list above).
 
 ### 3.2 TOML File Format
 
@@ -363,7 +367,7 @@ memoryschema doctor
 | `flatten_toml` | `toml_dict: dict` | `dict` | Nested → flat config dict |
 | `walk_config_chain` | `project_root: Path` | `list[Path]` | Child-first TOML paths |
 | `merge_config_dicts` | `child, parent: dict` | `dict` | Parent-wins merge |
-| `resolve_config_chain` | `project_root: Path, cli_overrides: dict \| None` | `dict` | Fully resolved config |
+| `resolve_config_chain` | `project_root: Path` | `dict` | Merged TOML chain (CLI/env layering happens in `MemoryConfig.from_toml`) |
 | `rules_ancestry` | `project_root: Path` | `list[Path]` | Child-first rules dirs |
 | `resolve_rules` | `project_root: Path` | `(list, list)` | (effective, overridden) |
 | `overridden_rules` | `project_root: Path` | `list[dict]` | Shadowed rules only |
@@ -404,8 +408,7 @@ from memoryschema import (
 | Config chain empty | No `memoryschema.toml` in any parent | Run `memoryschema init` |
 | Rules showing as overridden | Parent has same-named rule file | Intentional — rename child's file or accept |
 | `validate_toml_name` warning | TOML `project.name` doesn't match directory | Advisory only — update TOML or ignore |
-| Recall sees too many memories | `max_depth=None` traverses entire hierarchy | Set `max_depth` to limit scope |
-| Neo4j ignoring `max_depth` | Not implemented in Cypher queries | Known limitation — use JSONL for bounded depth |
+| Recall sees too many memories | depth separation within `max_inherit_depth` (default 3) | Lower `retrieval.max_inherit_depth` in memoryschema.toml |
 | Recall missing sibling memories | Scope is bidirectional within lineage only | Use parent project to see all children |
 | Search not finding parent memories | Filter mode is subtree-only | Use `recall` for bidirectional visibility |
 | Env var not overriding TOML | Not using `from_toml()` | Use `MemoryConfig.from_toml()`, not `MemoryConfig()` |
@@ -415,8 +418,8 @@ from memoryschema import (
 ## 8. Design Decisions
 
 - **Parent wins on conflict** — enforcement hierarchy, not customization. The root agent is authoritative.
-- **Schema stays v3** — dot-notation is a naming convention, not a structural change.
+- **No schema change** — dot-notation is a naming convention, not a structural change.
 - **`hierarchy.py` separate from `inheritance.py`** — hierarchy is string operations (zero deps). Inheritance is filesystem walking (needs `tomllib`).
 - **Marker-based walk** — `_walk_upward` skips intermediate directories cleanly. No fragile gap counting.
 - **Backward compatible** — flat project names, env-var-only config, and no-TOML setups all work unchanged.
-- **Neo4j over-fetch 3x for vector search** — vector index can't pre-filter by property. Over-fetch and post-filter.
+- **Neo4j escalating over-fetch for vector search** (3×/9×/100×) — the vector index can't pre-filter by property. Over-fetch and post-filter.

@@ -1,195 +1,98 @@
-# Memory Schema Rules (v4)
+# Memory Schema Rules (v5)
 
-These rules define what a valid memory entity looks like.
-They say nothing about when to write or what to capture — that is determined by the scope guidelines.
+What a valid memory entity looks like, and the write/merge semantics.
+These rules say nothing about when to write or what to capture — that is determined by
+the scope guidelines (memory-working.md / memory-corpus.md).
 
-**Source of truth:** `docs/schema.md` in the memory-schema package. This file is derived from it.
+**Source of truth:** `docs/memory-system-specification.md` in the memory-schema package
+(§3 schema, §4 write path). This file is a derived quick reference.
 
 ---
 
-## Rule 1: Entity Structure
+## The v5 entity (current format)
 
-Every memory entity MUST be a `<memory:entity>` XML block in a `.md` file.
+One markdown file per entity at `memory/<name>.md`. The **name comes from the
+filename**. YAML frontmatter carries machine scalars; ALL prose lives in the markdown
+body — nothing is ever escaped (raw `<` `>` `&` are safe everywhere).
 
-### Required fields (every entity MUST have these):
+```markdown
+---
+schema: 5
+type: semantic          # semantic | episodic | procedural (default: semantic)
+importance: 7           # 1-10 (default 5; vary it — 7 is the overused mode)
+project: my-project
+key: DOMAIN.fact        # optional fact key -> deterministic supersession
+valid_from: 2026-07-01  # temporal validity start (auto-stamped with --key)
+relations:
+  - USES chain-my-investigation
+  - SUPERSEDES old-entity-name
+---
 
-| Field | Location | Constraints |
-|-------|----------|-------------|
-| `schema` | attribute | Positive integer. Current: `4`. |
-| `name` | attribute | Kebab-case, unique, filesystem-safe. |
-| `description` | child element | One-line summary, under 120 characters. |
+One-line description, under 120 characters.
 
-### Minimal valid entity:
+## Summary
 
-```xml
-<memory:entity schema="4" name="unique-identifier">
-  <memory:description>One-line summary</memory:description>
-</memory:entity>
+Evolving summary (chains — replaced by `chain step --desc`).
+
+## Observations
+
+- atomic fact one
+- atomic fact two
+
+## Log
+
+- Step 1: chain steps live here, auto-numbered by the CLI
+
+## Reasoning
+
+Narrative: why, alternatives, connections. Appended-to with `---` separators.
+
+## Prompt
+
+The input that triggered this memory.
+
+## Notes
+
+Free markdown (the v4 "body" equivalent).
 ```
 
-### Full entity (all optional fields):
+Rules:
+- `schema: 5` is REQUIRED (the discriminator — without it the file is ignored).
+- Prefer the deterministic CLI over hand-authoring: `memoryschema remember` and
+  `memoryschema chain step --stdin` write valid entities for you (plain text in, code
+  structures/escapes/numbers/indexes).
+- Lifecycle fields (`status`, `superseded_at`, `superseded_by`, `promoted_to`) are
+  code-managed — don't hand-author them; they MUST live in frontmatter (file-first) or
+  `reconcile` resurrects the entity.
+- Unknown `##` sections are DISCARDED on the next programmatic rewrite.
+- Relation lines: `- TYPE target-name`; types: `USES MODIFIES SUPERSEDES DEPENDS_ON
+  INFORMS CONTRADICTS MITIGATES`. SUPERSEDES flips the target to superseded;
+  CONTRADICTS auto-creates the symmetric edge.
+- Validation is parse-based; `memoryschema sync` reports malformed files.
 
-```xml
-<memory:entity schema="4" name="unique-identifier" type="semantic" importance="7">
-  <memory:description>One-line summary</memory:description>
-  <memory:observations>
-    <memory:observation>Atomic fact 1</memory:observation>
-  </memory:observations>
-  <memory:prompt>The user's input that triggered this memory</memory:prompt>
-  <memory:reasoning>Narrative thinking — why, alternatives, connections</memory:reasoning>
-  <memory:chain>Reasoning chain context — what investigation this belongs to</memory:chain>
-  <memory:relations>
-    <memory:relation target="other-memory" type="MODIFIES"/>
-  </memory:relations>
-  <memory:project>project-name</memory:project>
-</memory:entity>
+## Legacy v4 (parses; do not author)
 
-Optional body text follows after the closing tag.
-```
+`<memory:entity schema="4" name="...">` XML blocks still parse and index. XML-escape
+`< > &` if you must touch one. Lifecycle changes on v4 files cannot be persisted to
+frontmatter and revert on reconcile (the CLI warns).
 
----
+## Write & merge semantics
 
-## Rule 2: Optional Fields
+- New names are always writable; existing entities are read-only except the **active
+  chain** (`memory/.active_chain`, managed by `chain start/release`).
+- Merge on re-index: description/reasoning/status REPLACE; observations APPEND
+  (deduped); relations MERGE (deduped by target+type); name/schema/project immutable.
+- Write gate: missing name REJECTS; numeric contradictions and L0-echo restatements
+  QUARANTINE (review via `memoryschema quarantine list/review/release/reject`).
+- Temporal facts: `remember --key X.y` supersedes the previous ACTIVE holder of the key
+  deterministically; `recall --as-of ISO-DATE` recalls what was valid then.
 
-Include when contextually appropriate. Omit if not relevant.
+## Retrieval scoring (what makes an entity findable)
 
-| Field | Tag | When to include |
-|-------|-----|-----------------|
-| `importance` | attribute | Integer 1-10. Defaults to 5 if omitted. |
-| `confidence` | attribute | Integer 1-10. Write-time metadata only (V12). Does not affect scoring. |
-| `type` | attribute | Free-form string. No predefined values enforced. |
-| `observations` | `<memory:observations>` | Atomic facts. Must contain at least one `<memory:observation>`. |
-| `reasoning` | `<memory:reasoning>` | Narrative thinking — why, alternatives, connections. |
-| `prompt` | `<memory:prompt>` | The user input that triggered the response. |
-| `chain` | `<memory:chain>` | Reasoning chain context — what investigation this belongs to. |
-| `relations` | `<memory:relations>` | Explicit links to other known memories. |
-| `project` | `<memory:project>` | Project scoping. |
-| `status` | attribute | `active` (default), `superseded`, `archived`, `quarantined`. |
-
----
-
-## Rule 3: Type System
-
-The `type` attribute is a free-form string. Optional — defaults to `semantic` when omitted (in parser). No predefined set is prescribed by the validator (any non-empty string accepted). The LLM determines the best value. Consistent usage patterns should emerge organically from the corpus.
-
-The scoring engine recognises `semantic`, `episodic`, `procedural` for recency modifiers. Unrecognised types get standard decay.
-
----
-
-## Rule 4: Relations
-
-Nine typed links connect entities explicitly (seven active, two deprecated). All optional.
-
-| Type | Meaning |
-|------|---------|
-| `USES` | A depends on or employs B |
-| `MODIFIES` | A changes or updates B |
-| `SUPERSEDES` | A replaces B (B is outdated) |
-| `DEPENDS_ON` | A requires B to be true/valid |
-| `INFORMS` | A provides context for B |
-| `CONTRADICTS` | A and B conflict |
-| `MITIGATES` | A reduces B's impact without satisfying B's criterion (B stays active) |
-| `PARENT_OF` | A is the parent agent of B *(deprecated — use project field)* |
-| `CHILD_OF` | A is a child agent of B *(deprecated — use project field)* |
-
-Rules: target must be a valid memory name. No self-references. No duplicate target+type pairs.
-
-**Hierarchy scoping:** Projects use dot-notation (`parent.child.grandchild`). Parent agents see child memories (containment). Child agents see parent memories during recall (inheritance). Unscoped entities are universally visible.
-
----
-
-## Rule 5: File Format
-
-- **Filename:** `<name>.md` — matches the `name` attribute exactly.
-- **Path:** `memory/<name>.md`
-- **Encoding:** XML-escape `<`, `>`, `&`, `"`. Unicode supported.
-- **Body:** Optional markdown text after the closing `</memory:entity>` tag.
-
----
-
-## Rule 6: Upsert Semantics
-
-Memories are **unauthorised (read-only) by default**. Only the active chain entity is **authorised** for upsert. New memories (names not in store) are always allowed. The active chain is tracked in `memory/.active_chain` — managed via `memoryschema chain start/release`.
-
-When authorised, re-saving with an existing `name` performs a merge:
-
-| Field | Behavior |
-|-------|----------|
-| `name` | Immutable |
-| `project` | Immutable |
-| `status` | Replaced (server-managed: set by SUPERSEDES, archive, quarantine) |
-| `description` | Replaced if provided |
-| `observations` | Appended (exact duplicates skipped) |
-| `reasoning` | Replaced if provided |
-| `prompt` | Replaced if provided |
-| `chain` | Replaced if provided |
-| `relations` | Deduplicated merge (same target+type not duplicated) |
-
----
-
-## Rule 7: Retrieval Scoring
-
-```
-score = recency(0.995^hours) × w_r + importance/10 × w_i + relevance × w_v
-```
-
-Relevance is computed from multi-space embeddings (7 spaces: default + name + description + observations + prompt + reasoning + chain). The combiner is variance-weighted: each space's similarity is multiplied by its divergence from default (precomputed at embed time). Distinctive fields get amplified, redundant fields suppressed. Falls back to equal weighting when no divergence profile is available.
-
-| Query type | Recency | Importance | Relevance |
-|------------|---------|------------|-----------|
-| Structured | 0.3 | 0.5 | 0.2 |
-| Semantic | 0.2 | 0.3 | 0.5 |
-
-Type factor: semantic `max(recency, 0.6)`, episodic standard decay, procedural `recency^(1/(1+0.3*min(accesses,10)))`.
-
-Bonuses: hub `+0.05 * ln(1 + backlinks)`, text match `+0.1` substring (Neo4j) or BM25 up to `+0.3` (JSONL).
-
----
-
-## Rule 8: Storage Layers
-
-| Layer | Store | On failure |
-|-------|-------|------------|
-| L0 | MEMORY.md | Never fails (always in context) |
-| L1a | Markdown files | Never fails (git-tracked) |
-| L1b | JSONL | Never fails (stdlib Python) |
-| L2a | Voyage embeddings (7 spaces × 1024 dims) | Degrades to L1 |
-| L2b | Neo4j | Degrades to L2a |
-
----
-
-## Rule 9: Chain Entities
-
-A **chain entity** is a live accumulating memory that grows with each response. It represents an ongoing or completed reasoning sequence.
-
-### Lifecycle
-1. **Create** — `memoryschema chain start <name>` authorises the entity. First write creates it.
-2. **Update** — the authorised chain accepts upserts (observations append, description/reasoning replace). All other memories are read-only.
-3. **Release** — `memoryschema chain release` makes it read-only permanently. Append "Conclusion:" before releasing.
-4. **New chain** — only one authorised at a time. Release first, then start a new one.
-
-### Structure
-- **Name:** `chain-` prefix (e.g., `chain-why-equal-weight-fails`)
-- **Type:** `semantic` (persists with recency floor 0.6)
-- **Description:** evolving summary (replaced on each upsert)
-- **Observations:** ordered steps — "Step 1: ...", "Step N: ...", "Conclusion: ..." (appended on each upsert)
-- **Prompt:** the original trigger (set on create, kept on updates)
-- **Reasoning:** evolving narrative (replaced on each upsert)
-- **Relations:** `USES` links to evidence memories (accumulated via merge)
-
-### Retrieval
-- Embedded in all spaces, re-embedded on every update (embedding stays current)
-- Recall cascade follows `USES` to surface evidence
-- As semantic type, chain persists (recency floor 0.6) even as evidence decays
-
----
-
-## Enforcement
-
-These rules are enforced by:
-- **Validator:** V1-V12 (structure), R1-R7 (relations), F1, F3 (filesystem)
-- **Write gate:** 4-stage pipeline (validation, consistency, numeric probe, L0 echo)
-- **PostToolUse hook:** Parses, embeds (7 spaces), gate-checks, indexes on every Write or Edit to `memory/*.md`
-- **Compact resilience:** Working memory entries auto-appended to MEMORY.md by the hook
-
-The schema defines structure. How strictly it is applied depends on the scope guidelines (importance-correlated enforcement).
+`score = recency·w_r + importance/10·w_i + relevance·w_v` (semantic weights 0.2/0.3/0.5,
+config-tunable). Relevance is variance-weighted over 7 embedding spaces (name,
+description+summary, observations, prompt, reasoning, chain, default blend). Type
+modifiers: semantic floors at 0.6; procedural reinforces with access; episodic decays.
+Practical consequences: front-load distinctive wording in the description; keep
+observations atomic; link liberally (`--uses`) — backlinks earn a hub bonus and
+citations feed attribution.
