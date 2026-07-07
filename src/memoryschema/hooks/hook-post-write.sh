@@ -74,13 +74,14 @@ if [ -f "$ENV_FILE" ]; then
                 _key="${_line%%=*}"
                 _val="${_line#*=}"
                 _key="${_key//[[:space:]]/}"
-                _val="${_val%%[[:space:]]#*}"   # strip ' # inline comment', keep '#' in values
-                # Strip surrounding matching quotes (dotenv convention; matches the
-                # CLI .env parser — a quoted NEO4J_PASSWORD="x" must export x, or the
-                # hook's Neo4j auth fails and it silently drifts to JSONL-only).
+                # Quote FIRST, then comment: a quoted value is taken verbatim (dotenv
+                # convention; matches the CLI parser — a quoted NEO4J_PASSWORD="x" must
+                # export x). Stripping the inline comment first would truncate a quoted
+                # value that legitimately contains ' #' and leave an unbalanced quote.
                 case "$_val" in
                     '"'*'"') _val="${_val#\"}"; _val="${_val%\"}" ;;
                     "'"*"'") _val="${_val#\'}"; _val="${_val%\'}" ;;
+                    *) _val="${_val%%[[:space:]]#*}" ;;   # unquoted: strip ' # comment', keep '#' in-word
                 esac
                 [ -n "$_key" ] && export "$_key=$_val"
                 ;;
@@ -88,8 +89,12 @@ if [ -f "$ENV_FILE" ]; then
     done < "$ENV_FILE"
 fi
 
-# Touch sentinel so Stop hook knows a memory file was updated this response
-touch /tmp/claude-memory-chain-updated 2>/dev/null || true
+# Touch sentinel so the Stop hook knows a memory file was updated this response.
+# Project-relative (not /tmp): the CLI write path and the Stop hook must agree on the
+# path, and POSIX /tmp differs from native-Windows-Python's /tmp (see write_index.py).
+_SENTINEL_DIR="${FILE_PATH%%/memory/*}/.memoryschema"
+mkdir -p "$_SENTINEL_DIR" 2>/dev/null || true
+touch "$_SENTINEL_DIR/chain-updated" 2>/dev/null || true
 
 # Skip MEMORY.md index file
 if [[ "$(basename "$FILE_PATH")" == "MEMORY.md" ]]; then

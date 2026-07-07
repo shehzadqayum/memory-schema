@@ -638,6 +638,21 @@ def quarantine_reject(config, name, confirm):
         click.echo(f"Error: Entity '{name}' not found or not quarantined.", err=True)
         sys.exit(1)
     store.delete(name)
+    # Delete from BOTH stores + the sidecar (get_store may return Neo4j, leaving the
+    # JSONL row + .npz to resurface the 'rejected' entity in degraded recall).
+    import os as _os
+    from memoryschema.store import MemoryStore
+    from memoryschema import vector_sidecar
+    try:
+        MemoryStore(str(config.store_path)).delete(name)
+    except Exception:
+        pass
+    _npz = vector_sidecar._npz_path(vector_sidecar.sidecar_dir(str(config.store_path)), name)
+    if _os.path.exists(_npz):
+        try:
+            _os.unlink(_npz)
+        except OSError:
+            pass
     _remove_from_memory_index(config, name)
     md_path = config.memory_dir / f"{name}.md"
     if md_path.exists():
@@ -784,9 +799,13 @@ def remember_cmd(config, name, desc, obs, mtype, importance, reasoning,
 
     # Persist supersession FILE-FIRST (keyed auto-supersession AND explicit
     # --supersedes): the store-side status flip alone reverts on reconcile.
+    # Gate on the new entity being ACTIVE — a gate QUARANTINE returns res.ok=True
+    # (the entry is still saved, just inactive), so retiring the old holder here
+    # would strand the fact key with no ACTIVE holder.
+    _new_active = res is None or (res.ok and res.verdict not in ("quarantine", "reject"))
     _to_supersede = ([old_holder] if old_holder else []) + [t for t in supersedes if t != old_holder]
-    if _to_supersede and res is not None and not res.ok:
-        click.echo(f"  warn: new entity not indexed cleanly — left "
+    if _to_supersede and not _new_active:
+        click.echo(f"  warn: new entity not active ({res.verdict}) — left "
                    f"{', '.join(_to_supersede)} ACTIVE (not superseded)", err=True)
     elif _to_supersede:
         from datetime import date

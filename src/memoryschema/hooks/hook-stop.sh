@@ -15,7 +15,11 @@
 set -uo pipefail
 
 CHAIN_FILE="memory/.active_chain"
-SENTINEL="/tmp/claude-memory-chain-updated"
+# Project-relative (cwd = project root, as for CHAIN_FILE): the CLI write path and the
+# PostToolUse hook write this same path. /tmp is unreliable — native-Windows-Python's
+# /tmp (C:\tmp) differs from Git Bash's, which made CLI chain-steps miss the sentinel
+# and fire a false "chain NOT updated" reminder every turn.
+SENTINEL=".memoryschema/chain-updated"
 
 # No active chain — nothing to remind
 if [ ! -f "$CHAIN_FILE" ]; then

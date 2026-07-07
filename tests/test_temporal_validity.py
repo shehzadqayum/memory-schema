@@ -122,6 +122,28 @@ class TestRememberKeySupersession:
         a = parse_memory_file(str(project_dir / "memory" / "plain-a.md"))
         assert (a.get("status") or "active") == "active"
 
+    def test_quarantined_new_entity_does_not_strand_key(self, runner, project_dir, monkeypatch):
+        """If the NEW keyed entity is quarantined (res.ok True but inactive), the
+        old holder must be left ACTIVE — otherwise the key has no active holder."""
+        runner.invoke(cli, ["--root", str(project_dir), "remember", "kf-old",
+                            "--desc", "old", "--obs", "o", "--key", "k.fact"])
+
+        # Force the new entity to quarantine (verdict='quarantine', ok=True).
+        # remember_cmd imports index_memory from write_index at call time, so patch there.
+        import memoryschema.write_index as wi
+        real = wi.index_memory
+        def fake_index(filepath, config=None, require_active_chain_auth=True):
+            r = real(filepath, config=config, require_active_chain_auth=require_active_chain_auth)
+            if str(filepath).endswith("kf-new.md"):
+                r.verdict = "quarantine"
+            return r
+        monkeypatch.setattr(wi, "index_memory", fake_index)
+
+        runner.invoke(cli, ["--root", str(project_dir), "remember", "kf-new",
+                            "--desc", "new", "--obs", "o2", "--key", "k.fact"])
+        old = parse_memory_file(str(project_dir / "memory" / "kf-old.md"))
+        assert (old.get("status") or "active") == "active"  # NOT stranded
+
 
 class TestRecallAsOf:
     def test_point_in_time_window(self, runner, project_dir):

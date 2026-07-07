@@ -201,9 +201,15 @@ def index_memory(filepath, config=None, require_active_chain_auth=True):
     except Exception as e:
         res.warnings.append("L0 rebuild failed: %s" % e)
 
-    # Stop-hook sentinel: a memory write happened this response.
+    # Stop-hook sentinel: a memory write happened this response. Write it under the
+    # PROJECT root (not POSIX /tmp): native Python on Windows resolves "/tmp" to C:\tmp,
+    # a different directory from the Git Bash hook's /tmp, so a CLI chain-step's sentinel
+    # was invisible to hook-stop.sh -> a false "chain NOT updated" reminder every turn.
+    # The Stop hook (cwd = project root) reads the same project-relative path.
     try:
-        with open("/tmp/claude-memory-chain-updated", "w") as f:
+        sentinel_dir = os.path.join(project_root, ".memoryschema")
+        os.makedirs(sentinel_dir, exist_ok=True)
+        with open(os.path.join(sentinel_dir, "chain-updated"), "w") as f:
             f.write(name)
     except Exception:
         pass

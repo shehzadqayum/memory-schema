@@ -55,7 +55,15 @@ def _unsafe_name(name):
         return True
     if name != os.path.basename(name):        # contains a separator
         return True
-    return any(c in name for c in '\\/:*?"<>|')
+    if any(c in name for c in '\\/:*?"<>|'):
+        return True
+    # Windows reserved device names: opening 'con.npz'/'nul.npz'/... targets the
+    # device, which HANGS or fails the whole store write. Compare on the stem.
+    stem = name.split('.', 1)[0].lower()
+    if stem in {"con", "prn", "aux", "nul",
+                *(f"com{i}" for i in range(1, 10)), *(f"lpt{i}" for i in range(1, 10))}:
+        return True
+    return False
 
 
 def externalize(entry, sdir):

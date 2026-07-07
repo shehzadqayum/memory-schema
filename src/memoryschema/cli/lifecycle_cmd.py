@@ -194,6 +194,7 @@ def reset(config, confirm, neo4j_only, store_only, working_memory_only):
                 deleted += 1
         click.echo(f"Deleted {deleted} memory files.")
 
+    neo4j_ok = True
     try:
         from neo4j import GraphDatabase
         driver = GraphDatabase.driver(config.neo4j_uri,
@@ -202,10 +203,20 @@ def reset(config, confirm, neo4j_only, store_only, working_memory_only):
             session.run("MATCH (n) DETACH DELETE n")
         driver.close()
         click.echo("Neo4j data deleted.")
-    except Exception:
-        pass  # Neo4j may not be running
+    except Exception as e:
+        # Distinguish "Neo4j simply isn't up" (fine — nothing to wipe) from a wipe that
+        # failed while connected (real: the graph may still hold data a wipe must remove).
+        etype = type(e).__name__
+        if any(s in etype for s in ("ServiceUnavailable", "ConnectionError", "AuthError")) \
+                or "connect" in str(e).lower():
+            click.echo(f"Neo4j unreachable — skipped ({etype}).", err=True)
+        else:
+            click.echo(f"Error: Neo4j wipe FAILED — the graph may still hold data: {e}", err=True)
+            neo4j_ok = False
 
     click.echo("Full reset complete.")
+    if not neo4j_ok:
+        sys.exit(1)
 
 
 @click.command()

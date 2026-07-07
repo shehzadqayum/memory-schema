@@ -34,7 +34,7 @@ def validate(config, path, strict, as_json):
         sys.exit(1)
 
     if os.path.isfile(path):
-        with open(path) as f:
+        with open(path, encoding="utf-8") as f:   # utf-8, not the Windows cp1252 default
             content = f.read()
         errors = _validate(content, path, strict=strict)
         if as_json:

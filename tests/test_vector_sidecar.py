@@ -90,6 +90,17 @@ class TestExternalizeRehydrate:
         # nothing was written outside the (possibly absent) sidecar dir
         assert not os.path.exists(os.path.join(tmp_path, "evil.npz"))
 
+    def test_windows_reserved_names_stay_inline(self, tmp_path):
+        """A name like 'con'/'nul'/'com1' must not be written as con.npz — on
+        Windows that targets the device and hangs/fails the whole store save."""
+        sdir = str(tmp_path / ".embeddings")
+        for bad in ("con", "NUL", "com1", "lpt3", "aux", "prn"):
+            e = {"name": bad, "embedding": [0.1] * 4, "embed_input_hash": "h"}
+            assert externalize(e, sdir) is e     # kept inline, never touched
+        # a legit name that merely contains a reserved substring is fine
+        ok = {"name": "console-log", "embedding": [0.1] * 4, "embed_input_hash": "h"}
+        assert externalize(ok, sdir) is not ok   # externalized normally
+
     def test_prune_orphans(self, tmp_path):
         sdir = str(tmp_path / ".embeddings")
         externalize(_entry("keep"), sdir)
