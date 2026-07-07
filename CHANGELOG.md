@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+### Fixed (2026-07-07 — operational artefacts are now packaged & deployable)
+- The runnable operating system (the `dream-pass` skill + the kernel + the on-demand
+  rules) is now versioned in the package at `.claude-plugin/` — previously the skill
+  existed only in the deployment's `.claude/` and was absent from the package entirely.
+- `plugin deploy` REPAIRED: it referenced a non-existent `.claude-plugin/` dir and a
+  declared skill set (recall/chain-start/…/bootstrap) that shipped no files — the command
+  could not deploy anything. Now the dir exists and `SKILL_FILES`/`RULE_FILES` reference
+  the real artefacts (dream-pass skill; kernel → `rules/`; v5 + corpus refs →
+  `rules-ondemand/`). Documented in spec §12.1 with the package-source-vs-deployment-local
+  split (machine/ops artefacts — the SessionStart hook, ensure-deps.ps1, tuned toml —
+  stay deployment-local by design).
+
 ### Added (2026-07-01..05 — Schema v5 & the deterministic write path)
 - **Schema v5**: YAML frontmatter (machine scalars + `relations:` block) + markdown body
   (description lead, `## Summary/Observations/Log/Reasoning/Prompt/Chain/Notes`) —

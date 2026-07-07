@@ -337,8 +337,9 @@ class TestStatus:
              patch("memoryschema.cli.plugin_cmd.find_stop_hook_script_path", return_value="/pkg/memoryschema/stop.sh"):
             runner.invoke(cli, ["plugin", "deploy"], catch_exceptions=False)
 
-        # Delete some deployed files
-        for _, dst_rel in SKILL_FILES[:2]:
+        # Delete 2 deployed files (from the combined skill+rule set, size-independent)
+        _deployed = SKILL_FILES + RULE_FILES
+        for _, dst_rel in _deployed[:2]:
             (claude_dir / dst_rel).unlink()
 
         # Check status

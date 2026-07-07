@@ -938,6 +938,34 @@ consoles).
   consolidate/reflect, hierarchy/inheritance helpers) + PEP 562 lazy exports
   (`Neo4jMemoryStore`, `embed_text/embed_batch/rerank`, the `embeddings` submodule).
 
+### 12.1 Operational artefacts (skills & rules) — the single source of truth
+
+The runnable operating system (the skill(s) + the injected rules) is versioned IN the
+package at **`packages/memory-schema/.claude-plugin/`** — not just described in this spec
+— so a deployment can be reconstructed and the package never drifts from what actually
+runs. `memoryschema plugin deploy` installs these into `~/.claude/`; the manifest at
+`~/.claude/memory-schema-manifest.json` records exactly what was placed, and `plugin
+status`/`uninstall` read it.
+
+| artefact (`.claude-plugin/…`) | deploys to | role |
+|-------------------------------|-----------|------|
+| `skills/dream-pass/SKILL.md` | `~/.claude/skills/dream-pass/` | the consolidation procedure (§8.2) |
+| `rules/memory-working.md` | `~/.claude/rules/` | the always-loaded ~534-token protocol kernel (§1 principle 5) |
+| `rules-ondemand/memory-schema.md` | `~/.claude/rules-ondemand/` | the v5 authoring reference (§3), loaded on demand |
+| `rules-ondemand/memory-corpus.md` | `~/.claude/rules-ondemand/` | corpus-ingestion guidelines (unused in Helios) |
+
+`SKILL_FILES`/`RULE_FILES` in `cli/plugin_cmd.py` MUST stay in sync with that directory.
+Separately, `src/memoryschema/templates/*.tpl` are the GENERIC scaffolds `init` writes
+into a fresh project (the `.claude-plugin/` copies are the deployed, possibly-tuned
+operational versions — edit those, then re-deploy; do not hand-maintain divergent copies
+in a project's `.claude/`).
+
+**Package-source vs. deployment-local.** Machine/ops-specific artefacts are deliberately
+NOT in the package (they carry absolute paths or non-portable ops): the Helios SessionStart
+hook (`.claude/settings.local.json`), `scripts/ensure-deps.ps1` (Docker/MT5/web
+auto-start), and the tuned `memoryschema.toml` (relevance-heavy weights). Those live in the
+deployment repo, by design.
+
 ---
 
 ## 13. Test suite — the rebuild-verification map

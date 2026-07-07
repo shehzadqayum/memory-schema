@@ -23,19 +23,19 @@ from memoryschema.cli._hooks_util import (
 CLAUDE_DIR = Path.home() / ".claude"
 MANIFEST_PATH = CLAUDE_DIR / "memory-schema-manifest.json"
 
-# Files to deploy: (source relative to plugin dir, target relative to ~/.claude/)
+# Files to deploy: (source relative to the .claude-plugin/ dir, target relative to
+# ~/.claude/). These are the CANONICAL operational artefacts, versioned in the package
+# at packages/memory-schema/.claude-plugin/ — the single source of truth for what runs
+# (mirrors the layout a Helios-style deployment uses: an always-loaded kernel + on-demand
+# references + the consolidation skill). Keep this list in sync with that directory.
 SKILL_FILES = [
-    ("skills/recall/SKILL.md", "skills/recall/SKILL.md"),
-    ("skills/chain-start/SKILL.md", "skills/chain-start/SKILL.md"),
-    ("skills/chain-status/SKILL.md", "skills/chain-status/SKILL.md"),
-    ("skills/chain-release/SKILL.md", "skills/chain-release/SKILL.md"),
-    ("skills/memory-status/SKILL.md", "skills/memory-status/SKILL.md"),
-    ("skills/bootstrap/SKILL.md", "skills/bootstrap/SKILL.md"),
+    ("skills/dream-pass/SKILL.md", "skills/dream-pass/SKILL.md"),
 ]
 
 RULE_FILES = [
-    ("rules/memory-schema.md", "rules/memory-schema.md"),
-    ("rules/memory-working.md", "rules/memory-working.md"),
+    ("rules/memory-working.md", "rules/memory-working.md"),                  # always-loaded kernel
+    ("rules-ondemand/memory-schema.md", "rules-ondemand/memory-schema.md"),  # v5 schema reference
+    ("rules-ondemand/memory-corpus.md", "rules-ondemand/memory-corpus.md"),  # corpus guidelines
 ]
 
 
