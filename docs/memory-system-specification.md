@@ -969,6 +969,11 @@ gate) without writing. In Helios the session-start self-heal (`scripts/ensure-de
 runs `plugin sync --check` each session and warns on drift, so the deployment can never
 silently diverge from the package source of truth.
 
+The session-start hook is **advisory** by decision (2026-07-07): it detects-and-warns,
+never overwrites, so a session start cannot silently revert a file mid-edit. It MAY become
+**auto-repair** later (the deployment always mirrors the package) once `.claude/` is
+treated purely as a build output — the flip is dropping `--check` from the hook line.
+
 **Package-source vs. deployment-local.** Machine/ops-specific artefacts are deliberately
 NOT in the package (they carry absolute paths or non-portable ops): the Helios SessionStart
 hook (`.claude/settings.local.json`), `scripts/ensure-deps.ps1` (Docker/MT5/web
