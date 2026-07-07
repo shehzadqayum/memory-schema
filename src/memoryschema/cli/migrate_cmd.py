@@ -84,10 +84,29 @@ def neo4j_to_jsonl(config, output):
 
     import json as json_mod
     import os
-    os.makedirs(os.path.dirname(output_path) or '.', exist_ok=True)
-    with open(output_path, 'w', encoding='utf-8') as f:
-        for entry in entries:
-            f.write(json_mod.dumps(entry, ensure_ascii=False) + '\n')
+    import tempfile
+    # Guard the canonical store: Neo4j does not carry embed_input_hash / summary /
+    # log / chain / confidence, so overwriting memory/store.jsonl with the Neo4j
+    # projection strips those fields and forces a full re-embed on the next
+    # reconcile. reconcile is the supported heal; this command is for export.
+    if os.path.abspath(output_path) == os.path.abspath(str(config.store_path)):
+        click.echo("Refusing to overwrite the canonical memory/store.jsonl (it carries "
+                   "fields Neo4j does not). Use --output <file>, or `memoryschema "
+                   "reconcile` to heal the store.", err=True)
+        sys.exit(1)
+    # Atomic write (tmp + os.replace) so an interrupt cannot leave a truncated file.
+    dirpath = os.path.dirname(output_path) or '.'
+    os.makedirs(dirpath, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(suffix='.tmp', dir=dirpath)
+    try:
+        with os.fdopen(fd, 'w', encoding='utf-8') as f:
+            for entry in entries:
+                f.write(json_mod.dumps(entry, ensure_ascii=False) + '\n')
+        os.replace(tmp, output_path)
+    except BaseException:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+        raise
 
     click.echo(f"Exported {len(entries):,} entries to {output_path}")
 

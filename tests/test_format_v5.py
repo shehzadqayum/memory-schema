@@ -113,6 +113,32 @@ class TestRoundtrip:
         assert back["observations"][0] == evil
         assert back["summary"] == evil
 
+    def test_scalar_newline_injection_blocked(self):
+        """A newline in a frontmatter scalar must not inject a frontmatter key
+        (e.g. status: archived) or close the fence early."""
+        m = {"schema": 5, "name": "inj", "description": "d",
+             "key": "EURUSD.bias\nstatus: archived", "valid_from": "2026-07-01"}
+        back = parse_v5_content(serialize_v5(m), filepath="inj.md")
+        assert back.get("status", "active") == "active"     # not injected
+        assert "\n" not in back["key"]
+
+    def test_relation_target_underscore_dot_preserved(self):
+        """Targets with _ or . must survive parse — else a SUPERSEDES edge to
+        e.g. my_fact silently vanishes."""
+        m = {"schema": 5, "name": "x", "description": "d",
+             "relations": [{"type": "SUPERSEDES", "target": "my_fact"},
+                           {"type": "USES", "target": "a.b-c"}]}
+        back = parse_v5_content(serialize_v5(m), filepath="x.md")
+        targets = {(r["type"], r["target"]) for r in back["relations"]}
+        assert ("SUPERSEDES", "my_fact") in targets
+        assert ("USES", "a.b-c") in targets
+
+    def test_star_bullets_accepted(self):
+        """Hand-edited * / + bullets parse as observations (not silently zero)."""
+        doc = "---\nschema: 5\n---\n\nd\n\n## Observations\n\n* fact one\n+ fact two\n"
+        back = parse_v5_content(doc, filepath="b.md")
+        assert back["observations"] == ["fact one", "fact two"]
+
 
 class TestChainStepV5:
     def _chain(self, tmp_path):

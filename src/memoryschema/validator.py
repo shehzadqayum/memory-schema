@@ -3,11 +3,12 @@ Memory schema validator.
 
 Validates <memory:> tagged files against the schema specification.
 
-Validation rules:
-  V1-V14: Structure (entity element, attributes, children, basis)
-  R1-R7:  Relations (attributes, types, self-reference, duplicates, referential integrity, cycles)
-  F1, F3: Filesystem (filename match, safe characters)
-  Q1-Q2, Q6-Q9: Content quality (strict mode only)
+Validation rules (as implemented — v4 XML only):
+  V1-V12: Structure (V8 retired; the filename-match check is emitted as V3)
+  R1-R6:  Relations (attributes, types, self-reference, duplicates, referential integrity)
+          — SUPERSEDES cycle detection (R7) lives in the store, not here
+  F3:     Filesystem (filesystem-safe name characters)
+  Q1-Q2, Q6-Q8: Content quality (strict mode only)
 """
 
 import os
@@ -233,7 +234,10 @@ def validate(content, filepath=None, strict=False, known_names=None):
 
 def validate_file(filepath):
     """Validate a memory file. Returns list of (rule_id, message) errors."""
-    with open(filepath) as f:
+    # Pin utf-8 (matching tags.parse_memory_file); the platform default (cp1252
+    # on Windows without PYTHONUTF8) raises UnicodeDecodeError on common
+    # typography and aborts validate_directory on the first such file.
+    with open(filepath, encoding="utf-8") as f:
         content = f.read()
     return validate(content, filepath, strict=True)
 

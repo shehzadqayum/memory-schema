@@ -49,7 +49,11 @@ def entry_to_node_props(entry):
         if key in entry and entry[key] is not None:
             props[key] = entry[key]
 
-    obs = entry.get('observations', [])
+    # Normalize observations to plain strings (legacy stores can still carry
+    # {"text","basis"} dicts); a raw ' '.join over dicts would crash migration —
+    # the designated on-ramp for exactly those legacy stores.
+    from memoryschema.tags import observation_text
+    obs = [observation_text(o) for o in entry.get('observations', [])]
     props['observations'] = obs
     props['observations_text'] = ' '.join(obs)
     props.setdefault('access_count', 0)

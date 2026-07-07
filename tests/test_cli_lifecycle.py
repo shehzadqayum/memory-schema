@@ -92,7 +92,7 @@ class TestClean:
 class TestExport:
     def test_jsonl_format(self, runner, project_dir):
         mock_store = type('MockStore', (), {
-            'list_all': lambda self: [{"name": "a", "description": "A"}],
+            'list_all': lambda self, include_inactive=False: [{"name": "a", "description": "A"}],
         })()
         with patch("memoryschema.store.get_store", return_value=mock_store):
             output = str(project_dir / "export.jsonl")

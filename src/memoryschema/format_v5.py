@@ -59,7 +59,18 @@ import re
 
 FRONTMATTER_OPEN = "---"
 _SECTIONS = ("summary", "observations", "log", "reasoning", "prompt", "chain")
-_REL_RE = re.compile(r"^-\s+([A-Z_]+)\s+([A-Za-z0-9][A-Za-z0-9-]*)\s*$")
+# Target charset must be at least as permissive as any entity name that can exist
+# (names are not hard-validated to kebab at creation), or a legal relation to e.g.
+# `my_fact` is silently dropped on parse — including SUPERSEDES edges.
+_REL_RE = re.compile(r"^-\s+([A-Z_]+)\s+([A-Za-z0-9][A-Za-z0-9._-]*)\s*$")
+
+
+def _scalar(val):
+    """Flatten a frontmatter scalar to one safe line. Collapsing newlines makes
+    value-injection impossible at the serialize chokepoint: a `--key` containing
+    a newline (or a literal `---`) can no longer inject frontmatter keys or close
+    the fence early — the resulting file stays exactly the entity that was asked for."""
+    return " ".join(str(val).split())
 
 
 def is_v5_content(content):
@@ -135,7 +146,9 @@ def parse_v5_content(content, filepath=None):
         out = []
         for line in (sections.get(section) or "").splitlines():
             s = line.strip()
-            if s.startswith("- "):
+            # Accept -, *, + markers (hand-edited/Obsidian files use any of them);
+            # a bullet section written with * would otherwise parse to ZERO items.
+            if len(s) >= 2 and s[0] in "-*+" and s[1] == " ":
                 out.append(s[2:].strip())
             elif s and out:                      # continuation line of the previous bullet
                 out[-1] += " " + s
@@ -195,14 +208,14 @@ def serialize_v5(memory):
         val = memory.get(key)
         if val is not None and val != "" and not (key == "type" and val == "semantic") \
                 and not (key == "status" and val == "active"):
-            out.append("%s: %s" % (key, val))
+            out.append("%s: %s" % (key, _scalar(val)))
     rels = memory.get("relations") or []
     if rels:
         out.append("relations:")
         for r in rels:
             rtype = r.get("type") if isinstance(r, dict) else r[0]
             target = r.get("target") if isinstance(r, dict) else r[1]
-            out.append("  - %s %s" % (rtype, target))
+            out.append("  - %s %s" % (_scalar(rtype), _scalar(target)))
     out.append(FRONTMATTER_OPEN)
     out.append("")
     out.append((memory.get("description") or "").strip())

@@ -64,10 +64,19 @@ def backup(config, output, neo4j_only, jsonl_only, files_only):
                 tar.add(f, arcname=f"memory/{f.relative_to(config.memory_dir)}")
             components.append("memory files")
 
-        # JSONL store
+        # JSONL store — arcname under memory/ so restore (extract to project root)
+        # lands it at memory/store.jsonl, not <root>/store.jsonl.
         if config.store_path.exists():
-            tar.add(config.store_path, arcname="store.jsonl")
+            tar.add(config.store_path, arcname="memory/store.jsonl")
             components.append("JSONL store")
+
+        # Vector sidecar (.npz) — store entries are vectors_external, so without
+        # these the restored corpus loads unembedded (no semantic recall).
+        emb_dir = config.memory_dir / ".embeddings"
+        if emb_dir.exists():
+            for f in sorted(emb_dir.glob("*.npz")):
+                tar.add(f, arcname=f"memory/.embeddings/{f.name}")
+            components.append("embeddings")
 
         # Rules
         if config.rules_dir.exists():
@@ -103,7 +112,13 @@ def restore(config, archive, confirm):
     with tarfile.open(archive, "r:gz") as tar:
         members = tar.getnames()
         click.echo(f"Restoring {len(members)} files from {archive}...")
-        tar.extractall(path=config.project_root)
+        # filter='data' rejects members with absolute paths or '..' traversal
+        # (Python 3.12+ still defaults to fully-trusted extraction, which a
+        # crafted archive can abuse to write outside the project root).
+        try:
+            tar.extractall(path=config.project_root, filter="data")
+        except TypeError:
+            tar.extractall(path=config.project_root)  # Python < 3.12
 
     click.echo(f"Restored to {config.project_root}")
 
@@ -141,7 +156,9 @@ def reset(config, confirm, neo4j_only, store_only, working_memory_only):
             setup_schema(config)
             click.echo("Schema recreated.")
         except Exception as e:
+            # Exit non-zero: a script must not read a failed wipe as success.
             click.echo(f"Error: {e}", err=True)
+            sys.exit(1)
         return
 
     if store_only:
@@ -298,7 +315,9 @@ def export_cmd(config, fmt, output):
     elif fmt == "jsonl":
         from memoryschema.store import get_store
         store = get_store(config=config)
-        entries = store.list_all()
+        # include_inactive: the export is a portable archive; dropping superseded/
+        # archived entities loses the bi-temporal history the system preserves.
+        entries = store.list_all(include_inactive=True)
         dest = output or f"export-{config.project_name}-{timestamp}.jsonl"
         with open(dest, 'w', encoding='utf-8') as f:
             for entry in entries:
@@ -354,7 +373,10 @@ def import_cmd(config, source, fmt):
 
     if fmt == "tar":
         with tarfile.open(source, "r:gz") as tar:
-            tar.extractall(path=config.project_root)
+            try:
+                tar.extractall(path=config.project_root, filter="data")
+            except TypeError:
+                tar.extractall(path=config.project_root)  # Python < 3.12
         click.echo(f"Imported archive to {config.project_root}")
 
     elif fmt == "jsonl":

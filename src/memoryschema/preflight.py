@@ -29,9 +29,13 @@ def _docker_engine_up():
 
 
 def _container_running(config):
-    rc, out, _ = _run(["docker", "ps", "--filter", f"name={config.neo4j_container_name}",
-                       "--filter", "status=running", "-q"], timeout=10)
-    return rc == 0 and bool(out)
+    # `--filter name=` is an UNANCHORED substring match, so a different container
+    # whose name merely contains ours (helios-neo4j-test) would read as running and
+    # skip the auto-start of the real one. Anchor with ^...$ and confirm the exact name.
+    name = config.neo4j_container_name
+    rc, out, _ = _run(["docker", "ps", "--filter", f"name=^{name}$",
+                       "--filter", "status=running", "--format", "{{.Names}}"], timeout=10)
+    return rc == 0 and name in (out or "").split()
 
 
 def _start_container(config):

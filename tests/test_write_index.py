@@ -30,6 +30,19 @@ def project_dir(tmp_path):
     return tmp_path
 
 
+class TestV4AttributeInjection:
+    def test_quote_in_name_does_not_inject_attributes(self, tmp_path):
+        """escape_text must escape '"' so a v4 name/attribute value cannot
+        truncate and inject arbitrary attributes (e.g. status='superseded')."""
+        assert escape_text('a"b') == "a&quot;b"
+        p = str(tmp_path / 'x.md')
+        create_entity_file(p, 'inj" status="superseded', 'desc', ['o'])
+        m = parse_memory_file(p)
+        # The injected status attribute must not exist; the name is the literal string.
+        assert (m.get("status") or "active") == "active"
+        assert '"' in m["name"]  # round-trips as data, not markup
+
+
 CHAIN_NAME = "chain-test-topic"
 
 CHAIN_V4 = """<memory:entity schema="4" name="chain-test-topic" type="semantic" importance="7">

@@ -157,9 +157,12 @@ class TestReembedFieldSpaces:
                              skip_assoc=True)
         assert result['embedded'] == 2
         assert result['skipped_empty'] == 2
-        # Verify embeddings dict was populated
+        # Verify embeddings dict was populated (vectors externalize to the sidecar;
+        # rehydrate before asserting, matching store._load).
+        from memoryschema.vector_sidecar import rehydrate, sidecar_dir
+        sd = sidecar_dir(path)
         with open(path) as f:
-            rewritten = [json.loads(line) for line in f if line.strip()]
+            rewritten = [rehydrate(json.loads(line), sd) for line in f if line.strip()]
         full = next(e for e in rewritten if e['name'] == 'full-1')
         assert 'observations' in full.get('embeddings', {})
         bare = next(e for e in rewritten if e['name'] == 'bare')
@@ -184,8 +187,10 @@ class TestReembedFieldSpaces:
         with patch("memoryschema.embeddings.embed_batch", return_value=mock_vectors):
             result = reembed(prefix="", config=config, skip_assoc=True)
         assert result['embedded'] == 4
+        from memoryschema.vector_sidecar import rehydrate, sidecar_dir
+        sd = sidecar_dir(path)
         with open(path) as f:
-            rewritten = [json.loads(line) for line in f if line.strip()]
+            rewritten = [rehydrate(json.loads(line), sd) for line in f if line.strip()]
         for e in rewritten:
             assert 'embedding' in e
             assert e.get('embeddings', {}).get('default') == e['embedding']

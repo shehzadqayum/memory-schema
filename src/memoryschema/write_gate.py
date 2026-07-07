@@ -199,12 +199,12 @@ def _run_v4_probes(memory, store, config, quarantine_reasons, warnings):
         except ImportError:
             warnings.append('numeric_probe unavailable — skipping stage 5')
     elif probe_enabled and store is not None and not memory.get('embedding'):
-        warnings.append('no embedding — stages 5-6 skipped')
+        warnings.append('no embedding — stage 5 (numeric probe) skipped')
 
     # Stage 6: L0 echo probe
     if store is not None:
         try:
-            _check_l0_echo(memory, echo_threshold, quarantine_reasons)
+            _check_l0_echo(memory, echo_threshold, quarantine_reasons, config)
         except Exception:
             pass
 
@@ -214,21 +214,35 @@ def _run_v4_probes(memory, store, config, quarantine_reasons, warnings):
         warnings.append(f'source_is_memory: {source}')
 
 
-def _check_l0_echo(memory, threshold, quarantine_reasons):
+def _check_l0_echo(memory, threshold, quarantine_reasons, config=None):
     """Check if the candidate restates an L0-resident entry without new content."""
     import os
 
     name = memory.get('name', '')
+    # An already-inactive entity (superseded/archived/quarantined) is being RETIRED,
+    # not competing for L0 — re-indexing it (e.g. the old holder during a keyed
+    # supersession, which naturally echoes its successor) must not re-quarantine it.
+    if (memory.get('status') or 'active') != 'active':
+        return
     description = (memory.get('description') or '').lower()
     if not description:
         return
 
-    # Find MEMORY.md
-    # Try common locations
-    for candidate_path in ['memory/MEMORY.md', 'MEMORY.md']:
+    # Resolve MEMORY.md from the config's project root FIRST — resolving relative
+    # to the process CWD makes the stage silently no-op when the command is run
+    # from another directory, and compares against the WRONG project's index when
+    # cwd is a different vault. Fall back to cwd-relative only when no config.
+    candidates = []
+    if config is not None:
+        idx = getattr(config, 'memory_index_path', None)
+        root = getattr(config, 'project_root', None)
+        if idx is not None:
+            candidates.append(os.path.join(str(root), str(idx)) if root and not os.path.isabs(str(idx)) else str(idx))
+    candidates += ['memory/MEMORY.md', 'MEMORY.md']
+    for candidate_path in candidates:
         if os.path.exists(candidate_path):
             try:
-                with open(candidate_path) as f:
+                with open(candidate_path, encoding='utf-8') as f:
                     lines = f.readlines()
             except OSError:
                 return
@@ -277,9 +291,14 @@ def _check_l0_echo(memory, threshold, quarantine_reasons):
 
     # Check for relations to targets outside echoed entry
     candidate_rel_targets = {r.get('target') for r in memory.get('relations', []) if r.get('target')}
+    # Entries this candidate SUPERSEDES are exempt: a new version of a fact
+    # legitimately restates-and-replaces the old one (the whole point of a keyed
+    # supersession), so echoing the entry it supersedes must NOT quarantine it.
+    superseded_targets = {r.get('target') for r in memory.get('relations', [])
+                          if r.get('type') == 'SUPERSEDES' and r.get('target')}
 
     for entry_name, entry_desc in l0_entries.items():
-        if entry_name == name:
+        if entry_name == name or entry_name in superseded_targets:
             continue
         entry_words = content_words(entry_desc)
         if not entry_words:

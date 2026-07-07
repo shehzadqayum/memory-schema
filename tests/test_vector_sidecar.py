@@ -61,10 +61,34 @@ class TestExternalizeRehydrate:
         assert not os.path.exists(os.path.join(sdir, "no-vec.npz"))
 
     def test_missing_sidecar_degrades_unembedded(self, tmp_path):
+        """Missing sidecar -> no vectors this load, but the marker is KEPT so a
+        later load (or reconcile) retries and the entry is never permanently
+        detached from an intact .npz by a numpy-less/missing-file pass."""
         sdir = str(tmp_path / ".embeddings")
         e = {"name": "ghost", "vectors_external": True}
         out = rehydrate(e, sdir)
-        assert "embedding" not in out and "vectors_external" not in out
+        assert "embedding" not in out       # degraded to unembedded for this load
+        assert out["vectors_external"] is True   # link preserved for retry
+
+    def test_marker_popped_only_on_success(self, tmp_path):
+        import numpy as np
+        sdir = str(tmp_path / ".embeddings")
+        externalize({"name": "real", "embedding": [0.1] * 8,
+                     "embed_input_hash": "h1"}, sdir)
+        out = rehydrate({"name": "real", "vectors_external": True}, sdir)
+        assert "vectors_external" not in out          # success pops the marker
+        assert len(out["embedding"]) == 8
+
+    def test_unsafe_name_stays_inline(self, tmp_path):
+        """A name with a path separator / '..' must not escape the sidecar dir
+        or crash the save — it keeps its vectors inline instead."""
+        sdir = str(tmp_path / ".embeddings")
+        for bad in ("../evil", "plans/x", "a:b"):
+            e = {"name": bad, "embedding": [0.1] * 4, "embed_input_hash": "h"}
+            out = externalize(e, sdir)
+            assert out is e                      # unchanged, vectors kept inline
+        # nothing was written outside the (possibly absent) sidecar dir
+        assert not os.path.exists(os.path.join(tmp_path, "evil.npz"))
 
     def test_prune_orphans(self, tmp_path):
         sdir = str(tmp_path / ".embeddings")

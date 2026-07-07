@@ -29,6 +29,26 @@ def _now_iso():
     return datetime.now(timezone.utc).isoformat()
 
 
+_LUCENE_SPECIAL = set(r'+-&|!(){}[]^"~*?:\/')
+
+
+def _lucene_escape(query):
+    """Backslash-escape Lucene query-syntax metacharacters.
+
+    `db.index.fulltext.queryNodes` parses its argument as a Lucene query, so a
+    raw user string with '/', ':', unbalanced quotes/parens, etc. throws a
+    ClientError that crashes the CLI — and these are routine in a trading journal
+    ('USD/JPY', 'R/R', 'win/loss'). Escaping turns the query into a safe literal
+    term search, matching the command's documented substring/keyword intent.
+    """
+    out = []
+    for ch in str(query):
+        if ch in _LUCENE_SPECIAL:
+            out.append("\\")
+        out.append(ch)
+    return "".join(out)
+
+
 def connect(config=None, uri=None, user=None, password=None):
     """Build a Neo4j driver, run a RETURN 1 liveness probe, and wrap auth failures with a friendly
     ConnectionError. The SINGLE place driver construction + the probe live — the store, schema setup,
@@ -422,7 +442,7 @@ class Neo4jMemoryStore:
                            OR node.project STARTS WITH $filter_project_prefix){active_filter}
                     RETURN node
                     LIMIT $result_limit
-                """, search_query=query, filter_type=type,
+                """, search_query=_lucene_escape(query), filter_type=type,
                     filter_project=project,
                     filter_project_prefix=(project + '.') if project else None,
                     result_limit=limit)

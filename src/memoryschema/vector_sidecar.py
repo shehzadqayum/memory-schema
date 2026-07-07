@@ -41,17 +41,35 @@ def _npz_path(sdir, name):
     return os.path.join(sdir, "%s.npz" % name)
 
 
+def _unsafe_name(name):
+    """True if `name` cannot be a plain file inside the sidecar dir.
+
+    An entity name is used raw as the .npz filename; a name containing a path
+    separator or '..' would write OUTSIDE memory/.embeddings (traversal), and a
+    Windows-illegal character would make open() raise mid-_save, failing every
+    subsequent store write for the whole corpus. Names are not hard-validated to
+    kebab at creation, so guard here: unsafe names keep their vectors inline
+    rather than escape the dir or crash the save.
+    """
+    if not name or name in (".", ".."):
+        return True
+    if name != os.path.basename(name):        # contains a separator
+        return True
+    return any(c in name for c in '\\/:*?"<>|')
+
+
 def externalize(entry, sdir):
     """Return a shallow copy of `entry` with vectors moved to <name>.npz.
 
     Writes the .npz only when missing or the stored provenance hash differs
-    (embeddings are immutable per content-version). If numpy is unavailable or
-    the entry has no vectors/name, returns the entry unchanged (inline).
+    (embeddings are immutable per content-version). If numpy is unavailable, the
+    entry has no vectors/name, or the name is not a safe filename, returns the
+    entry unchanged (inline).
     """
     np = _np()
     name = entry.get("name")
     has_vec = any(entry.get(k) for k in VEC_KEYS)
-    if np is None or not name or not has_vec:
+    if np is None or not name or not has_vec or _unsafe_name(name):
         return entry
 
     os.makedirs(sdir, exist_ok=True)
@@ -94,18 +112,21 @@ def externalize(entry, sdir):
 def rehydrate(entry, sdir):
     """Load vectors back into an entry saved with externalize (in place).
 
-    Missing/corrupt sidecar degrades to an unembedded entry (scoring treats it
-    like any embedding-less memory; reconcile re-embeds via the hash check).
+    The marker is popped ONLY on a successful rehydrate. If we cannot rehydrate
+    now (no numpy, missing/corrupt .npz), the marker is KEPT — otherwise the next
+    store._save would persist the entry with neither vectors nor marker,
+    permanently detaching an intact sidecar (e.g. a single mutation run from a
+    numpy-less Python would silently strip the whole corpus's embeddings). The
+    entry is treated as unembedded for THIS load; a later load (or reconcile)
+    retries via the still-present marker.
     """
-    if not entry.pop(MARKER, False):
+    if not entry.get(MARKER):
         return entry
     np = _np()
     name = entry.get("name")
-    if np is None or not name:
-        return entry
-    path = _npz_path(sdir, name)
-    if not os.path.exists(path):
-        return entry
+    path = _npz_path(sdir, name) if name else None
+    if np is None or not name or not path or not os.path.exists(path):
+        return entry  # keep marker; cannot rehydrate now
     try:
         with np.load(path, allow_pickle=False) as z:
             if "embedding" in z.files:
@@ -116,8 +137,9 @@ def rehydrate(entry, sdir):
                     spaces[f[3:]] = z[f].astype(float).tolist()
             if spaces:
                 entry["embeddings"] = spaces
+        entry.pop(MARKER, None)  # success — vectors are inline again
     except Exception:
-        pass  # degraded: unembedded entry
+        return entry  # corrupt/unreadable: keep marker, degrade this load
     return entry
 
 

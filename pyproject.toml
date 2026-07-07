@@ -1,5 +1,7 @@
 [build-system]
-requires = ["setuptools>=64"]
+# >=77: the PEP 639 string-form `license = "MIT"` below is rejected by setuptools
+# 64-76 ('project.license must be a table'), so the old floor could not build.
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]

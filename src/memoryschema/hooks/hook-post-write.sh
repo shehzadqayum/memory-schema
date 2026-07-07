@@ -75,6 +75,13 @@ if [ -f "$ENV_FILE" ]; then
                 _val="${_line#*=}"
                 _key="${_key//[[:space:]]/}"
                 _val="${_val%%[[:space:]]#*}"   # strip ' # inline comment', keep '#' in values
+                # Strip surrounding matching quotes (dotenv convention; matches the
+                # CLI .env parser — a quoted NEO4J_PASSWORD="x" must export x, or the
+                # hook's Neo4j auth fails and it silently drifts to JSONL-only).
+                case "$_val" in
+                    '"'*'"') _val="${_val#\"}"; _val="${_val%\"}" ;;
+                    "'"*"'") _val="${_val#\'}"; _val="${_val%\'}" ;;
+                esac
                 [ -n "$_key" ] && export "$_key=$_val"
                 ;;
         esac
@@ -89,12 +96,15 @@ if [[ "$(basename "$FILE_PATH")" == "MEMORY.md" ]]; then
     exit 0
 fi
 
-# Run the Python indexing pipeline using memoryschema package
-"$PYTHON" -c "
+# Run the Python indexing pipeline using memoryschema package.
+# Pass the file path via the ENVIRONMENT, never interpolated into the source: a
+# path containing a single quote (e.g. C:/Users/O'Brien/...) would otherwise break
+# the Python literal (every write fails) or inject arbitrary code.
+MEMORYSCHEMA_HOOK_FILE="$FILE_PATH" "$PYTHON" -c "
 import sys, os
 
 # Derive project root from file path (parent of memory/)
-filepath = '$FILE_PATH'
+filepath = os.environ['MEMORYSCHEMA_HOOK_FILE']
 parts = filepath.replace('\\\\', '/').split('/')
 project_root = None
 for i, part in enumerate(parts):

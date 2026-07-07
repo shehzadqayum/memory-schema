@@ -28,13 +28,17 @@ from xml.sax.saxutils import escape as _xml_escape
 
 
 def escape_text(text):
-    """XML-escape plain text for insertion into an entity element.
+    """XML-escape plain text for insertion into an entity element OR attribute.
 
     The single chokepoint that makes the M14 corruption class impossible on
-    the CLI path: '<', '>', '&' in prose become entities before they ever
-    touch the file.
+    the CLI path: '<', '>', '&', and '"' become entities before they ever
+    touch the file. The quote matters: attribute values (name, type, relation
+    target/type) live in double-quoted contexts, so an un-escaped '"' would
+    silently truncate the value and inject arbitrary attributes that still
+    parse as well-formed XML (e.g. name='inj" status="superseded'). Escaping
+    '"' everywhere is harmless for element text ('&quot;' round-trips to '"').
     """
-    return _xml_escape(str(text))
+    return _xml_escape(str(text), {'"': "&quot;"})
 
 
 class IndexResult:
@@ -274,9 +278,12 @@ def append_chain_step(filepath, step_text, desc=None, reasoning=None, uses=None)
             raise ValueError("no <memory:reasoning> element found")
 
     for target in (uses or []):
-        rel = '    <memory:relation target="%s" type="USES"/>\n  ' % escape_text(target)
+        esc = escape_text(target)
+        rel = '    <memory:relation target="%s" type="USES"/>\n  ' % esc
         if _RELS_CLOSE in content:
-            if ('target="%s" type="USES"' % target) not in content:  # dedupe
+            # dedupe against the ESCAPED form actually present in the file, or a
+            # target containing '&'/'"' is never matched and duplicates accumulate.
+            if ('target="%s" type="USES"' % esc) not in content:
                 content = content.replace(_RELS_CLOSE, rel + _RELS_CLOSE, 1)
         else:
             raise ValueError("no <memory:relations> block found (add one first)")

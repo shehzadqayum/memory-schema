@@ -13,7 +13,7 @@ Public API:
     parse_memory_content  Parse raw content string into dict
     discover_memory_files Find all .md files under a path
 
-    validate              Validate memory content against schema (V1-V13, R1-R7)
+    validate              Validate v4 memory content against schema (V1-V12, R1-R6)
     validate_file         Validate a file
     validate_directory    Validate all files in a directory
 

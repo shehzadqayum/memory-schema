@@ -87,7 +87,15 @@ def load_toml_config(path):
     try:
         with open(path, 'rb') as f:
             return tomllib.load(f)
-    except (FileNotFoundError, tomllib.TOMLDecodeError):
+    except FileNotFoundError:
+        return {}
+    except tomllib.TOMLDecodeError as e:
+        # A syntax error must NOT silently drop the whole config (project scope
+        # reverts to 'default', container name changes, scoped recall misfilters)
+        # — surface it loudly (invariant: degradation is loud, never silent).
+        import sys
+        print("⚠ memoryschema: malformed TOML %s (%s) — using defaults for it"
+              % (path, e), file=sys.stderr)
         return {}
 
 

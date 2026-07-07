@@ -104,8 +104,11 @@ def build_report(config, active_chain=None, today=None):
         if not key or not vf:
             continue
         try:
-            age = (datetime.fromisoformat(today) - datetime.fromisoformat(vf)).days
-        except ValueError:
+            vf_dt = datetime.fromisoformat(vf)
+            if vf_dt.tzinfo is not None:      # a tz-aware valid_from would raise
+                vf_dt = vf_dt.replace(tzinfo=None)   # TypeError vs naive `today`
+            age = (datetime.fromisoformat(today) - vf_dt).days
+        except (ValueError, TypeError):
             continue
         if age >= STALE_DAYS:
             report["stale_keyed"].append({

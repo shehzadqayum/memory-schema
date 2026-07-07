@@ -1107,9 +1107,10 @@ def get_store(jsonl_path=None, config=None, require_neo4j=None):
 
     Tries Neo4j (L2b). Falls back to JSONL (L1b) — but NEVER silently: a fallback prints a
     loud DEGRADED banner to stderr (the default mode is "Neo4j up at all times", so a
-    fallback means drift will accrue until reconciled). When require_neo4j is set (param,
-    else config.require_neo4j), a Neo4j failure RAISES instead of degrading — used by
-    write-class callers, since JSONL-only writes are what cause drift. (helios local patch.)
+    fallback means drift will accrue until reconciled). When the `require_neo4j` PARAM is
+    truthy, a Neo4j failure RAISES instead of degrading. NOTE: this function does NOT read
+    config.require_neo4j — write-class callers must pass `require_neo4j=config.require_neo4j`
+    explicitly (they do); the param default None means False (degrade). (helios local patch.)
 
     Args:
         jsonl_path: Override JSONL file path.

@@ -383,6 +383,24 @@ def delete(config, name, confirm):
 
     store = _get_store(config)
     deleted = store.delete(name)
+
+    # Delete from BOTH stores + the sidecar: get_store may have returned Neo4j,
+    # leaving the JSONL entry and its .npz to resurface in degraded (JSONL) recall.
+    import os
+    from memoryschema.store import MemoryStore
+    from memoryschema import vector_sidecar
+    try:
+        jsonl = MemoryStore(str(config.store_path))
+        deleted = jsonl.delete(name) or deleted
+    except Exception:
+        pass
+    npz = vector_sidecar._npz_path(vector_sidecar.sidecar_dir(str(config.store_path)), name)
+    if os.path.exists(npz):
+        try:
+            os.unlink(npz)
+        except OSError:
+            pass
+
     if not deleted:
         click.echo(f"Error: Entity '{name}' not found.", err=True)
         sys.exit(1)
@@ -747,10 +765,30 @@ def remember_cmd(config, name, desc, obs, mtype, importance, reasoning,
     click.echo(f"Created: memory/{name}.md ({len(obs)} observation(s))"
                + (f" · key={fact_key}" if fact_key else ""))
 
-    # Persist supersession FILE-FIRST for both paths (keyed auto-supersession AND
-    # explicit --supersedes): the store-side status flip alone reverts on reconcile.
+    # Index the NEW entity FIRST, then retire the prior holder(s) only if it landed
+    # cleanly. Superseding before indexing meant a gate QUARANTINE or index failure
+    # of the new entity would retire the old fact and leave the key with NO active
+    # holder (the durable fact silently vanishing from recall).
+    res = None
+    if not no_index:
+        res = index_memory(filepath, config=config)
+        _probe = [w for w in res.warnings if '[numeric-probe-hit]' in str(w)]
+        _other = [w for w in res.warnings if '[numeric-probe-hit]' not in str(w)]
+        for w in _other[:5]:
+            click.echo(f"  warn: {w}", err=True)
+        if len(_other) > 5:
+            click.echo(f"  warn: (+{len(_other)-5} more)", err=True)
+        if _probe:  # the v4 numeric probe is noisy on number-dense chain prose — summarize
+            click.echo(f"  warn: numeric-probe: {len(_probe)} cross-entity number mismatches (advisory)", err=True)
+        click.echo(f"  {res.summary()}")
+
+    # Persist supersession FILE-FIRST (keyed auto-supersession AND explicit
+    # --supersedes): the store-side status flip alone reverts on reconcile.
     _to_supersede = ([old_holder] if old_holder else []) + [t for t in supersedes if t != old_holder]
-    if _to_supersede:
+    if _to_supersede and res is not None and not res.ok:
+        click.echo(f"  warn: new entity not indexed cleanly — left "
+                   f"{', '.join(_to_supersede)} ACTIVE (not superseded)", err=True)
+    elif _to_supersede:
         from datetime import date
         for _old in _to_supersede:
             old_path = os.path.join(project_root, "memory", f"{_old}.md")
@@ -767,19 +805,8 @@ def remember_cmd(config, name, desc, obs, mtype, importance, reasoning,
             except (ValueError, OSError) as e:
                 click.echo(f"  warn: could not supersede {_old}: {e}", err=True)
 
-    if not no_index:
-        res = index_memory(filepath, config=config)
-        _probe = [w for w in res.warnings if '[numeric-probe-hit]' in str(w)]
-        _other = [w for w in res.warnings if '[numeric-probe-hit]' not in str(w)]
-        for w in _other[:5]:
-            click.echo(f"  warn: {w}", err=True)
-        if len(_other) > 5:
-            click.echo(f"  warn: (+{len(_other)-5} more)", err=True)
-        if _probe:  # the v4 numeric probe is noisy on number-dense chain prose — summarize
-            click.echo(f"  warn: numeric-probe: {len(_probe)} cross-entity number mismatches (advisory)", err=True)
-        click.echo(f"  {res.summary()}")
-        if not res.ok:
-            raise SystemExit(1)
+    if res is not None and not res.ok:
+        raise SystemExit(1)
 
 
 @click.command("dream")

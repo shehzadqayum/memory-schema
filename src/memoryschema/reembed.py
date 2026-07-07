@@ -19,7 +19,7 @@ import time
 from memoryschema.embedding_input import compose_embedding_text  # canonical source
 
 
-def reembed(prefix, config=None, batch_size=20, max_chars=2000, dry_run=False,
+def reembed(prefix, config=None, batch_size=20, max_chars=8000, dry_run=False,
             skip_assoc=False, space=None):
     """Re-embed entries matching prefix.
 
@@ -79,6 +79,7 @@ def reembed(prefix, config=None, batch_size=20, max_chars=2000, dry_run=False,
     from memoryschema.embeddings import embed_batch as _embed_batch
 
     embedded = 0
+    _reembedded = set()
 
     for i in range(0, len(embeddable), batch_size):
         batch = embeddable[i:i + batch_size]
@@ -94,6 +95,7 @@ def reembed(prefix, config=None, batch_size=20, max_chars=2000, dry_run=False,
                     else:
                         e['embedding'] = vec
                         e.setdefault('embeddings', {})['default'] = vec
+                    _reembedded.add(e.get('name'))
                 embedded += len(batch)
                 break
             except Exception as ex:
@@ -107,13 +109,31 @@ def reembed(prefix, config=None, batch_size=20, max_chars=2000, dry_run=False,
 
     stats['embedded'] = embedded
 
-    # Write store back atomically
+    # Re-stamp provenance for the re-embedded entries and force the sidecar to
+    # rewrite (skip-if-unchanged would otherwise keep the OLD .npz when content —
+    # hence embed_input_hash — is unchanged but the vector was recomputed).
+    from memoryschema.embedding_input import embed_input_hash
+    from memoryschema import vector_sidecar
+    sdir = vector_sidecar.sidecar_dir(store_path)
+    for entry in entries:
+        if entry.get('name') in _reembedded:
+            entry['embed_input_hash'] = embed_input_hash(entry)
+            stale = vector_sidecar._npz_path(sdir, entry['name'])
+            if os.path.exists(stale):
+                try:
+                    os.unlink(stale)
+                except OSError:
+                    pass
+
+    # Write store back atomically, externalizing vectors to the sidecar (matching
+    # store._save) so store.jsonl is not re-bloated with inline vector JSON.
     dirpath = os.path.dirname(store_path)
     fd, tmp_path = tempfile.mkstemp(suffix='.tmp', dir=dirpath)
     try:
         with os.fdopen(fd, 'w', encoding='utf-8') as f:
             for entry in entries:
-                f.write(json.dumps(entry, ensure_ascii=False) + '\n')
+                f.write(json.dumps(vector_sidecar.externalize(entry, sdir),
+                                   ensure_ascii=False) + '\n')
         os.replace(tmp_path, store_path)
     except BaseException:
         if os.path.exists(tmp_path):

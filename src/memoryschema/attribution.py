@@ -87,9 +87,13 @@ def compute_attribution(config):
 
     def _dt(s):
         try:
-            return datetime.fromisoformat(s)
-        except ValueError:
+            d = datetime.fromisoformat(s)
+        except (ValueError, TypeError):
             return None
+        # Normalize to naive so a single tz-aware entry (an older writer, a manual
+        # repair, or an external appender) can't raise TypeError on subtraction and
+        # crash the whole attribution join / dream report.
+        return d.replace(tzinfo=None) if d.tzinfo is not None else d
 
     out = {}
     for name in set(recalls) | set(citations):
