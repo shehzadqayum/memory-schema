@@ -960,6 +960,15 @@ into a fresh project (the `.claude-plugin/` copies are the deployed, possibly-tu
 operational versions — edit those, then re-deploy; do not hand-maintain divergent copies
 in a project's `.claude/`).
 
+**Mechanical, MD5-verified sync.** `memoryschema plugin sync` deploys the canonical
+artefacts into a project's `.claude/` (default `<project_root>/.claude`; `--global` targets
+`~/.claude`) as a **verifiable derived copy**: it MD5s each source against its deployed
+copy and writes only the files that are missing or differ. `plugin sync --check` is
+read-only — it reports drift and **exits non-zero** (a CI / pre-commit / session-start
+gate) without writing. In Helios the session-start self-heal (`scripts/ensure-deps.ps1`)
+runs `plugin sync --check` each session and warns on drift, so the deployment can never
+silently diverge from the package source of truth.
+
 **Package-source vs. deployment-local.** Machine/ops-specific artefacts are deliberately
 NOT in the package (they carry absolute paths or non-portable ops): the Helios SessionStart
 hook (`.claude/settings.local.json`), `scripts/ensure-deps.ps1` (Docker/MT5/web

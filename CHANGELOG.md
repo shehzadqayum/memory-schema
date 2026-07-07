@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Added (2026-07-07 — mechanical, MD5-verified artefact sync)
+- `memoryschema plugin sync [--check] [--target] [--global]` — deploys the canonical
+  memory artefacts from the package into a project's `.claude/` as a verifiable derived
+  copy, MD5-comparing each source against its deployed copy (writes only what differs;
+  `--check` reports drift and exits non-zero without writing — a CI/session-start gate).
+  Helios's session-start self-heal (`ensure-deps.ps1`, new `-NoSync` opt-out) runs the
+  check each session and warns on drift. Spec §12.1.
+
 ### Fixed (2026-07-07 — operational artefacts are now packaged & deployable)
 - The runnable operating system (the `dream-pass` skill + the kernel + the on-demand
   rules) is now versioned in the package at `.claude-plugin/` — previously the skill

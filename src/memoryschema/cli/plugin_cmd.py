@@ -1,5 +1,6 @@
 """CLI commands for deploying/uninstalling the memory-schema plugin at user level (~/.claude/)."""
 
+import hashlib
 import json
 import shutil
 import sys
@@ -369,3 +370,117 @@ def plugin_status(config):
             click.echo("User store:  empty (no store.jsonl yet)")
     else:
         click.echo("User store:  directory missing")
+
+
+# ---------------------------------------------------------------------------
+# Mechanical, checksum-verified sync of the canonical memory artefacts
+# ---------------------------------------------------------------------------
+
+def _md5(path):
+    """MD5 hex digest of a file (streamed)."""
+    h = hashlib.md5()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(65536), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def _artefact_pairs():
+    """(source_rel, target_rel) for every canonical memory artefact — the
+    complete set the package is the single source of truth for."""
+    return list(SKILL_FILES) + list(RULE_FILES)
+
+
+def compute_artefact_sync(src_dir, base):
+    """Compare each canonical artefact's MD5 against its deployed copy.
+
+    Returns a list of {file, status, src_md5, dst_md5, src, dst}. Status is one of
+    src-missing (source of truth absent — a package defect), missing (not deployed),
+    drift (deployed copy differs), in-sync (MD5 match). Pure/read-only.
+    """
+    rows = []
+    for src_rel, dst_rel in _artefact_pairs():
+        s = Path(src_dir) / src_rel
+        d = Path(base) / dst_rel
+        s_md5 = _md5(s) if s.exists() else None
+        d_md5 = _md5(d) if d.exists() else None
+        if s_md5 is None:
+            status = "src-missing"
+        elif d_md5 is None:
+            status = "missing"
+        elif s_md5 == d_md5:
+            status = "in-sync"
+        else:
+            status = "drift"
+        rows.append({"file": dst_rel, "status": status,
+                     "src_md5": s_md5, "dst_md5": d_md5, "src": s, "dst": d})
+    return rows
+
+
+@plugin.command("sync")
+@click.option("--check", is_flag=True,
+              help="Verify only (MD5): report drift, write nothing. Exit 1 on any drift/missing.")
+@click.option("--target", type=click.Path(), default=None,
+              help="Target .claude directory. Default: <project_root>/.claude.")
+@click.option("--global", "use_global", is_flag=True,
+              help="Sync to ~/.claude instead of the project.")
+@click.option("--json", "as_json", is_flag=True, help="Machine-readable output.")
+@click.pass_obj
+def sync(config, check, target, use_global, as_json):
+    """Sync the deployed memory artefacts FROM the package into a project's .claude/,
+    verified by MD5.
+
+    The canonical artefacts (the dream-pass skill, the kernel, the on-demand rules) live
+    in the package at .claude-plugin/ — the SINGLE SOURCE OF TRUTH. This makes a
+    deployment's .claude/ a verifiable derived copy:
+
+      --check   report drift and exit non-zero (a CI / pre-commit gate); writes nothing.
+      (default) copy only the files that are missing or differ; leave in-sync files alone.
+
+    Machine/ops-specific artefacts (the SessionStart hook, ensure-deps.ps1, the tuned
+    memoryschema.toml) are deployment-local by design and are NOT touched here.
+    """
+    src_dir = _find_plugin_dir()
+    if not src_dir:
+        click.echo("Error: package .claude-plugin/ not found — the source of truth is missing.", err=True)
+        sys.exit(1)
+    if use_global:
+        base = CLAUDE_DIR
+    elif target:
+        base = Path(target)
+    else:
+        base = Path(config.project_root) / ".claude"
+    base = Path(base).resolve()
+
+    rows = compute_artefact_sync(src_dir, base)
+    src_missing = [r for r in rows if r["status"] == "src-missing"]
+    changed = [r for r in rows if r["status"] in ("missing", "drift")]
+
+    if not check:
+        for r in changed:
+            r["dst"].parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(r["src"], r["dst"])
+            r["status"] = "written"
+
+    if as_json:
+        click.echo(json.dumps(
+            [{k: v for k, v in r.items() if k not in ("src", "dst")} for r in rows], indent=1))
+    else:
+        mode = "check" if check else "deploy"
+        click.echo(f"Memory artefact sync ({mode})")
+        click.echo(f"  source: {src_dir}")
+        click.echo(f"  target: {base}")
+        marks = {"in-sync": "=", "written": "+", "missing": "!", "drift": "~", "src-missing": "x"}
+        for r in rows:
+            click.echo("  %s %-11s %s  (%s)" % (
+                marks.get(r["status"], "?"), r["status"], r["file"], (r["src_md5"] or "--------")[:8]))
+
+    # Exit semantics: a broken source of truth always fails; --check fails on any drift.
+    if src_missing:
+        click.echo("  ERROR: %d artefact(s) missing from the package source." % len(src_missing), err=True)
+        sys.exit(1)
+    if check and changed:
+        click.echo("  DRIFT: %d file(s) differ from the package — run `memoryschema plugin sync`." % len(changed), err=True)
+        sys.exit(1)
+    if not check and changed:
+        click.echo("  Synced %d file(s) from the package (single source of truth)." % len(changed))

@@ -12,7 +12,65 @@ from memoryschema.cli.main import cli
 from memoryschema.cli.plugin_cmd import (
     SKILL_FILES,
     RULE_FILES,
+    compute_artefact_sync,
 )
+
+
+class TestArtefactSync:
+    """`plugin sync` — mechanical, MD5-verified deploy of the canonical artefacts."""
+
+    def _src(self, tmp_path):
+        src = tmp_path / ".claude-plugin"
+        for src_rel, _ in SKILL_FILES + RULE_FILES:
+            f = src / src_rel
+            f.parent.mkdir(parents=True, exist_ok=True)
+            f.write_text("canonical: " + src_rel + "\n")
+        return src
+
+    def test_check_reports_drift_and_exits_1(self, tmp_path):
+        runner = CliRunner()
+        src = self._src(tmp_path)
+        target = tmp_path / "dep" / ".claude"
+        with patch("memoryschema.cli.plugin_cmd._find_plugin_dir", return_value=src):
+            r = runner.invoke(cli, ["plugin", "sync", "--check", "--target", str(target)])
+        assert r.exit_code == 1                      # nothing deployed yet -> drift
+        assert "missing" in r.output
+
+    def test_deploy_then_check_is_in_sync(self, tmp_path):
+        runner = CliRunner()
+        src = self._src(tmp_path)
+        target = tmp_path / "dep" / ".claude"
+        with patch("memoryschema.cli.plugin_cmd._find_plugin_dir", return_value=src):
+            d = runner.invoke(cli, ["plugin", "sync", "--target", str(target)])
+            assert d.exit_code == 0 and "written" in d.output
+            c = runner.invoke(cli, ["plugin", "sync", "--check", "--target", str(target)])
+            assert c.exit_code == 0 and "in-sync" in c.output
+
+    def test_md5_detects_tamper_and_repairs(self, tmp_path):
+        runner = CliRunner()
+        src = self._src(tmp_path)
+        target = tmp_path / "dep" / ".claude"
+        with patch("memoryschema.cli.plugin_cmd._find_plugin_dir", return_value=src):
+            runner.invoke(cli, ["plugin", "sync", "--target", str(target)])
+            # tamper one deployed file
+            tampered = target / RULE_FILES[0][1]
+            tampered.write_text(tampered.read_text() + "TAMPER")
+            rows = compute_artefact_sync(src, target)
+            assert any(x["status"] == "drift" for x in rows)
+            # repair from source
+            runner.invoke(cli, ["plugin", "sync", "--target", str(target)])
+            rows = compute_artefact_sync(src, target)
+            assert all(x["status"] == "in-sync" for x in rows)
+
+    def test_src_missing_is_a_package_defect(self, tmp_path):
+        runner = CliRunner()
+        src = tmp_path / ".claude-plugin"       # exists but empty — artefacts absent
+        src.mkdir()
+        target = tmp_path / "dep" / ".claude"
+        with patch("memoryschema.cli.plugin_cmd._find_plugin_dir", return_value=src):
+            r = runner.invoke(cli, ["plugin", "sync", "--check", "--target", str(target)])
+        assert r.exit_code == 1
+        assert "src-missing" in r.output
 
 
 @pytest.fixture
