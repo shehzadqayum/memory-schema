@@ -58,6 +58,20 @@ class TestInit:
         result = runner.invoke(cli, ["--project", "test", "--root", str(tmp_path), "init"])
         assert (tmp_path / "docker-compose.yml").exists()
 
+    def test_compose_password_parameterized_not_baked(self, runner, tmp_path, monkeypatch):
+        # Security (Part C MED): the generated compose must NOT bake a plaintext secret at rest — it
+        # references ${NEO4J_PASSWORD}, persisted to a gitignored .env instead.
+        monkeypatch.delenv("NEO4J_PASSWORD", raising=False)
+        runner.invoke(cli, ["--project", "test", "--root", str(tmp_path), "init"])
+        compose = (tmp_path / "docker-compose.yml").read_text(encoding="utf-8")
+        assert "NEO4J_AUTH=neo4j/${NEO4J_PASSWORD}" in compose
+        import re as _re
+        assert not _re.search(r"NEO4J_AUTH=neo4j/[A-Za-z0-9_-]{16,}", compose), "plaintext secret baked in compose"
+        assert "# memoryschema-managed" in compose, "preflight trust sentinel missing"
+        env_text = (tmp_path / ".env").read_text(encoding="utf-8")
+        assert "NEO4J_PASSWORD=" in env_text and len(env_text.split("NEO4J_PASSWORD=")[1].strip()) >= 16
+        assert ".env" in [ln.strip() for ln in (tmp_path / ".gitignore").read_text(encoding="utf-8").splitlines()]
+
     def test_env_example_created(self, runner, tmp_path):
         result = runner.invoke(cli, ["--project", "test", "--root", str(tmp_path), "init"])
         assert (tmp_path / ".env.example").exists()

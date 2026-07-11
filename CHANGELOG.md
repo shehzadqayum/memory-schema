@@ -15,6 +15,11 @@
   (cloud tokens, other services) far beyond the DB/embedding credentials it needs. The export is now
   allowlisted to the memory backend's own namespaces (`NEO4J_*`, `VOYAGE_*`, `MEMORYSCHEMA_*`,
   `MEMORY_PROJECT`, `MEMORY_GENERATOR`, `MEMORY_ROOT`).
+- **MED — `init` no longer bakes the Neo4j password into the generated compose.** `docker-compose.yml.tpl`
+  rendered `NEO4J_AUTH=neo4j/<plaintext>` (and the healthcheck) with the generated secret at rest in the
+  file. The template now references `${NEO4J_PASSWORD}`, and `init` persists the generated secret to the
+  sibling `.env` (creating/extending `.gitignore` to exclude it) so `docker compose up` interpolates it and
+  the CLI/hook — which already auto-load `.env` — pick it up. Matches the helios deployment fix (`310a42e`).
 
 ### Changed (2026-07-11 — schema-split Part B: the harness conforms UP to the entity authority)
 - **B4 — `SCHEMA_VERSION` reflects the current format.** It was pinned at the legacy v4 marker (`4`) while

@@ -203,13 +203,27 @@ def init(config, with_neo4j, scopes, neo4j_password):
             tpl = (pkg_files("memoryschema.templates") / "docker-compose.yml.tpl").read_text()
             content = tpl.format(
                 neo4j_container_name=config.neo4j_container_name,
-                neo4j_password=neo4j_password,
                 neo4j_bolt_port=config.neo4j_bolt_port,
                 neo4j_http_port=config.neo4j_http_port,
                 volume_name=f"{config.project_name}_neo4j_data",
             )
             config.docker_compose_path.write_text(content)
             created.append(str(config.docker_compose_path))
+            # The compose references ${NEO4J_PASSWORD} rather than baking the secret at rest (security). Persist
+            # it to the sibling .env (gitignored) so `docker compose up` interpolates it and the CLI/hook — which
+            # already auto-load .env — pick it up. Append-if-missing; never clobber an existing value.
+            env_path = config.project_root / ".env"
+            has_pw = env_path.exists() and "NEO4J_PASSWORD=" in env_path.read_text(encoding="utf-8")
+            if not has_pw:
+                with open(env_path, "a", encoding="utf-8") as f:
+                    f.write(f"NEO4J_PASSWORD={neo4j_password}\n")
+                created.append(str(env_path))
+            # Keep the secret out of version control: ensure .gitignore excludes .env.
+            gi_path = config.project_root / ".gitignore"
+            gi_lines = gi_path.read_text(encoding="utf-8").splitlines() if gi_path.exists() else []
+            if ".env" not in [ln.strip() for ln in gi_lines]:
+                with open(gi_path, "a", encoding="utf-8") as f:
+                    f.write(".env\n")
         except Exception:
             click.echo("Warning: docker-compose.yml template not found. Skipping.", err=True)
 
