@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### Added (2026-07-11 — deployment architecture + the machine-stamped ledger)
+- **`memoryschema deploy register` / `deploy status`** + **`DEPLOYMENT.md`** — the git-sharing architecture:
+  a single-source-of-truth module repo, `git subtree` vendoring, per-project `deployments/<project>` branches,
+  and a **machine-stamped ledger** (`deployments/<project>.toml` on `main`). `register` deterministically
+  stamps the pointer + module HEAD + schema version + date; `status` reconciles the ledger files against the
+  actual `deployments/*` branches and flags any disagreement (registered-not-pushed / branch-only), so the
+  ledger can never silently drift from git — unlike a hand-maintained registry. Hermetic tests (throwaway git
+  repo). Rationale + rejected alternatives (PyPI-registry, submodules) documented in DEPLOYMENT.md.
+
 ### Added (2026-07-11 — the adoption guide)
 - **`BOOTSTRAP.md`** — how to adopt the module in a new or existing project, written from the verified path:
   prerequisites, the two install modes (pip vs git-subtree vendor), `init` (what it scaffolds), `hook install`,

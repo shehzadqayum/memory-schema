@@ -8,6 +8,7 @@ Setup & Deployment:
     init           Initialize a new project with memory system
     neo4j          Manage Neo4j Docker container (deploy, up, down, status, ...)
     voyage         Manage Voyage AI connectivity (status, test)
+    deploy         Deployment ledger — which projects vendor this module (register, status)
 
 Memory Operations:
     status         Show store backend, node count, embedding coverage
@@ -388,3 +389,6 @@ cli.add_command(plugin_group)
 
 from memoryschema.cli.preflight_cmd import preflight
 cli.add_command(preflight)
+
+from memoryschema.cli.deploy_cmd import deploy as deploy_group
+cli.add_command(deploy_group)
