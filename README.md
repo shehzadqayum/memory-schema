@@ -16,7 +16,7 @@ cd ~/Projects/my-project
 memoryschema --project my-project init --scopes working --with-neo4j
 memoryschema hook install
 export VOYAGE_API_KEY=voy-xxxxx        # or put it in .env — auto-loaded by CLI and hook
-export MEMORYSCHEMA_V5=1               # author schema-v5 entities (recommended)
+# entities are authored in v5 by default; set MEMORYSCHEMA_V4=1 (or MEMORYSCHEMA_V5=0) only to author legacy v4
 memoryschema preflight && memoryschema status
 ```
 

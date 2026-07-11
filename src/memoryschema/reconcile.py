@@ -87,6 +87,8 @@ def _declares_v5_in_frontmatter(text):
         s = line.strip()
         if s == '---':                     # end of frontmatter — stop before the body
             break
+        if line.startswith((' ', '-')):    # indented / list lines are not top-level scalars (parser rule) —
+            continue                        # a nested `schema: 5` does not make the file a v5 entity
         if s.startswith('schema:'):
             val = s[len('schema:'):].strip().strip('"').strip("'")
             if val == '5':

@@ -177,6 +177,10 @@ def test_b3_malformed_v5_is_guarded_not_pruned(tmp_path):
     # be misread as a corrupt entity — the marker scans the frontmatter block only, never the body
     (mem / "doc-note.md").write_text(
         "---\ntype: doc\n---\n\n# The v5 format\nA v5 entity's frontmatter contains:\nschema: 5\n", encoding="utf-8")
+    # negative control 3: an INDENTED `schema: 5` (nested under another key) is not a top-level scalar — the
+    # parser ignores indented lines, so the guard must too (else it falsely aborts reconcile on a legit note)
+    (mem / "nested-note.md").write_text(
+        "---\ntype: doc\nmeta:\n  schema: 5\n---\n\nprose\n", encoding="utf-8")
     # regression: a corrupt v4 file stays guarded too
     (mem / "broken-v4.md").write_text(
         '<memory:entity schema="4" name="broken-v4">\n  <memory:description>unclosed', encoding="utf-8")
@@ -188,7 +192,8 @@ def test_b3_malformed_v5_is_guarded_not_pruned(tmp_path):
     assert "broken-v4.md" in flagged, "corrupt v4 entity must stay guarded"
     assert "plain-note.md" not in flagged, "a non-entity note must NOT be flagged as corruption"
     assert "doc-note.md" not in flagged, "a note that mentions `schema: 5` in its BODY must NOT be flagged"
-    assert "good-v5" in out and "plain-note" not in out and "doc-note" not in out
+    assert "nested-note.md" not in flagged, "an indented (non-top-level) `schema: 5` must NOT be flagged"
+    assert "good-v5" in out and "plain-note" not in out and "doc-note" not in out and "nested-note" not in out
 
 
 def test_doc_machine_sections_match_render_reference_tables():
