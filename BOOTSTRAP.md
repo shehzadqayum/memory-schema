@@ -123,7 +123,7 @@ kernel (`.claude/rules/memory-working.md`) states these five habits for the agen
 - **After bulk `.md` edits:** `memoryschema reconcile` rebuilds JSONL from the `.md` set, pushes Neo4j, prunes,
   and verifies (idempotent; `sync` inspects drift read-only first).
 - **Eval your corpus (optional):** drop a `eval-gold.jsonl` (`{query, relevant, kind}` per line) at the project
-  root and run `memoryschema eval ablation` / `eval backends`.
+  root and run `memoryschema eval --mode ablation` / `--mode backends`.
 
 | Problem | Fix |
 |---------|-----|
