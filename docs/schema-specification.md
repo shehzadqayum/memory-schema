@@ -102,7 +102,7 @@ suffer the v4 content-corruption class). Roundtrip identity is pinned by `tests/
 
 v5 well-formedness is **parse-based**: `parse_v5_content(...) is None` is the single criterion, and every
 deterministic writer re-parses its own output before committing (create refuses to write on failure; append
-validates before/after). The content-quality rules (see §5) are enforced by the validator.
+validates before/after). The content-quality rules (the V/R/Q invariants below) are enforced by the validator.
 
 **Corruption invariant (NORMATIVE):** a *present-but-unparseable* entity file is **corruption, never a
 deletion** — `reconcile`/`sync` must surface it and **abort rather than prune** the entity. *(Today the guard

@@ -5,7 +5,7 @@ markdown body), a deterministic CLI write path, JSONL/Neo4j dual storage, Voyage
 multi-space embeddings, and Claude Code hook integration.
 
 > **The single source of truth for how this system works is
-> [`docs/memory-system-specification.md`](docs/memory-system-specification.md).**
+> [`docs/harness-manual.md`](docs/harness-manual.md).**
 > This README is a quickstart; on any divergence, the specification wins.
 
 ## Quickstart
@@ -137,7 +137,7 @@ rebuild-verification map (spec §13). `memoryschema doctor` verifies a live depl
 
 ## Documentation
 
-- [`docs/memory-system-specification.md`](docs/memory-system-specification.md) — **the
+- [`docs/harness-manual.md`](docs/harness-manual.md) — **the
   single source of truth** (schema, write path, storage, retrieval, telemetry,
   consolidation, ops, config, complete CLI, test map)
 - [`docs/hierarchy-and-inheritance.md`](docs/hierarchy-and-inheritance.md) — project

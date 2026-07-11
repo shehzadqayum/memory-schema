@@ -1,13 +1,13 @@
-# memory-schema — System Specification
+# memory-schema — Harness / Operations Manual
 
-**Status: THE SINGLE SOURCE OF TRUTH.** This document normatively specifies the entire
-memory-schema system as implemented. Every other document (README, rules files, feature
-deep-dives) derives from this one and defers to it on divergence. It is written to be
-sufficient to rebuild the system from scratch; the test-suite map in §13 is the
-rebuild-verification harness.
+**This document specifies the HARNESS** — the reference implementation of the memory system (CLI, hooks,
+storage layers, retrieval, telemetry, consolidation, operations, configuration, packaging). The **entity
+schema itself** — format, fields, enums, relations, and invariants — is the NORMATIVE authority in
+**[`schema-specification.md`](schema-specification.md)**, to which this harness conforms. Written to be
+sufficient to rebuild the implementation; the test-suite map in §13 is the rebuild-verification harness.
 
-**Schema version: 5** (YAML frontmatter + markdown body). v4 XML entities remain
-parse-compatible legacy (§3.4). Spec date: 2026-07-05. Implementation:
+**Schema version: 5** (YAML frontmatter + markdown body); v4 XML entities remain parse-compatible legacy.
+Spec date 2026-07-05 (schema authority split out 2026-07-11). Implementation:
 `packages/memory-schema/src/memoryschema/`.
 
 ---
@@ -102,7 +102,7 @@ Expected degradations become warnings; structural failures set `ok=False`.
 
 1. **Normalize**: absolute path, backslashes → `/`; must contain `/memory/`; project
    root = prefix before the last `/memory/`.
-2. **Parse** via the dispatch (§3.1); unparseable → error.
+2. **Parse** via the dispatch (schema-specification.md); unparseable → error.
 3. **Authorize** (when `require_active_chain_auth`): an entity whose name already exists
    in `store.jsonl` is read-only **unless it is the active chain**
    (`memory/.active_chain`). New names always pass. (Supersession re-indexes the old
@@ -240,7 +240,7 @@ raises "locked by another process").
 
 **Entry fields.** Store-managed: `created_at`, `last_accessed` (UTC ISO), `access_count`
 (0), `backlinks` (`{source, type}` — recomputed), `associations` (`{name, score}` k-NN —
-recomputed). Content: everything the parser emits (§3), observations as plain strings
+recomputed). Content: everything the parser emits (schema-specification.md), observations as plain strings
 (legacy `{"text","basis"}` dicts collapse to text on both read and write). Derived:
 `embedding` (default space), `embeddings` (per-space), `divergence_profile`,
 `embed_input_hash`. On disk only: `vectors_external: true` (§5.3). Absent `status` ≡
@@ -729,13 +729,13 @@ config resolution → throttled banner-only preflight (§9.1). `--json` on query
 | `sync` | §9.2 read-only name-set drift |
 | `reconcile [--dry-run] [--prune/--no-prune] [--no-verify] [--allow-empty]` | §9.3; exit 1 on abort/verify-fail |
 | `doctor [--json] [--fix]` | 22 live checks (python→tests); `--fix` prints fix commands, advisory only; always exit 0 |
-| `validate [PATH] [--strict] [--json]` | v4 rule validator (v5 files report V1 — §3.3) |
+| `validate [PATH] [--strict] [--json]` | v4 rule validator (v5 files report V1 — schema-specification.md) |
 | `index [--base-path] [--project] [--embed]` | bulk consolidate (hard-requires Neo4j) |
 | `embed [--prefix\|--all] [--space X] [--all-spaces] [--coverage] [--batch-size 20] [--dry-run]` | §6.5 |
 | `associations [--recompute] [--k 10]` | k-NN edge stats/recompute |
 | `reflect [-p] [--min-cluster 2] [--max-cluster 10] [--score-threshold 0.7] [--dry-run] [--include-contradictory]` | §8.4 episodic→semantic |
 | `migrate jsonl-to-neo4j [--batch-size 500] [--dry-run] [--verify] [--skip-assoc]` / `migrate neo4j-to-jsonl [--output]` | store-to-store migration (idempotent MERGE / full mirror export) |
-| `write FILE` | legacy: parse+validate+gate+embed(default-space)+index — effectively v4-only (§3.3); hard-requires Neo4j |
+| `write FILE` | legacy: parse+validate+gate+embed(default-space)+index — effectively v4-only (schema-specification.md); hard-requires Neo4j |
 
 **Infrastructure**
 
@@ -793,7 +793,7 @@ status`/`uninstall` read it.
 |-------------------------------|-----------|------|
 | `skills/dream-pass/SKILL.md` | `~/.claude/skills/dream-pass/` | the consolidation procedure (§8.2) |
 | `rules/memory-working.md` | `~/.claude/rules/` | the always-loaded ~534-token protocol kernel (§1 principle 5) |
-| `rules-ondemand/memory-schema.md` | `~/.claude/rules-ondemand/` | the v5 authoring reference (§3), loaded on demand |
+| `rules-ondemand/memory-schema.md` | `~/.claude/rules-ondemand/` | the v5 authoring reference (schema-specification.md), loaded on demand |
 | `rules-ondemand/memory-corpus.md` | `~/.claude/rules-ondemand/` | corpus-ingestion guidelines (unused in Helios) |
 
 `SKILL_FILES`/`RULE_FILES` in `cli/plugin_cmd.py` MUST stay in sync with that directory.
@@ -885,7 +885,7 @@ record.
   hardcoded at their call sites.
 - A corrupt v5 file is silently skipped by the hook and reads as a non-entity to the
   reconcile malformed-guard (v4-only tripwire) — v5 safety lives in the writers'
-  round-trip checks (§3.3).
+  round-trip checks (schema-specification.md).
 - `remember --body` survives only on the v4 branch; fact keys survive only on v5.
 - The chain bootstrap always writes v5 regardless of `MEMORYSCHEMA_V5`.
 

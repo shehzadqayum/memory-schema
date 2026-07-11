@@ -1,7 +1,7 @@
 # Agent Hierarchy and Inheritance
 
 > Feature deep-dive (non-normative). The single source of truth is
-> [`memory-system-specification.md`](memory-system-specification.md) — see §10.4 for the
+> [`harness-manual.md`](harness-manual.md) — see §10.4 for the
 > normative summary; on divergence, the specification wins.
 
 ## Overview

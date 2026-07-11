@@ -4,7 +4,7 @@ What a valid memory entity looks like, and the write/merge semantics.
 These rules say nothing about when to write or what to capture — that is determined by
 the scope guidelines (memory-working.md / memory-corpus.md).
 
-**Source of truth:** `docs/memory-system-specification.md` in the memory-schema package
+**Source of truth:** `docs/harness-manual.md` in the memory-schema package
 (§3 schema, §4 write path). This file is a derived quick reference.
 
 ---

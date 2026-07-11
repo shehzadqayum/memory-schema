@@ -68,7 +68,7 @@
   CLI and hook; hook Windows-path patch; injection kernel rewrite (~534 tokens).
 
 ### Changed (2026-07-05 — Documentation audit)
-- `docs/memory-system-specification.md` rebuilt as **the single source of truth**
+- `docs/harness-manual.md` rebuilt as **the single source of truth**
   (rebuildable-from-scratch spec: schema, write path, storage, retrieval, telemetry,
   consolidation, ops, config, complete CLI, test map).
 - Deleted `docs/schema.md`, `docs/technical-reference.md`, `docs/implementation-guide.md`,

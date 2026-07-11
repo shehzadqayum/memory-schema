@@ -2,7 +2,7 @@
 
 > **HISTORICAL** — a point-in-time reconnaissance snapshot (June 2026, pre-v5). Several
 > findings were later changed by design (e.g. embedding now runs BEFORE the gate).
-> Current behavior: [`memory-system-specification.md`](../memory-system-specification.md).
+> Current behavior: [`harness-manual.md`](../harness-manual.md).
 
 All 7 assumptions confirmed. No §A fallbacks triggered.
 

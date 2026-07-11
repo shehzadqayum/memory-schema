@@ -10,7 +10,7 @@
 # Output format (PostToolUse event):
 #   PostToolUse hooks support hookSpecificOutput with additionalContext.
 #   This hook returns no stdout JSON (pass-through via exit code only).
-#   See docs/memory-system-specification.md §9.4 (hook output formats).
+#   See docs/harness-manual.md §9.4 (hook output formats).
 #
 # Exit codes:
 #   0 — success (or non-memory write, silently ignored)

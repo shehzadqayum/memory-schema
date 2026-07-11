@@ -2,7 +2,7 @@
 
 | document | role |
 |----------|------|
-| [`memory-system-specification.md`](memory-system-specification.md) | **THE SINGLE SOURCE OF TRUTH** — the complete, normative, rebuildable-from-scratch specification (schema, write path, storage, retrieval, telemetry, consolidation, ops, config, CLI, test map). Every other document defers to it. |
+| [`harness-manual.md`](harness-manual.md) | **THE SINGLE SOURCE OF TRUTH** — the complete, normative, rebuildable-from-scratch specification (schema, write path, storage, retrieval, telemetry, consolidation, ops, config, CLI, test map). Every other document defers to it. |
 | [`hierarchy-and-inheritance.md`](hierarchy-and-inheritance.md) | Feature deep-dive: project nesting, config/rules inheritance (non-normative satellite of spec §10.4) |
 | [`design/`](design/) | Historical design documents (bannered; includes proposals that were never implemented) |
 | [`plans/`](plans/) | Historical implementation plans (bannered) |

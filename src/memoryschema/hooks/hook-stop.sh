@@ -7,7 +7,7 @@
 #   Stop hooks do NOT support hookSpecificOutput. Use top-level fields only.
 #   Valid:   {"systemMessage": "..."}
 #   Invalid: {"hookSpecificOutput": {"additionalContext": "..."}}
-#   See docs/memory-system-specification.md §9.4 (hook output formats).
+#   See docs/harness-manual.md §9.4 (hook output formats).
 #
 # Exit codes:
 #   0 — always (Stop hooks must not block)

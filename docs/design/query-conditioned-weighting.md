@@ -4,7 +4,7 @@
 > `WEIGHT_PROFILES`, query→profile combining) was superseded by the
 > **variance-weighted divergence-profile combiner** now in `spaces.py`
 > (`combine_similarities`: no base weights, no query classification, no heuristics) —
-> see [`memory-system-specification.md`](../memory-system-specification.md) §6.3.
+> see [`harness-manual.md`](../harness-manual.md) §6.3.
 > Retained for the eval evidence that motivated the multi-space redesign (equal-weight
 > averaging measurably degraded retrieval). The “current system” sections below describe
 > the June-2026 v4 system, not the present one.
