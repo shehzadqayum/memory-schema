@@ -10,6 +10,9 @@ multi-space embeddings, and Claude Code hook integration.
 
 ## Quickstart
 
+> Adopting this in a new or existing project? See **[BOOTSTRAP.md](BOOTSTRAP.md)** for the full
+> install → `init` → hook → preflight → first-memory walkthrough (both pip and git-subtree modes).
+
 ```bash
 pip install memory-schema[all]          # or vendor it (git subtree) into your project
 cd ~/Projects/my-project

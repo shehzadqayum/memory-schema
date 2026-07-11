@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Added (2026-07-11 — the adoption guide)
+- **`BOOTSTRAP.md`** — how to adopt the module in a new or existing project, written from the verified path:
+  prerequisites, the two install modes (pip vs git-subtree vendor), `init` (what it scaffolds), `hook install`,
+  `plugin sync` (+ `--check` drift gate), backend up + `preflight`, first-memory habits, a verification
+  checklist, and an upgrade/troubleshooting section. Linked from the README quickstart.
+
 ### Changed (2026-07-11 — project-agnosticism: the package no longer references any specific deployment)
 - **The entire package is now project-agnostic — zero references to any deployment (no "Helios", "Aurora",
   "trading-journal", or trading-domain examples) in any live file** (code, tests, deployed rules/skill, docs).
