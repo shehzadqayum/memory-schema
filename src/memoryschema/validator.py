@@ -21,8 +21,7 @@ from memoryschema.config import (
     VALID_RELATION_TYPES, DEPRECATED_RELATION_TYPES, ALL_RELATION_TYPES,
     SCHEMA_VERSION,
 )
-
-KEBAB_CASE = re.compile(r'^[a-z0-9]+(-[a-z0-9]+)*$')
+from memoryschema.entity_schema import KEBAB_CASE   # the single name/target grammar (authority)
 
 
 def extract_entity_block(content):

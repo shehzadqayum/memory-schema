@@ -9,19 +9,13 @@ import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
-# Canonical constants — other modules import from here.
-VALID_TYPES = frozenset({'semantic', 'episodic', 'procedural'})
-VALID_STATUSES = frozenset({'active', 'superseded', 'archived', 'quarantined'})
-VALID_RELATION_TYPES = frozenset({
-    'USES', 'MODIFIES', 'SUPERSEDES', 'DEPENDS_ON', 'INFORMS', 'CONTRADICTS',
-    'MITIGATES',
-})
-# Deprecated in v3: hierarchy is the project field, not relation edges.
-# Accepted on read for backward compatibility, warned on write.
-DEPRECATED_RELATION_TYPES = frozenset({'PARENT_OF', 'CHILD_OF'})
-# Combined set for validation (accepts both active and deprecated)
-ALL_RELATION_TYPES = VALID_RELATION_TYPES | DEPRECATED_RELATION_TYPES
-SCHEMA_VERSION = 4
+# The entity-schema constants live in the single authority entity_schema.py; re-exported here so the historical
+# ``from memoryschema.config import VALID_TYPES`` import paths keep working. (entity_schema is a leaf module —
+# it imports nothing from config, so there is no cycle.)
+from memoryschema.entity_schema import (  # noqa: F401  (re-export of the canonical authority)
+    VALID_TYPES, VALID_STATUSES, VALID_RELATION_TYPES,
+    DEPRECATED_RELATION_TYPES, ALL_RELATION_TYPES, SCHEMA_VERSION,
+)
 
 
 @dataclass
