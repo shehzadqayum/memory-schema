@@ -79,7 +79,13 @@ def _declares_v5_in_frontmatter(text):
     drift from what the parser accepts (hand-rolled scans diverged on quoted / `schema :` / indented spellings,
     each a data-loss regression). Scans only the region between the opening `---` and the closing `---`, or to
     EOF when the fence is unterminated (the corrupt case the guard exists for) — never the terminated body. The
-    discriminator is exactly `parse_v5_content`'s: the parsed `schema` scalar equals "5"."""
+    discriminator is exactly `parse_v5_content`'s: the parsed `schema` scalar equals "5".
+
+    Accepted limitation: in the unterminated-fence case the scanned region runs to EOF, so a later column-0
+    `schema: <non-5>` body line can overwrite the declaration via the parser's last-wins semantics and the
+    file is then not flagged. Detecting authorial intent inside a corrupt file is inherently ambiguous;
+    matching the parser exactly (rather than a heuristic that could mis-flag valid notes) is the deliberate
+    trade."""
     from memoryschema.format_v5 import _parse_frontmatter
     lines = text.lstrip('﻿').lstrip().splitlines()
     if not lines or lines[0].strip() != '---':
