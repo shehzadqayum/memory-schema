@@ -4,7 +4,7 @@ What a valid memory entity looks like, and the write/merge semantics. Loaded on 
 needed only when hand-authoring or debugging entity files; the deterministic CLI
 (`chain step` / `remember`) writes valid entities for you.
 
-**Source of truth:** `packages/memory-schema/docs/schema-specification.md`
+**Source of truth:** the memory-schema package's `docs/schema-specification.md`
 (the entity schema — format, fields, enums, grammars, invariants; the write-path *mechanics* live in
 `harness-manual.md` §4). This file is a derived quick reference.
 
@@ -21,11 +21,11 @@ body — nothing is ever escaped (raw `<` `>` `&` are safe everywhere).
 schema: 5
 type: semantic          # semantic | episodic | procedural (default: semantic)
 importance: 7           # 1-10 (default 5; vary it — 7 is the overused mode)
-project: helios
-key: EURUSD.bias        # optional fact key -> deterministic supersession
+project: my-project
+key: some-topic.subkey  # optional fact key -> deterministic supersession
 valid_from: 2026-07-01  # temporal validity start (auto-stamped with --key)
 relations:
-  - USES chain-session-2026-07-04
+  - USES some-evidence-memory
   - SUPERSEDES old-entity-name
 ---
 
@@ -91,8 +91,8 @@ frontmatter — lifecycle changes on v4 files revert on reconcile (the CLI warns
 
 ## Retrieval scoring (what makes an entity findable)
 
-`score = recency·w_r + importance/10·w_i + relevance·w_v` (semantic weights 0.2/0.3/0.5;
-Helios tunes to 0.15/0.15/0.70). Relevance is variance-weighted over 7 embedding spaces
+`score = recency·w_r + importance/10·w_i + relevance·w_v` (default semantic weights 0.2/0.3/0.5;
+tune per deployment via `retrieval.semantic_weights` in memoryschema.toml). Relevance is variance-weighted over 7 embedding spaces
 (name, description+summary, observations, prompt, reasoning, chain, default blend).
 Type modifiers: semantic floors at 0.6; procedural reinforces with access; episodic
 decays. Practical consequences: front-load distinctive wording in the description;

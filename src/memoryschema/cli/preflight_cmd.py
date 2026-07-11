@@ -1,4 +1,4 @@
-"""Preflight dependency-health command (helios local patch)."""
+"""Preflight dependency-health command."""
 import json
 import sys
 

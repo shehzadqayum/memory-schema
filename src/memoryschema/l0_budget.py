@@ -186,7 +186,7 @@ def categorize_index(index_path, store_path=None):
     return len(entries)
 
 
-# --- L0 self-heal: rebuild MEMORY.md from the store (helios local patch) ---------------------
+# --- L0 self-heal: rebuild MEMORY.md from the store ---------------------
 #
 # The append-only hook + evict-only budget could not keep MEMORY.md faithful: superseded/archived
 # entries lingered (nothing removed them), evicted-or-never-added active entries never came back

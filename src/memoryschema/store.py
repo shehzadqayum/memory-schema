@@ -1110,7 +1110,7 @@ def get_store(jsonl_path=None, config=None, require_neo4j=None):
     fallback means drift will accrue until reconciled). When the `require_neo4j` PARAM is
     truthy, a Neo4j failure RAISES instead of degrading. NOTE: this function does NOT read
     config.require_neo4j — write-class callers must pass `require_neo4j=config.require_neo4j`
-    explicitly (they do); the param default None means False (degrade). (helios local patch.)
+    explicitly (they do); the param default None means False (degrade).
 
     Args:
         jsonl_path: Override JSONL file path.

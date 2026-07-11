@@ -1,8 +1,7 @@
 # Corpus Memory Guidelines (importance: 4-7)
 
-> **Unused in Helios** — no corpus scope is deployed here. Retained as the reference for
-> batch source-content ingestion. Normative schema:
-> `packages/memory-schema/docs/schema-specification.md`.
+> Deployed only when a project inits with `--scopes corpus`. The reference for batch
+> source-content ingestion. Normative schema: the package's `docs/schema-specification.md`.
 
 **Enforcement: batch — imported via scripts, no per-response requirement.** Validated at
 import time. Absence from a response is not a violation.

@@ -14,7 +14,7 @@ File shape:
     type: semantic            # optional
     importance: 7             # optional
     status: active            # optional
-    project: helios           # optional
+    project: my-project       # optional
     relations:
       - USES some-memory
       - SUPERSEDES old-memory

@@ -28,7 +28,7 @@ def create_schema(driver):
         # Declarative vector-index DDL (Neo4j 5.11+) — idempotent via IF NOT EXISTS, unlike the
         # legacy db.index.vector.createNodeIndex(...) which throws EquivalentSchemaRuleAlreadyExists
         # on re-run and broke `neo4j reset`/`schema`/`deploy`. Backticks on the dotted option keys
-        # are required. (helios local patch — re-apply on re-vendor.)
+        # are required.
         session.run("""
             CREATE VECTOR INDEX memory_embedding IF NOT EXISTS
             FOR (m:Memory) ON (m.embedding)

@@ -307,7 +307,7 @@ def write(config, file_path):
 
     # Embed BEFORE gate (stages 4-6 need the embedding vector).
     # `write` is an explicit MATERIALIZE command — hard-require Neo4j by default (like `index`) so a
-    # missing backend fails loud instead of writing JSONL-only that drifts. (helios local patch.)
+    # missing backend fails loud instead of writing JSONL-only that drifts.
     from memoryschema.store import get_store
     try:
         store = get_store(config=config, require_neo4j=config.require_neo4j)
@@ -741,11 +741,11 @@ def remember_cmd(config, name, desc, obs, mtype, importance, reasoning,
     dual-write, L0 rebuild). Refuses to overwrite an existing entity.
 
     Example:
-        memoryschema remember bridge-timeout-fix \
-            --desc "Bridge reads must use a 5s timeout (hangs observed)" \
-            --obs "MT5 copy_rates_range hangs when the terminal dialog is open" \
+        memoryschema remember api-timeout-fix \
+            --desc "Data-source reads must use a 5s timeout (hangs observed)" \
+            --obs "the upstream call hangs when a modal dialog is open" \
             --obs "5s timeout + one retry resolves it" \
-            --uses helios-bridge --importance 7
+            --uses data-source-client --importance 7
     """
     from memoryschema.write_index import (create_entity_file, find_active_by_key,
                                           index_memory, set_lifecycle)

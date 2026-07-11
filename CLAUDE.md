@@ -1,9 +1,9 @@
 # memory-schema — package guide (for a session working INSIDE this package)
 
 An LLM memory system: v5 entity files (`memory/*.md`) → JSONL store → Neo4j + Voyage embeddings, with a
-deterministic write path, a PostToolUse indexing hook, and a CLI. In Helios this is **vendored** at
-`packages/memory-schema/` and installed editable into `helios\.venv`. On extraction it becomes a standalone
-private repo (this file travels with it as the repo's CLAUDE.md).
+deterministic write path, a PostToolUse indexing hook, and a CLI. A host project either `pip install`s it or
+**vendors** it under `packages/memory-schema/` (installed editable into the project's venv). As a standalone
+private repo this file is the repo's own CLAUDE.md.
 
 **This vendored copy IS the canonical source** — there is no upstream to sync from, so historical "re-apply on
 re-vendor" local patches (7-space activation, hermetic-test isolation, the Neo4j fixes, the three hook patches)
@@ -69,4 +69,4 @@ safe unless you replace the package files.
 ## Status
 
 Schema split complete (authority + harness conformance B1–B4 + security). **Extraction** to a standalone
-private repo (git-subtree → `main` + a `deployments/helios` pointer branch) is the next step, not yet started.
+private repo (git-subtree → `main` + a `deployments/<project>` pointer branch) is the next step, not yet started.

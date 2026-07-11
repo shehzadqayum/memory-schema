@@ -36,11 +36,11 @@ Use for: structural levels, validated patterns, user corrections, decisions.
 The PostToolUse hook indexes hand edits; corruption safety differs by format — legacy
 v4 XML fails LOUD (exit 2), a broken v5 file is skipped silently (check `sync`).
 Full v5 schema reference (needed only when hand-authoring):
-`.claude/rules-ondemand/memory-schema.md` · corpus ingestion (unused in Helios):
+`.claude/rules-ondemand/memory-schema.md` · corpus ingestion (deploy with `init --scopes corpus`):
 `.claude/rules-ondemand/memory-corpus.md`
 
 ## 5. Health
 `memoryschema preflight` (deps gate) · `sync` (drift, read-only) · `reconcile` (heals all
 three layers to the .md set; also re-embeds stale content via the provenance hash).
-Run the test suite env-free (hermetic fail-closed):
-`cd packages/memory-schema && python -m pytest tests/`
+Run the package's test suite env-free (hermetic fail-closed), from a source checkout:
+`python -m pytest tests/`

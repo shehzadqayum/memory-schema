@@ -80,7 +80,6 @@ def migrate_nodes(driver, entries, batch_size=500):
             # (was 1 + 2N queries — this is the reconcile hot-path). MERGE (not CREATE) on the unique
             # name keeps the import IDEMPOTENT (no ConstraintError on memory_name_unique re-runs).
             # coalesce keeps existing values when a row carries no embedding / multispace.
-            # (helios local patch — re-apply on re-vendor.)
             session.run("""
                 UNWIND $nodes AS nd
                 MERGE (m:Memory {name: nd.props.name})

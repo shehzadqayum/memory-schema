@@ -67,7 +67,7 @@ class MemoryConfig:
     # rather than silently writing JSONL-only that then drifts. The hook + reads deliberately stay on
     # graceful-degrade-with-a-loud-banner so a routine memory Write never loses .md content-truth.
     # Voyage degradation (-> keyword/BM25) is survivable by default. Set the env vars to override.
-    # Env: MEMORYSCHEMA_REQUIRE_NEO4J / MEMORYSCHEMA_REQUIRE_VOYAGE. (helios local patch.)
+    # Env: MEMORYSCHEMA_REQUIRE_NEO4J / MEMORYSCHEMA_REQUIRE_VOYAGE.
     require_neo4j: bool = field(
         default_factory=lambda: os.environ.get("MEMORYSCHEMA_REQUIRE_NEO4J", "true").lower()
         in ("1", "true", "yes", "on")
@@ -89,9 +89,9 @@ class MemoryConfig:
 
     # L0 budget — MEMORY.md is a full status-filtered index regenerated from the store (rebuild_index),
     # not append-only, so this bounds the always-in-context index; only the lowest-importance ACTIVE
-    # entries are dropped, and only when over budget. Raised 2000->3000 to hold the current active
-    # corpus with headroom (helios local patch; re-apply on re-vendor).
-    l0_token_budget: int = 3000
+    # entries are dropped, and only when over budget. Deployments with a large active corpus can raise it
+    # via `retrieval.l0_token_budget` in memoryschema.toml.
+    l0_token_budget: int = 2000
 
     # Retrieval
     recency_decay: float = 0.995

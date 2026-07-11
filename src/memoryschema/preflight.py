@@ -8,8 +8,6 @@ Chain: Docker engine -> Neo4j container (auto `up` if stopped) -> bolt -> schema
 Policy: Neo4j is hard-required by default (config.require_neo4j); Voyage degrades to
 keyword/BM25 with a visible warning unless config.require_voyage. We start the CONTAINER
 but never Docker Desktop itself (heavy GUI) — that's reported with an instruction.
-
-helios local patch — re-apply on re-vendor.
 """
 import subprocess
 import time
@@ -30,7 +28,7 @@ def _docker_engine_up():
 
 def _container_running(config):
     # `--filter name=` is an UNANCHORED substring match, so a different container
-    # whose name merely contains ours (helios-neo4j-test) would read as running and
+    # whose name merely contains ours (myproject-neo4j-test) would read as running and
     # skip the auto-start of the real one. Anchor with ^...$ and confirm the exact name.
     name = config.neo4j_container_name
     rc, out, _ = _run(["docker", "ps", "--filter", f"name=^{name}$",

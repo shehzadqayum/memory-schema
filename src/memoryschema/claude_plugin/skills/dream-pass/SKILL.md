@@ -1,11 +1,11 @@
 ---
 name: dream-pass
-description: Memory consolidation session for the Helios memory store — distill released chains into durable entities, merge duplicates, refresh stale keyed facts, archive dead weight. Run scheduled (weekly) or on demand when `memoryschema dream` shows candidates.
+description: Memory consolidation session for a project's memory store — distill released chains into durable entities, merge duplicates, refresh stale keyed facts, archive dead weight. Run scheduled (weekly) or on demand when `memoryschema dream` shows candidates.
 ---
 
 # The Dream Pass — memory consolidation
 
-You are running Helios's consolidation session (plan-memory-direction-2026): the
+You are running the project's memory-consolidation session: the
 industry-converged pattern (OpenAI Dreaming V3, Claude Code Auto Dream, Letta
 sleep-time) implemented on our file-first substrate. **Code discovers, you judge,
 the safe primitives act.** Nothing here bypasses the write gate, the audit trail,
@@ -24,7 +24,7 @@ or git — every action below is reversible and reviewable.
 
 1. **Setup + report**
    ```bash
-   source .venv/Scripts/activate && export PYTHONUTF8=1 PYTHONIOENCODING=utf-8
+   export PYTHONUTF8=1 PYTHONIOENCODING=utf-8   # activate your venv first if the package is in one
    memoryschema preflight && memoryschema sync
    memoryschema dream          # the candidate report (read-only)
    ```

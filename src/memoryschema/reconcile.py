@@ -19,7 +19,7 @@ reconcile() makes all three agree COMPLETELY and IDEMPOTENTLY:
 A second run on a clean store is a no-op (nothing changed, nothing re-embedded, nothing
 pruned). If Voyage is down, new/changed entities are written without an embedding (loud
 degraded path, not a crash). If Neo4j is down, the JSONL is still reconciled and Neo4j is
-reported unreachable. helios local patch — re-apply on re-vendor.
+reported unreachable.
 """
 import json
 import os

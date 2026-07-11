@@ -53,7 +53,7 @@ def connect(config=None, uri=None, user=None, password=None):
     """Build a Neo4j driver, run a RETURN 1 liveness probe, and wrap auth failures with a friendly
     ConnectionError. The SINGLE place driver construction + the probe live — the store, schema setup,
     migration, and preflight all route through this instead of re-implementing it.
-    (helios local patch — re-apply on re-vendor.)"""
+    """
     if config is None and uri is None:
         from memoryschema.config import MemoryConfig
         config = MemoryConfig()
@@ -727,7 +727,7 @@ class Neo4jMemoryStore:
         """Neighbors for a WHOLE frontier in ONE round-trip (vs _get_neighbors per node — the recall
         N+1 cascade). Returns {src_name: [neighbor_info, ...]} with the SAME neighbor_info shape as
         _get_neighbors (channel relation/backlink carry rel_type; association carries assoc_score).
-        (helios local patch — re-apply on re-vendor.)"""
+        """
         out = {n: [] for n in names}
         if not names:
             return out

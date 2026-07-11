@@ -9,7 +9,7 @@ surface, and which never do (dead-weight candidates).
 Honest limit: this measures RETRIEVAL, not UTILITY (whether the recalled memory changed the answer
 needs response-attribution — a later, second-order metric).
 
-helios local patch — re-apply on re-vendor.
+
 """
 import json
 import os

@@ -97,7 +97,7 @@ def _load_project_env(root):
     """Auto-load the project .env so NEO4J_*/VOYAGE_API_KEY are present for EVERY CLI invocation —
     mirroring the PostToolUse hook. Without this, a shell that didn't manually `source .env` silently
     degrades to JSONL (auth failure), undermining the "deps up at all times" default. Never overrides
-    an already-set var (an explicit export wins); searches `root` then its parents. (helios local patch.)"""
+    an already-set var (an explicit export wins); searches `root` then its parents."""
     import os
     from pathlib import Path
     try:
@@ -128,7 +128,7 @@ def _maybe_preflight(config):
     stopped Neo4j container and prints a LOUD banner when degraded — so degradation is never
     silent. Banner-only (never exits/raises): reads degrade with the warning, write-class
     callers self-guard via get_store(require_neo4j=...). Skipped when MEMORYSCHEMA_SKIP_PREFLIGHT
-    is set (tests / hooks that run their own). (helios local patch.)"""
+    is set (tests / hooks that run their own)."""
     import os
     if os.environ.get("MEMORYSCHEMA_SKIP_PREFLIGHT"):
         return
