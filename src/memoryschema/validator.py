@@ -69,6 +69,12 @@ def validate(content, filepath=None, strict=False, known_names=None):
         List of (rule_id, message) tuples for each validation failure.
         Empty list means the file is valid.
     """
+    # Format dispatch: v5 (frontmatter+markdown) validates via the parsed dict; v4 XML falls through below.
+    # Without this, a v5 file returns a spurious V1 "no entity" and bypasses every V/R/Q rule (schema-split B1).
+    from memoryschema.format_v5 import is_v5_content
+    if is_v5_content(content):
+        return _validate_v5(content, filepath=filepath, strict=strict, known_names=known_names)
+
     errors = []
 
     # V1: exactly one <memory:entity> root element
@@ -224,6 +230,100 @@ def validate(content, filepath=None, strict=False, known_names=None):
                 errors.append(('R6', f'Relation target "{target}" does not exist in known memories'))
 
     # Filesystem
+    if filepath and name:
+        if ' ' in name or any(c in name for c in '<>:"|?*\\'):
+            errors.append(('F3', f'Name "{name}" contains filesystem-unsafe characters'))
+
+    return errors
+
+
+def _validate_v5(content, filepath=None, strict=False, known_names=None):
+    """Validate a v5 (frontmatter+markdown) entity against the semantic invariants.
+
+    v5 well-formedness is PARSE-BASED — a file that parses is structurally sound, so the XML-structural rules
+    (V1 root, V6 description, V9 closed-tags) do not apply; a file that declares `schema: 5` but won't parse
+    is corruption. This runs the content/relation/quality rules on the parsed dict, reusing the v4 rule IDs so
+    every consumer sees one vocabulary. Grammars come from entity_schema (the authority), same as the v4 path."""
+    from memoryschema.format_v5 import parse_v5_content
+    mem = parse_v5_content(content, filepath=filepath)
+    if mem is None:
+        return [('V1', 'v5 entity failed to parse (unterminated fence or missing `schema: 5`)')]
+
+    errors = []
+    name = mem.get('name')
+    if not name:
+        errors.append(('V2', 'Missing name (no frontmatter name and no filename stem)'))
+
+    # V3: name matches filename
+    if filepath and name:
+        expected = f'{name}.md'
+        actual = os.path.basename(filepath)
+        if actual != expected:
+            errors.append(('V3', f'Filename "{actual}" does not match name "{name}" (expected "{expected}")'))
+
+    # V5: importance 1-10 (already coerced to int by the parser when present)
+    if 'importance' in mem:
+        imp = mem['importance']
+        if not isinstance(imp, int) or imp < 1 or imp > 10:
+            errors.append(('V5', f'Importance {imp} out of range, must be 1-10'))
+
+    # V11: status is valid
+    status_val = mem.get('status')
+    if status_val and status_val not in VALID_STATUSES:
+        errors.append(('V11', f'Invalid status "{status_val}", must be one of: {", ".join(sorted(VALID_STATUSES))}'))
+
+    # Content quality (strict mode)
+    if strict:
+        if name and not KEBAB_CASE.match(name):
+            errors.append(('Q1', f'Name "{name}" is not kebab-case'))
+        desc = mem.get('description') or ''
+        if '\n' in desc:
+            errors.append(('Q2', 'Description contains newlines'))
+        if len(desc) > 120:
+            errors.append(('Q2', f'Description is {len(desc)} chars, max 120'))
+        # Q6/Q7 apply to real observations, NOT chain `## Log` steps (the parser flattens log into
+        # observations; a chain legitimately carries many steps). observations == obs + log, so the
+        # leading slice is the true observation set.
+        log = mem.get('log') or []
+        all_obs = mem.get('observations') or []
+        real_obs = all_obs[:len(all_obs) - len(log)] if len(all_obs) >= len(log) else all_obs
+        if len(real_obs) > 10:
+            errors.append(('Q6', f'{len(real_obs)} observations, recommended max 10'))
+        for i, o in enumerate(real_obs, 1):
+            wc = len(str(o).split())
+            if wc > 50:
+                errors.append(('Q7', f'Observation {i} has {wc} words, recommended max 50'))
+        reasoning = mem.get('reasoning')
+        if reasoning and len(reasoning.split()) > 500:
+            errors.append(('Q8', f'Reasoning has {len(reasoning.split())} words, recommended max 500'))
+
+    # Relations (R1-R6) — parse-liberally/validate-strictly: the parser accepts a superset of the target
+    # grammar, so a non-kebab target reaches here and R3 flags it (rather than being silently dropped).
+    seen = set()
+    for rel in (mem.get('relations') or []):
+        target = rel.get('target')
+        rel_type = rel.get('type')
+        if not target:
+            errors.append(('R1', 'Relation missing target attribute'))
+        if not rel_type:
+            errors.append(('R1', 'Relation missing type attribute'))
+        if rel_type and rel_type not in ALL_RELATION_TYPES:
+            errors.append(('R2', f'Invalid relation type "{rel_type}"'))
+        elif rel_type and rel_type in DEPRECATED_RELATION_TYPES:
+            errors.append(('R2', f'Deprecated relation type "{rel_type}" — use project field for hierarchy'))
+        if target and not KEBAB_CASE.match(target):
+            errors.append(('R3', f'Relation target "{target}" is not kebab-case'))
+        if target and name and target == name:
+            errors.append(('R4', f'Self-reference: target "{target}" equals memory name'))
+        if target and rel_type:
+            key = (target, rel_type)
+            if key in seen:
+                errors.append(('R5', f'Duplicate relation: target="{target}" type="{rel_type}"'))
+            seen.add(key)
+        if target and known_names is not None and target not in known_names:
+            errors.append(('R6', f'Relation target "{target}" does not exist in known memories'))
+
+    # F3: filesystem-safe name
     if filepath and name:
         if ' ' in name or any(c in name for c in '<>:"|?*\\'):
             errors.append(('F3', f'Name "{name}" contains filesystem-unsafe characters'))

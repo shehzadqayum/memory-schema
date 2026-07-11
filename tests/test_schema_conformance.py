@@ -95,9 +95,26 @@ def test_b4_schema_version_reflects_current_format():
     assert SCH.SCHEMA_VERSION == SCH.CURRENT_ENTITY_FORMAT
 
 
-@pytest.mark.skip(reason="B1 (tracked): validator is v4-only — v5 entities bypass V/R/Q. Real test lands with the fix.")
 def test_b1_v5_entities_are_validated():
-    ...
+    """B1 (LANDED): validate() dispatches on format — a v5 entity runs the real V/R/Q rules instead of the
+    old spurious V1 'no entity'. Hermetic: inline content strings, no dir read."""
+    from memoryschema import validator
+    good = ("---\nschema: 5\nname: good-entity\ntype: semantic\nstatus: active\n---\n\n"
+            "A well-formed v5 entity used as the clean fixture.\n\n"
+            "## Observations\n- a fine observation\n")
+    assert validator.validate(good, strict=True) == [], "a well-formed v5 entity must validate clean"
+    # regression: it must NOT be reported as the XML V1 'no entity' (the pre-B1 bug)
+    assert not any(r == 'V1' for r, _ in validator.validate(good)), "v5 must not trip the XML V1 rule"
+
+    def rules(md):
+        return {r for r, _ in validator.validate(md, strict=True)}
+
+    assert 'Q1' in rules("---\nschema: 5\nname: Bad_Name\n---\n\nd\n\n## Observations\n- x\n")      # non-kebab name
+    assert 'V11' in rules("---\nschema: 5\nname: e\nstatus: bogus\n---\n\nd\n\n## Observations\n- x\n")  # bad status
+    assert 'Q2' in rules("---\nschema: 5\nname: e\n---\n\n" + ("word " * 40) + "\n\n## Observations\n- x\n")  # desc >120
+    assert 'R2' in rules("---\nschema: 5\nname: e\nrelations:\n- FROBNICATE target-x\n---\n\nd\n")   # bad rel type
+    assert 'R3' in rules("---\nschema: 5\nname: e\nrelations:\n- USES Bad_Target\n---\n\nd\n")       # non-kebab target
+    assert 'V1' in rules("---\nschema: 5\nname: e\n## Observations\n- unterminated fence\n")         # corrupt v5
 
 
 @pytest.mark.skip(reason="B2 (tracked): create_entity_file defaults to v4 XML unless MEMORYSCHEMA_V5=1. Flip the default.")

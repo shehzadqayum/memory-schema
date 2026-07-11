@@ -3,6 +3,12 @@
 ## [Unreleased]
 
 ### Fixed (2026-07-11 — schema-split Part B: the harness conforms UP to the entity authority)
+- **B1 — v5 entities are now validated.** `validate()` counted `<memory:entity` tags and returned a spurious
+  `V1 "no entity"` on any v5 file, so v5 entities bypassed every V/R/Q rule (and `memory validate` rejected
+  *every* v5 file). It now dispatches on `is_v5_content` to a new `_validate_v5` that runs the content /
+  relation / quality invariants (V2/V3/V5/V11, Q1/Q2/Q6/Q7/Q8, R1–R6, F3) on the parsed dict, reusing the v4
+  rule IDs and the `entity_schema` grammars. XML-structural rules (V1/V6/V9) don't apply — v5 well-formedness
+  is parse-success; a `schema: 5` file that won't parse returns a single `V1` well-formedness error.
 - **B3 — malformed v5 files are guarded, not pruned (data-loss fix).** `reconcile._parse_md`'s
   corruption guard keyed only on the v4 `<memory:entity` tag, so a v5 entity whose frontmatter fence
   broke parsed to nothing and was treated as a deletion — reconcile then pruned its store/graph entry.
