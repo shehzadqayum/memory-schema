@@ -17,10 +17,14 @@ import re
 
 # ── Version ────────────────────────────────────────────────────────────────────────────────────────
 # The current authored entity format is v5 (YAML frontmatter + markdown body). v4 XML is legacy: parsed on
-# read + migrated, never newly authored. ``SCHEMA_VERSION`` remains the v4-XML version marker used by legacy
-# serialization; reconciling that name is tracked as follow-up B4 (bump requires confirming no behavioral use).
-SCHEMA_VERSION = 4            # legacy v4-XML schema-version marker (NOT the current format)
+# read + migrated, never newly authored.
 CURRENT_ENTITY_FORMAT = 5    # entities are authored in v5
+# ``SCHEMA_VERSION`` is the current entity-schema version — it now tracks the current format (schema-split B4;
+# previously it was pinned at the legacy v4 marker, misreporting the schema as v4). The v4-XML ``schema="N"``
+# attribute keeps its OWN upper bound below (a v4 file is not "schema 5" — v5 is a different format, not XML),
+# used solely by the validator's V10 range check.
+SCHEMA_VERSION = CURRENT_ENTITY_FORMAT        # = 5, the current schema version
+V4_XML_SCHEMA_VERSION = 4                      # legacy v4-XML `schema=` attribute upper bound (V10 only)
 
 # ── Enums (semantics documented in docs/schema-specification.md §3.5/§3.6) ───────────────────────────
 VALID_TYPES = frozenset({'semantic', 'episodic', 'procedural'})

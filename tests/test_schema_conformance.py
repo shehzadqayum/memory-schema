@@ -89,10 +89,11 @@ def test_render_reference_tables_reflects_the_authority():
 
 
 # ── Part-B follow-up worklist (each flips to a passing test when its harness fix lands) ────────────
-@pytest.mark.xfail(reason="B4: SCHEMA_VERSION is still the legacy v4 marker; reconcile it to the current format",
-                   strict=True)
 def test_b4_schema_version_reflects_current_format():
-    assert SCH.SCHEMA_VERSION == SCH.CURRENT_ENTITY_FORMAT
+    """B4 (LANDED): SCHEMA_VERSION tracks the current authored format, not the legacy v4 marker. The v4-XML
+    `schema=` attribute keeps its own distinct upper bound for the V10 range check."""
+    assert SCH.SCHEMA_VERSION == SCH.CURRENT_ENTITY_FORMAT == 5
+    assert SCH.V4_XML_SCHEMA_VERSION == 4 and SCH.V4_XML_SCHEMA_VERSION < SCH.SCHEMA_VERSION
 
 
 def test_b1_v5_entities_are_validated():

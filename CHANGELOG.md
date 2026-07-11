@@ -3,6 +3,12 @@
 ## [Unreleased]
 
 ### Changed (2026-07-11 — schema-split Part B: the harness conforms UP to the entity authority)
+- **B4 — `SCHEMA_VERSION` reflects the current format.** It was pinned at the legacy v4 marker (`4`) while
+  entities carry `schema: 5`, so the schema mis-reported its own version. `SCHEMA_VERSION` now equals
+  `CURRENT_ENTITY_FORMAT` (`5`); a new `V4_XML_SCHEMA_VERSION = 4` carries the legacy v4-XML `schema=`
+  attribute upper bound used solely by the validator's V10 range check (a v4 file is never "schema 5" — v5 is
+  a different format, not XML). `config.schema_version` is now `5`. The B4 conformance test is no longer an
+  xfail — all four Part-B placeholders are now real passing tests.
 - **B2 — v5 is now the authored default.** `create_entity_file` (and therefore `remember` / new entities)
   emitted **v4 XML** unless `MEMORYSCHEMA_V5=1` — the harness authored the *superseded* format by default. It
   now authors **v5 by default**; v4 XML authoring is retained only for legacy/migration behind an explicit

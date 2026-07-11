@@ -19,9 +19,8 @@ import xml.etree.ElementTree as ET
 from memoryschema.config import (
     VALID_TYPES, VALID_STATUSES,
     VALID_RELATION_TYPES, DEPRECATED_RELATION_TYPES, ALL_RELATION_TYPES,
-    SCHEMA_VERSION,
 )
-from memoryschema.entity_schema import KEBAB_CASE   # the single name/target grammar (authority)
+from memoryschema.entity_schema import KEBAB_CASE, V4_XML_SCHEMA_VERSION  # authority: name grammar + v4 attr bound
 
 
 def extract_entity_block(content):
@@ -103,13 +102,14 @@ def validate(content, filepath=None, strict=False, known_names=None):
     if not name:
         errors.append(('V2', 'Missing name attribute on <memory:entity>'))
 
-    # V10: schema version
+    # V10: the legacy v4-XML `schema=` attribute must be within the v4 range (this path is v4-only; v5 is a
+    # different format, never a `schema="5"` XML file, so the bound stays the v4 marker, not the current version)
     schema_str = root.get('schema')
     if schema_str is not None:
         try:
             schema_ver = int(schema_str)
-            if schema_ver < 1 or schema_ver > SCHEMA_VERSION:
-                errors.append(('V10', f'Schema version {schema_ver} out of range, must be 1-{SCHEMA_VERSION}'))
+            if schema_ver < 1 or schema_ver > V4_XML_SCHEMA_VERSION:
+                errors.append(('V10', f'Schema version {schema_ver} out of range, must be 1-{V4_XML_SCHEMA_VERSION}'))
         except ValueError:
             errors.append(('V10', f'Schema "{schema_str}" is not a valid integer'))
 
