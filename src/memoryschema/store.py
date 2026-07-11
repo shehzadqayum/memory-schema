@@ -767,7 +767,8 @@ class MemoryStore:
                     accessed = accessed.replace(tzinfo=timezone.utc)
                 now = datetime.now(timezone.utc)
                 hours = max(0, (now - accessed).total_seconds() / 3600)
-                recency = 0.995 ** hours
+                decay = self.config.recency_decay if self.config else 0.995
+                recency = decay ** hours
             except (ValueError, TypeError):
                 pass
 
@@ -824,7 +825,7 @@ class MemoryStore:
             if bl.get('type') == 'MITIGATES'
         )
         if mitigates_count > 0:
-            score *= 0.95  # mitigation_dampening default
+            score *= self.config.mitigation_dampening if self.config else 0.95
 
         return round(min(score, 1.0), 4)
 

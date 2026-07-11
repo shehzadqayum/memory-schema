@@ -379,8 +379,8 @@ score = recency × w_r + importance/10 × w_i + relevance × w_v      (clamped t
 - **Recency** `0.995^hours_since(last_accessed || created_at)` (missing → 0.5), then
   type modifiers: `semantic` → `max(recency, 0.6)` floor; `procedural` →
   `recency^(1/(1 + 0.3·min(access_count, 10)))` (access-reinforced); `episodic`/unknown →
-  standard decay. (The 0.995 literal is hardcoded in the scorers; `config.recency_decay`
-  is display/TOML-mappable only.)
+  standard decay. (The base is `config.recency_decay`, default 0.995 — TOML-tunable via
+  `retrieval.recency_decay`; both stores honour it.)
 - **Importance** `(importance or 5)/10`.
 - **Relevance**: per-space `max(0, cos(query, space_vec))` over `entry.embeddings`
   (single `embedding` treated as the default space), combined by the
@@ -402,8 +402,8 @@ score = recency × w_r + importance/10 × w_i + relevance × w_v      (clamped t
 ### 6.4 Recall cascade
 
 `recall(query|name, depth=2, decay=0.8, limit, project, include_inactive,
-max_inherit_depth=3)` (the CLI never passes depth/decay — `config.recall_depth/decay`
-are TOML-mappable but dead in the recall path):
+max_inherit_depth=3)` (the CLI `recall` passes `config.recall_depth`/`recall_decay` — both
+TOML-tunable via `retrieval.*`):
 
 1. **Scope**: `project_matches_scope` — bidirectional (ancestors AND descendants),
    unscoped entities universally visible, depth separation ≤ `max_inherit_depth`.
@@ -646,12 +646,12 @@ PostToolUse hook does the same from the written file's project root. Secrets bel
 | `require_neo4j` | **true** | env `MEMORYSCHEMA_REQUIRE_NEO4J`; gates preflight + index/write/import |
 | `require_voyage` | false | env `MEMORYSCHEMA_REQUIRE_VOYAGE` |
 | `l0_token_budget` | **2000** (raise via TOML for a large active corpus) | TOML `retrieval.l0_token_budget` |
-| `recency_decay` | 0.995 | display/TOML only — scorers hardcode 0.995 |
+| `recency_decay` | 0.995 | TOML `retrieval.recency_decay` — the per-hour recency base, honoured by both stores |
 | `association_k` | 10 | |
-| `recall_depth` / `recall_decay` | 2 / 0.8 | TOML-mappable but the CLI never passes them — store defaults rule |
+| `recall_depth` / `recall_decay` | 2 / 0.8 | TOML `retrieval.*` — the CLI `recall` passes them to the cascade |
 | `max_inherit_depth` | 3 | hierarchy depth separation cap in recall |
 | `verification_staleness_days` | 7 | recall staleness annotation |
-| `mitigation_dampening` | 0.95 | (scorers hardcode the literal) |
+| `mitigation_dampening` | 0.95 | TOML `retrieval.mitigation_dampening` — score ×= it for a mitigated entry |
 | `semantic_weights` / `structured_weights` | (0.2, 0.3, 0.5) / (0.3, 0.5, 0.2) | TOML-tunable |
 | `numeric_probe_enabled` / `mode` / `sim_threshold` | true / `log` / 0.80 | gate stage 5 |
 | `l0_echo_threshold` | 0.6 | gate stage 6 |
@@ -879,9 +879,7 @@ record.
 - `hook install --timeout` changes only the echoed message (registered timeout is the
   constant 10 s). `backup --neo4j-only` falls through to a full backup. `validate`
   `--json` mode exits 0 even with errors. `doctor` always exits 0; its docstring still
-  says "21-point" (22 checks). `config.recency_decay`/`mitigation_dampening`/
-  `recall_depth`/`recall_decay` exist as config fields but the operative values are
-  hardcoded at their call sites.
+  says "21-point" (22 checks).
 - A corrupt v5 file is silently skipped by the hook, but the reconcile malformed-guard now
   detects it (via its `schema: 5` frontmatter declaration) and refuses to prune its entity —
   v5 safety also lives in the writers' round-trip checks (schema-specification.md).

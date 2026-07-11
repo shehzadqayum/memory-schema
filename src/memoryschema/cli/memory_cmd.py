@@ -78,6 +78,7 @@ def recall(config, query, limit, project, include_inactive, as_of, as_json):
     results = store.recall(
         query=query, limit=limit if not as_of else max(limit * 4, 20), project=project,
         include_inactive=include_inactive or bool(as_of),
+        depth=config.recall_depth, decay=config.recall_decay,
         max_inherit_depth=config.max_inherit_depth,
     )
     if as_of:

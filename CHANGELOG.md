@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+### Fixed (2026-07-11 — retrieval-scoring config knobs were silent placebos)
+- **`recency_decay`, `mitigation_dampening`, `recall_depth`, `recall_decay` now actually take effect.** All
+  four were config fields (TOML-mappable) but the scorers hardcoded the literals (`0.995` / `0.95`) and the
+  CLI `recall` never passed depth/decay — so setting them in `memoryschema.toml` did nothing, contradicting the
+  module's "degrade loudly / no silent no-op" doctrine (and the `semantic_weights` knob in the same file DID
+  work, making the gap surprising). Both stores' `_score_entry` now read `self.config.recency_decay` /
+  `mitigation_dampening` (falling back to the same literals when `config is None`), and CLI `recall` passes
+  `config.recall_depth`/`recall_decay` to the cascade. **No default behaviour change** — `config=None` and a
+  default `MemoryConfig` reproduce the historical `0.995`/`0.95` (pinned by a test). The three now-stale
+  "hardcoded" caveats in the harness manual are corrected.
+
 ### Added (2026-07-11 — deployment architecture + the machine-stamped ledger)
 - **`memoryschema deploy register` / `deploy status`** + **`DEPLOYMENT.md`** — the git-sharing architecture:
   a single-source-of-truth module repo, `git subtree` vendoring, per-project `deployments/<project>` branches,
