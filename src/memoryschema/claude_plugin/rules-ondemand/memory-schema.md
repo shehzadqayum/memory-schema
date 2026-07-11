@@ -92,7 +92,8 @@ frontmatter — lifecycle changes on v4 files revert on reconcile (the CLI warns
 ## Retrieval scoring (what makes an entity findable)
 
 `score = recency·w_r + importance/10·w_i + relevance·w_v` (default semantic weights 0.2/0.3/0.5;
-tune per deployment via `retrieval.semantic_weights` in memoryschema.toml). Relevance is variance-weighted over 7 embedding spaces
+tune per deployment via the `[retrieval]` section of memoryschema.toml — weights, `recency_decay`,
+`mitigation_dampening`, `recall_depth`/`recall_decay`). Relevance is variance-weighted over 7 embedding spaces
 (name, description+summary, observations, prompt, reasoning, chain, default blend).
 Type modifiers: semantic floors at 0.6; procedural reinforces with access; episodic
 decays. Practical consequences: front-load distinctive wording in the description;
