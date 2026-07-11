@@ -105,9 +105,33 @@ def test_b2_new_entities_default_to_v5():
     ...
 
 
-@pytest.mark.skip(reason="B3 (tracked): reconcile's malformed guard is v4-only — a corrupt v5 file is pruned (data loss).")
-def test_b3_malformed_v5_is_guarded_not_pruned():
-    ...
+def test_b3_malformed_v5_is_guarded_not_pruned(tmp_path):
+    """B3 (LANDED): reconcile._parse_md treats a corrupt v5 entity as CORRUPTION — surfaced as `malformed`
+    so reconcile aborts rather than prunes — while a plain non-entity frontmatter note is still skipped.
+    Hermetic: a throwaway tmp dir, never the live memory/."""
+    import os
+    from memoryschema import reconcile
+    mem = tmp_path
+    # a corrupt v5 entity: declares `schema: 5` but the frontmatter fence is never closed -> parse fails
+    (mem / "broken-v5.md").write_text(
+        "---\nschema: 5\nname: broken-v5\ntype: semantic\n"
+        "## Observations\n- the closing fence is missing so this never parses\n", encoding="utf-8")
+    # a well-formed v5 entity -> parses, lands in the entity map
+    (mem / "good-v5.md").write_text(
+        "---\nschema: 5\nname: good-v5\ntype: semantic\n---\n\n## Observations\n- fine\n", encoding="utf-8")
+    # negative control: a plain frontmatter wiki note (schema != 5) is NOT an entity -> neither map nor malformed
+    (mem / "plain-note.md").write_text(
+        "---\ntitle: not an entity\ntags: [x]\n---\n\n# Note\nprose only\n", encoding="utf-8")
+    # regression: a corrupt v4 file stays guarded too
+    (mem / "broken-v4.md").write_text(
+        '<memory:entity schema="4" name="broken-v4">\n  <memory:description>unclosed', encoding="utf-8")
+
+    out, malformed = reconcile._parse_md(mem)
+    flagged = {os.path.basename(f) for f in malformed}
+    assert "broken-v5.md" in flagged, "corrupt v5 entity must be guarded, not pruned (B3)"
+    assert "broken-v4.md" in flagged, "corrupt v4 entity must stay guarded"
+    assert "plain-note.md" not in flagged, "a non-entity note must NOT be flagged as corruption"
+    assert "good-v5" in out and "plain-note" not in out
 
 
 def test_doc_machine_sections_match_render_reference_tables():

@@ -23,6 +23,7 @@ reported unreachable. helios local patch — re-apply on re-vendor.
 """
 import json
 import os
+import re
 import tempfile
 
 from memoryschema.discovery import discover_memory_files
@@ -73,13 +74,22 @@ def _embed_text(entry):
     return compose_embedding_text(entry)
 
 
+# A v5 entity declares `schema: 5` as a frontmatter scalar (line-start, per format_v5._parse_frontmatter).
+# This marks a `---`-fenced file as an intended v5 entity even when its fence is broken and parse fails —
+# the v5 analogue of the `<memory:entity` tag used to detect a corrupt v4 file.
+_V5_SCHEMA5_MARKER = re.compile(r'^schema:\s*5\b', re.MULTILINE)
+
+
 def _parse_md(memory_dir):
     """({name: parsed entity}, [malformed_entity_files]) from the canonical .md files.
 
-    Non-entity .md files are skipped silently. A file that DECLARES a memory entity (contains a
-    `<memory:entity` tag) but fails to parse is CORRUPTION (e.g. an unescaped & / < / >) — it is
-    collected separately so reconcile can REFUSE to prune its entity: a parse failure must never be
-    mistaken for an intentional deletion."""
+    Non-entity .md files are skipped silently. A file that DECLARES a memory entity but fails to parse is
+    CORRUPTION (an unescaped & / < / > in v4, or a broken frontmatter fence in v5) — it is collected
+    separately so reconcile can REFUSE to prune its entity: a parse failure must never be mistaken for an
+    intentional deletion. The entity marker is format-specific: `<memory:entity` (v4), or a `---`-fenced
+    file that declares `schema: 5` (v5). A plain frontmatter note (schema != 5) is NOT an entity and is
+    skipped, exactly as a v4-era non-entity .md was."""
+    from memoryschema.format_v5 import is_v5_content
     out, malformed = {}, []
     for fp in discover_memory_files(str(memory_dir)):
         m = parse_memory_file(fp)
@@ -90,7 +100,11 @@ def _parse_md(memory_dir):
             text = open(fp, encoding="utf-8", errors="replace").read()
         except Exception:
             text = ""
-        if "<memory:entity" in text:   # an entity file that won't parse = corruption, not a non-entity .md
+        # Reached here only because parse produced no named entity — so a positive marker match means a
+        # DECLARED entity that won't parse = corruption, not a non-entity .md.
+        v4_corrupt = "<memory:entity" in text
+        v5_corrupt = is_v5_content(text) and bool(_V5_SCHEMA5_MARKER.search(text))
+        if v4_corrupt or v5_corrupt:
             malformed.append(fp)
     return out, malformed
 

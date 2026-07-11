@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### Fixed (2026-07-11 — schema-split Part B: the harness conforms UP to the entity authority)
+- **B3 — malformed v5 files are guarded, not pruned (data-loss fix).** `reconcile._parse_md`'s
+  corruption guard keyed only on the v4 `<memory:entity` tag, so a v5 entity whose frontmatter fence
+  broke parsed to nothing and was treated as a deletion — reconcile then pruned its store/graph entry.
+  The guard now also flags a `---`-fenced file that declares `schema: 5` but fails `parse_v5_content`
+  as corruption (abort, never prune); a plain non-entity frontmatter note (schema ≠ 5) is still skipped.
+  The `test_b3_malformed_v5_is_guarded_not_pruned` conformance placeholder is now a real hermetic test.
+  Authority: `docs/schema-specification.md` §3 (corruption invariant).
+
 ### Added (2026-07-07 — mechanical, MD5-verified artefact sync)
 - `memoryschema plugin sync [--check] [--target] [--global]` — deploys the canonical
   memory artefacts from the package into a project's `.claude/` as a verifiable derived
