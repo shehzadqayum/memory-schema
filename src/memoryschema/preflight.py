@@ -38,16 +38,20 @@ def _container_running(config):
     return rc == 0 and name in (out or "").split()
 
 
-# preflight is ALWAYS-ON, so it must never auto-run an arbitrary docker-compose.yml found in the current
-# working directory (a hostile CWD file could `up` malicious services on any memoryschema invocation).
-# memoryschema-generated compose files carry this sentinel in their header; the auto path composes ONLY a
-# sentinel-bearing file, and prefers `docker start` (which executes NO file) for stopped-container recovery.
+# preflight is ALWAYS-ON, so the auto-recovery path should not casually `compose up` whatever
+# docker-compose.yml happens to sit in the current working directory. This sentinel is an ANTI-FOOTGUN, not a
+# security boundary: it stops preflight from accidentally running an *unrelated* compose file, but it is a
+# plaintext token an adversary could copy into a hostile file — it does not defend against a deliberate
+# attacker who has studied memoryschema. The real boundary is "don't run memoryschema in an untrusted CWD."
+# Note preflight prefers `docker start` (which executes NO file at all) and only reaches `compose up` on a
+# genuine first-bootstrap of a missing container.
 _COMPOSE_SENTINEL = "memoryschema-managed"
 
 
 def _compose_is_trusted(compose_path):
-    """True iff the compose file is memoryschema-generated (carries the sentinel in its header). Guards the
-    automatic `compose up` against an untrusted docker-compose.yml sitting in the current working directory."""
+    """True iff the compose file looks memoryschema-generated (carries the sentinel in its header). An
+    anti-footgun gate on the automatic `compose up` — see the note above on why this is not an adversarial
+    boundary."""
     try:
         with open(compose_path, encoding="utf-8", errors="replace") as f:
             head = f.read(4096)
@@ -57,12 +61,13 @@ def _compose_is_trusted(compose_path):
 
 
 def _start_container(config):
-    """Recover the (existing) Neo4j container — never Docker Desktop, never an untrusted compose file.
+    """Recover the (existing) Neo4j container — never Docker Desktop, and not an unrecognized compose file.
 
     (1) `docker start <name>` first: recovers a merely-stopped named container and executes NO file — the
-        common case, and the safe one. (2) Only if the container does not exist do we bootstrap via
-        `docker compose up`, and ONLY when the compose file is memoryschema-managed (SECURITY: preflight is
-        always-on, so a hostile docker-compose.yml in the CWD must not be run automatically)."""
+        common case. (Tradeoff: `docker start` does NOT reconcile against an edited docker-compose.yml; a
+        deliberate config change is applied by the explicit `memoryschema neo4j up`, which recreates.)
+    (2) Only if the container does not exist do we bootstrap via `docker compose up`, and only when the
+        compose file carries the memoryschema sentinel (the anti-footgun gate above)."""
     rc, _, err = _run(["docker", "start", config.neo4j_container_name], timeout=30)
     if rc == 0:
         return True, ""

@@ -209,21 +209,32 @@ def init(config, with_neo4j, scopes, neo4j_password):
             )
             config.docker_compose_path.write_text(content)
             created.append(str(config.docker_compose_path))
+
+            def _append_line(path, line):
+                # Newline-safe append: if the file exists and its last byte is not a newline, insert one first,
+                # so the new entry never glues onto a non-terminated final line (which would silently break a
+                # .gitignore pattern or corrupt a .env key/value pair).
+                prefix = ""
+                if path.exists():
+                    existing = path.read_text(encoding="utf-8")
+                    if existing and not existing.endswith("\n"):
+                        prefix = "\n"
+                with open(path, "a", encoding="utf-8") as f:
+                    f.write(prefix + line + "\n")
+
             # The compose references ${NEO4J_PASSWORD} rather than baking the secret at rest (security). Persist
             # it to the sibling .env (gitignored) so `docker compose up` interpolates it and the CLI/hook — which
             # already auto-load .env — pick it up. Append-if-missing; never clobber an existing value.
             env_path = config.project_root / ".env"
             has_pw = env_path.exists() and "NEO4J_PASSWORD=" in env_path.read_text(encoding="utf-8")
             if not has_pw:
-                with open(env_path, "a", encoding="utf-8") as f:
-                    f.write(f"NEO4J_PASSWORD={neo4j_password}\n")
+                _append_line(env_path, f"NEO4J_PASSWORD={neo4j_password}")
                 created.append(str(env_path))
             # Keep the secret out of version control: ensure .gitignore excludes .env.
             gi_path = config.project_root / ".gitignore"
             gi_lines = gi_path.read_text(encoding="utf-8").splitlines() if gi_path.exists() else []
             if ".env" not in [ln.strip() for ln in gi_lines]:
-                with open(gi_path, "a", encoding="utf-8") as f:
-                    f.write(".env\n")
+                _append_line(gi_path, ".env")
         except Exception:
             click.echo("Warning: docker-compose.yml template not found. Skipping.", err=True)
 

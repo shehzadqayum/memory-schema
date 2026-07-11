@@ -145,6 +145,14 @@ class TestStructureRules:
         errors = validate(INVALID_SCHEMA_VERSION)
         assert any(r == 'V10' for r, _ in errors)
 
+    def test_v10_v4_ceiling_is_four_not_current_schema_version(self):
+        # B4 boundary: the v4-XML `schema=` ceiling stays 4 (V4_XML_SCHEMA_VERSION), NOT SCHEMA_VERSION (=5).
+        # `schema="99"` alone can't catch a regression that reconciles the bound to 5; `schema="5"` can.
+        v4_5 = '<memory:entity schema="5" name="x"><memory:description>d</memory:description></memory:entity>'
+        v4_4 = '<memory:entity schema="4" name="x"><memory:description>d</memory:description></memory:entity>'
+        assert any(r == 'V10' for r, _ in validate(v4_5)), "a v4 schema=5 must be out of range (ceiling is 4)"
+        assert not any(r == 'V10' for r, _ in validate(v4_4)), "a v4 schema=4 must be in range"
+
     def test_v7_empty_observations(self):
         errors = validate(EMPTY_OBSERVATIONS)
         assert any(r == 'V7' for r, _ in errors)

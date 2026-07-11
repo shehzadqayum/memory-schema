@@ -1,7 +1,7 @@
 # memoryschema-managed — this compose is auto-recovered by `memoryschema preflight` when the Neo4j
-# container is missing. The header sentinel above is REQUIRED for that auto `compose up`; preflight refuses
-# to run a compose file that lacks it, so it never executes an untrusted docker-compose.yml from the CWD.
-# Do NOT add untrusted services to this file.
+# container is missing. The `memoryschema-managed` sentinel in this header is REQUIRED for that auto
+# `compose up`: preflight won't run a compose file lacking it (an anti-footgun so it doesn't casually run an
+# UNRELATED compose file — not a security boundary; the sentinel is copyable). Don't add untrusted services.
 services:
   neo4j:
     image: neo4j:5.26-community

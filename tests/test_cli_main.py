@@ -72,6 +72,20 @@ class TestInit:
         assert "NEO4J_PASSWORD=" in env_text and len(env_text.split("NEO4J_PASSWORD=")[1].strip()) >= 16
         assert ".env" in [ln.strip() for ln in (tmp_path / ".gitignore").read_text(encoding="utf-8").splitlines()]
 
+    def test_init_env_gitignore_append_is_newline_safe(self, runner, tmp_path, monkeypatch):
+        # Real-bug guard: a pre-existing .gitignore/.env whose final line lacks a trailing newline must NOT get
+        # the new entry glued onto it (which would break the .gitignore pattern or corrupt the .env key/value).
+        monkeypatch.delenv("NEO4J_PASSWORD", raising=False)
+        (tmp_path / ".gitignore").write_text("node_modules", encoding="utf-8")   # no trailing newline
+        (tmp_path / ".env").write_text("VOYAGE_API_KEY=vk", encoding="utf-8")     # no trailing newline
+        runner.invoke(cli, ["--project", "test", "--root", str(tmp_path), "init"])
+        gi = (tmp_path / ".gitignore").read_text(encoding="utf-8")
+        assert ".env" in [ln.strip() for ln in gi.splitlines()], ".env must land on its own gitignore line"
+        assert "node_modules.env" not in gi, "gitignore entry glued onto the prior non-terminated line"
+        env = (tmp_path / ".env").read_text(encoding="utf-8")
+        assert any(ln.strip() == "VOYAGE_API_KEY=vk" for ln in env.splitlines()), "existing .env line corrupted"
+        assert any(ln.startswith("NEO4J_PASSWORD=") for ln in env.splitlines()), "NEO4J_PASSWORD not on its own line"
+
     def test_env_example_created(self, runner, tmp_path):
         result = runner.invoke(cli, ["--project", "test", "--root", str(tmp_path), "init"])
         assert (tmp_path / ".env.example").exists()

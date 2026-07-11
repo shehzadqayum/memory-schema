@@ -219,6 +219,16 @@ class TestRememberV5:
         create_entity_file(fp, "still-v4", "d", ["o"])
         assert open(fp, encoding="utf-8").read().startswith("<memory:entity")
 
+    def test_create_v4_on_v5_zero_optout(self, tmp_path, monkeypatch):
+        # The other documented opt-out spelling: MEMORYSCHEMA_V5=0 (not just MEMORYSCHEMA_V4=1) also authors v4.
+        monkeypatch.delenv("MEMORYSCHEMA_V4", raising=False)
+        monkeypatch.setenv("MEMORYSCHEMA_V5", "0")
+        d = tmp_path / "memory"
+        d.mkdir()
+        fp = str(d / "v5zero.md")
+        create_entity_file(fp, "v5zero", "d", ["o"])
+        assert open(fp, encoding="utf-8").read().startswith("<memory:entity")
+
     def test_remember_cli_v5(self, tmp_path, monkeypatch):
         monkeypatch.setenv("MEMORYSCHEMA_V5", "1")
         (tmp_path / "memory").mkdir()

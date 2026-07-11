@@ -237,6 +237,22 @@ def validate(content, filepath=None, strict=False, known_names=None):
     return errors
 
 
+def _frontmatter_scalar(content, key):
+    """Return the raw (quote-stripped) value of a top-level frontmatter scalar `key`, scanning ONLY the leading
+    `---` fence block (never the body), or None if absent. Used to recover a value the v5 parser dropped."""
+    lines = content.lstrip('﻿').lstrip().splitlines()
+    if not lines or lines[0].strip() != '---':
+        return None
+    prefix = key + ':'
+    for line in lines[1:]:
+        s = line.strip()
+        if s == '---':
+            break
+        if s.startswith(prefix) and not line.startswith((' ', '-')):
+            return s[len(prefix):].strip().strip('"').strip("'")
+    return None
+
+
 def _validate_v5(content, filepath=None, strict=False, known_names=None):
     """Validate a v5 (frontmatter+markdown) entity against the semantic invariants.
 
@@ -261,11 +277,20 @@ def _validate_v5(content, filepath=None, strict=False, known_names=None):
         if actual != expected:
             errors.append(('V3', f'Filename "{actual}" does not match name "{name}" (expected "{expected}")'))
 
-    # V5: importance 1-10 (already coerced to int by the parser when present)
+    # V5: importance 1-10. The parser SILENTLY DROPS a non-integer importance (so it's absent from `mem`); for
+    # parity with the v4 path — which flags a non-integer importance — re-scan the raw frontmatter when the key
+    # is absent, and flag a present-but-non-integer value.
     if 'importance' in mem:
         imp = mem['importance']
         if not isinstance(imp, int) or imp < 1 or imp > 10:
             errors.append(('V5', f'Importance {imp} out of range, must be 1-10'))
+    else:
+        raw_imp = _frontmatter_scalar(content, 'importance')
+        if raw_imp is not None:
+            try:
+                int(raw_imp)
+            except ValueError:
+                errors.append(('V5', f'Importance "{raw_imp}" is not a valid integer'))
 
     # V11: status is valid
     status_val = mem.get('status')

@@ -5,7 +5,8 @@ needed only when hand-authoring or debugging entity files; the deterministic CLI
 (`chain step` / `remember`) writes valid entities for you.
 
 **Source of truth:** `packages/memory-schema/docs/schema-specification.md`
-(§3 schema, §4 write path). This file is a derived quick reference.
+(the entity schema — format, fields, enums, grammars, invariants; the write-path *mechanics* live in
+`harness-manual.md` §4). This file is a derived quick reference.
 
 ---
 

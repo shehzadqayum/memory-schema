@@ -23,7 +23,6 @@ reported unreachable. helios local patch — re-apply on re-vendor.
 """
 import json
 import os
-import re
 import tempfile
 
 from memoryschema.discovery import discover_memory_files
@@ -74,10 +73,25 @@ def _embed_text(entry):
     return compose_embedding_text(entry)
 
 
-# A v5 entity declares `schema: 5` as a frontmatter scalar (line-start, per format_v5._parse_frontmatter).
-# This marks a `---`-fenced file as an intended v5 entity even when its fence is broken and parse fails —
-# the v5 analogue of the `<memory:entity` tag used to detect a corrupt v4 file.
-_V5_SCHEMA5_MARKER = re.compile(r'^schema:\s*5\b', re.MULTILINE)
+def _declares_v5_in_frontmatter(text):
+    """True iff the file's LEADING frontmatter block declares `schema: 5` (quotes tolerated). Scans only the
+    region between the opening `---` and the next `---` (or EOF when the fence is unterminated) — never the
+    body — so a non-entity note that merely mentions `schema: 5` in its prose is not mistaken for a corrupt
+    entity, and a quoted `schema: "5"` (which parse_v5_content accepts) is still detected. Mirrors
+    format_v5.parse_v5_content's own discriminator (strip surrounding quotes, compare to "5"). This is the v5
+    analogue of the `<memory:entity` marker used to detect a corrupt v4 file."""
+    lines = text.lstrip('﻿').lstrip().splitlines()
+    if not lines or lines[0].strip() != '---':
+        return False
+    for line in lines[1:]:
+        s = line.strip()
+        if s == '---':                     # end of frontmatter — stop before the body
+            break
+        if s.startswith('schema:'):
+            val = s[len('schema:'):].strip().strip('"').strip("'")
+            if val == '5':
+                return True
+    return False
 
 
 def _parse_md(memory_dir):
@@ -89,7 +103,6 @@ def _parse_md(memory_dir):
     intentional deletion. The entity marker is format-specific: `<memory:entity` (v4), or a `---`-fenced
     file that declares `schema: 5` (v5). A plain frontmatter note (schema != 5) is NOT an entity and is
     skipped, exactly as a v4-era non-entity .md was."""
-    from memoryschema.format_v5 import is_v5_content
     out, malformed = {}, []
     for fp in discover_memory_files(str(memory_dir)):
         m = parse_memory_file(fp)
@@ -103,7 +116,7 @@ def _parse_md(memory_dir):
         # Reached here only because parse produced no named entity — so a positive marker match means a
         # DECLARED entity that won't parse = corruption, not a non-entity .md.
         v4_corrupt = "<memory:entity" in text
-        v5_corrupt = is_v5_content(text) and bool(_V5_SCHEMA5_MARKER.search(text))
+        v5_corrupt = _declares_v5_in_frontmatter(text)
         if v4_corrupt or v5_corrupt:
             malformed.append(fp)
     return out, malformed

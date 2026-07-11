@@ -2,7 +2,7 @@
 
 > **Unused in Helios** — no corpus scope is deployed here. Retained as the reference for
 > batch source-content ingestion. Normative schema:
-> `packages/memory-schema/docs/harness-manual.md` §3.
+> `packages/memory-schema/docs/schema-specification.md`.
 
 **Enforcement: batch — imported via scripts, no per-response requirement.** Validated at
 import time. Absence from a response is not a violation.

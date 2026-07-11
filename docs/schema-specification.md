@@ -105,14 +105,16 @@ deterministic writer re-parses its own output before committing (create refuses 
 validates before/after). The content-quality rules (the V/R/Q invariants below) are enforced by the validator.
 
 **Corruption invariant (NORMATIVE):** a *present-but-unparseable* entity file is **corruption, never a
-deletion** — `reconcile`/`sync` must surface it and **abort rather than prune** the entity. *(Today the guard
-covers v4 only; extending it to v5 is tracked as follow-up B3 — until then a malformed v5 file is silently
-pruned, a known gap the code must close, not the spec.)*
+deletion** — `reconcile`/`sync` must surface it and **abort rather than prune** the entity. The guard now
+covers v5 as well as v4: `reconcile._parse_md` flags a `---`-fenced file that declares `schema: 5` in its
+frontmatter but fails `parse_v5_content`, so a malformed v5 entity aborts the reconcile instead of being
+pruned (`_declares_v5_in_frontmatter`, quote-tolerant, frontmatter-scoped).
 
 **Quality invariants (V/R/Q):** structure (V), relations (R — types in the Reference tables, no
 self-reference, dedup by (target,type)), filesystem-safe names (F3), and content quality (Q — name is
-authority-kebab, description ≤ 120 chars, atomic observations). *(These run on v4 today; extending them to v5
-is tracked as follow-up B1 — the validator must validate the current format.)*
+authority-kebab, description ≤ 120 chars, atomic observations). These now run on **both** formats: `validate()`
+format-dispatches — a v5 file is validated by `_validate_v5` (parse-based well-formedness plus the V/R/Q rules
+on the parsed entity), a v4 XML file by the legacy path.
 
 ## 4. v4 XML format (legacy — parses, not authored)
 

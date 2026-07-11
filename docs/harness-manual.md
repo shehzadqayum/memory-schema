@@ -657,9 +657,10 @@ PostToolUse hook does the same from the written file's project root. Secrets bel
 | `l0_echo_threshold` | 0.6 | gate stage 6 |
 | `generator_id` | None | env `MEMORY_GENERATOR` (session-scoped) |
 
-Canonical constant sets (`config.py`): `VALID_TYPES`, `VALID_STATUSES`,
-`VALID_RELATION_TYPES` + `DEPRECATED_RELATION_TYPES`, `SCHEMA_VERSION = 4` (the v4 XML
-validation ceiling — v5 is a file-format discriminator, not this constant).
+Canonical constant sets are defined in `entity_schema.py` (the single authority) and re-exported by
+`config.py`: `VALID_TYPES`, `VALID_STATUSES`, `VALID_RELATION_TYPES` + `DEPRECATED_RELATION_TYPES`,
+`SCHEMA_VERSION = 5` (tracks the current entity format). The legacy v4-XML `schema=` attribute ceiling is the
+separate constant `V4_XML_SCHEMA_VERSION = 4`, used only by the validator's V10 range check.
 
 ### 10.3 The Helios deployment (`memoryschema.toml`)
 
@@ -750,8 +751,9 @@ config resolution → throttled banner-only preflight (§9.1). `--json` on query
 | `config [--json] [--chain]` / `rules [--json] [--conflicts]` | resolved config / rules inheritance inspection |
 
 Environment variables (complete): `MEMORY_PROJECT`, `MEMORY_ROOT`, `MEMORY_GENERATOR`,
-`NEO4J_URI`, `NEO4J_USER`, `NEO4J_PASSWORD`, `VOYAGE_API_KEY`, `MEMORYSCHEMA_V5`
-(v5 creation gate), `MEMORYSCHEMA_REQUIRE_NEO4J` (default true),
+`NEO4J_URI`, `NEO4J_USER`, `NEO4J_PASSWORD`, `VOYAGE_API_KEY`, `MEMORYSCHEMA_V5` / `MEMORYSCHEMA_V4`
+(legacy-v4 opt-out — v5 is the authored default; set `MEMORYSCHEMA_V4=1` or `MEMORYSCHEMA_V5=0` to author v4
+XML), `MEMORYSCHEMA_REQUIRE_NEO4J` (default true),
 `MEMORYSCHEMA_REQUIRE_VOYAGE` (default false), `MEMORYSCHEMA_SKIP_PREFLIGHT`,
 `MEMORYSCHEMA_RECALL_LOG=0` (telemetry opt-out), `MEMORYSCHEMA_PYTHON` (hook
 interpreter), `PYTHONUTF8=1` + `PYTHONIOENCODING=utf-8` (required on Windows cp1252
@@ -883,9 +885,9 @@ record.
   says "21-point" (22 checks). `config.recency_decay`/`mitigation_dampening`/
   `recall_depth`/`recall_decay` exist as config fields but the operative values are
   hardcoded at their call sites.
-- A corrupt v5 file is silently skipped by the hook and reads as a non-entity to the
-  reconcile malformed-guard (v4-only tripwire) — v5 safety lives in the writers'
-  round-trip checks (schema-specification.md).
+- A corrupt v5 file is silently skipped by the hook, but the reconcile malformed-guard now
+  detects it (via its `schema: 5` frontmatter declaration) and refuses to prune its entity —
+  v5 safety also lives in the writers' round-trip checks (schema-specification.md).
 - `remember --body` survives only on the v4 branch; fact keys survive only on v5.
 - The chain bootstrap always writes v5 regardless of `MEMORYSCHEMA_V5`.
 

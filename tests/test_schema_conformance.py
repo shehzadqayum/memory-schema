@@ -116,6 +116,19 @@ def test_b1_v5_entities_are_validated():
     assert 'R2' in rules("---\nschema: 5\nname: e\nrelations:\n- FROBNICATE target-x\n---\n\nd\n")   # bad rel type
     assert 'R3' in rules("---\nschema: 5\nname: e\nrelations:\n- USES Bad_Target\n---\n\nd\n")       # non-kebab target
     assert 'V1' in rules("---\nschema: 5\nname: e\n## Observations\n- unterminated fence\n")         # corrupt v5
+    assert 'R4' in rules("---\nschema: 5\nname: self-ref\nrelations:\n- USES self-ref\n---\n\nd\n")  # self-reference
+    assert 'R5' in rules("---\nschema: 5\nname: e\nrelations:\n- USES target-x\n- USES target-x\n---\n\nd\n")  # dup
+    # importance parity: a non-integer importance is flagged V5 in v5 exactly as v4 does (parser drops it silently)
+    assert 'V5' in rules("---\nschema: 5\nname: e\nimportance: high\n---\n\nd\n\n## Observations\n- x\n")
+
+    # Q6/Q7 operate on REAL observations, not chain `## Log` steps (the parser flattens log into observations)
+    chain_md = ("---\nschema: 5\nname: e\n---\n\nd\n\n## Observations\n- one real observation\n\n## Log\n"
+                + "".join(f"- Step {i}: did a thing\n" for i in range(1, 16)))
+    assert 'Q6' not in rules(chain_md), "chain Log steps must not count toward the Q6 observation cap"
+    many_obs = "---\nschema: 5\nname: e\n---\n\nd\n\n## Observations\n" + "".join(f"- obs {i}\n" for i in range(11))
+    assert 'Q6' in rules(many_obs), "11 real observations must trip Q6"
+    long_obs = "---\nschema: 5\nname: e\n---\n\nd\n\n## Observations\n- " + ("word " * 60) + "\n"
+    assert 'Q7' in rules(long_obs), "a >50-word observation must trip Q7"
 
 
 def test_b2_new_entities_default_to_v5(tmp_path, monkeypatch):
@@ -152,9 +165,18 @@ def test_b3_malformed_v5_is_guarded_not_pruned(tmp_path):
     # a well-formed v5 entity -> parses, lands in the entity map
     (mem / "good-v5.md").write_text(
         "---\nschema: 5\nname: good-v5\ntype: semantic\n---\n\n## Observations\n- fine\n", encoding="utf-8")
-    # negative control: a plain frontmatter wiki note (schema != 5) is NOT an entity -> neither map nor malformed
+    # a corrupt v5 entity whose schema scalar is QUOTED — parse_v5_content strips quotes and accepts it, so the
+    # guard must too (else it evades detection -> silent prune = the exact data loss B3 closes)
+    (mem / "broken-quoted.md").write_text(
+        "---\nschema: \"5\"\nname: broken-quoted\ntype: semantic\n"
+        "## Observations\n- quoted schema, missing closing fence\n", encoding="utf-8")
+    # negative control 1: a plain frontmatter wiki note (schema != 5) is NOT an entity -> neither map nor malformed
     (mem / "plain-note.md").write_text(
         "---\ntitle: not an entity\ntags: [x]\n---\n\n# Note\nprose only\n", encoding="utf-8")
+    # negative control 2: a non-entity note whose BODY mentions `schema: 5` (a doc ABOUT the v5 format) must NOT
+    # be misread as a corrupt entity — the marker scans the frontmatter block only, never the body
+    (mem / "doc-note.md").write_text(
+        "---\ntype: doc\n---\n\n# The v5 format\nA v5 entity's frontmatter contains:\nschema: 5\n", encoding="utf-8")
     # regression: a corrupt v4 file stays guarded too
     (mem / "broken-v4.md").write_text(
         '<memory:entity schema="4" name="broken-v4">\n  <memory:description>unclosed', encoding="utf-8")
@@ -162,9 +184,11 @@ def test_b3_malformed_v5_is_guarded_not_pruned(tmp_path):
     out, malformed = reconcile._parse_md(mem)
     flagged = {os.path.basename(f) for f in malformed}
     assert "broken-v5.md" in flagged, "corrupt v5 entity must be guarded, not pruned (B3)"
+    assert "broken-quoted.md" in flagged, "corrupt v5 with a QUOTED schema must be guarded (parser accepts it)"
     assert "broken-v4.md" in flagged, "corrupt v4 entity must stay guarded"
     assert "plain-note.md" not in flagged, "a non-entity note must NOT be flagged as corruption"
-    assert "good-v5" in out and "plain-note" not in out
+    assert "doc-note.md" not in flagged, "a note that mentions `schema: 5` in its BODY must NOT be flagged"
+    assert "good-v5" in out and "plain-note" not in out and "doc-note" not in out
 
 
 def test_doc_machine_sections_match_render_reference_tables():

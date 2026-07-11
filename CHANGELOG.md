@@ -2,6 +2,25 @@
 
 ## [Unreleased]
 
+### Fixed (2026-07-11 — adversarial-review follow-ups on Part B/C)
+- **B3 corruption marker was both too broad AND too narrow.** `_V5_SCHEMA5_MARKER` scanned the whole file
+  (`re.MULTILINE`), so a non-entity note whose *body* contained a `schema: 5` line was misclassified as a
+  corrupt entity and aborted the entire reconcile (false positive); it also missed a quoted `schema: "5"`
+  that the parser accepts, so a corrupt quoted-schema file evaded the guard and was silently pruned (false
+  negative). Replaced with `_declares_v5_in_frontmatter` — frontmatter-scoped and quote-tolerant, mirroring
+  `parse_v5_content`'s discriminator. Both cases now covered by tests.
+- **`init` .env/.gitignore append was not newline-safe.** Appending `.env`/`NEO4J_PASSWORD=…` to a file whose
+  last line lacked a trailing newline glued the entry onto the prior line (`.env` never ignored → secret
+  committable; or a corrupted `.env` key/value). Appends now insert a leading newline when needed.
+- **v5 validation parity:** `_validate_v5` now flags a non-integer `importance` (which the parser silently
+  drops) exactly as the v4 path does.
+- **Docs synced to the landed code:** the schema-spec §3 corruption/quality notes, the harness-manual
+  `SCHEMA_VERSION`/env-var/`corrupt-v5` caveats, and the on-demand rule source-of-truth pointers no longer
+  describe B1/B3/B4 as pending or `SCHEMA_VERSION` as `4`.
+- **Honesty:** preflight's compose-trust-gate comments now state it is an anti-footgun, not an adversarial
+  boundary (the sentinel is a copyable token). Added regression tests for the trust gate, the hook `.env`
+  allowlist, the V10 v4-ceiling boundary, and the B1 Q6/Q7 log-slice.
+
 ### Security (2026-07-11 — pre-extraction hardening, Part C)
 - **HIGH — preflight no longer auto-runs an untrusted compose file.** `preflight._start_container` ran
   `docker compose -f <cwd>/docker-compose.yml up -d` unconditionally, so invoking any memoryschema command

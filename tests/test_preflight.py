@@ -72,3 +72,43 @@ def test_container_autostart_failure_is_loud(monkeypatch):
     assert r["ok"] is False                                               # the anti-silent guarantee
     assert any(c["name"] == "neo4j_container" and not c["ok"] for c in r["failures"])
     assert "FAIL" in pf.format_report(r)
+
+
+# ── HIGH-1: the compose trust gate on the always-on auto-recovery path ─────────────────────────────
+def test_compose_trust_gate(tmp_path):
+    managed = tmp_path / "managed.yml"
+    managed.write_text("# memoryschema-managed\nservices:\n  neo4j: {}\n", encoding="utf-8")
+    hostile = tmp_path / "hostile.yml"
+    hostile.write_text("services:\n  evil:\n    image: attacker/x\n", encoding="utf-8")
+    assert pf._compose_is_trusted(str(managed)) is True
+    assert pf._compose_is_trusted(str(hostile)) is False
+    assert pf._compose_is_trusted(str(tmp_path / "missing.yml")) is False
+
+
+def test_start_container_refuses_untrusted_compose(tmp_path, monkeypatch):
+    """When the named container is absent, _start_container must NOT `compose up` a sentinel-less CWD file."""
+    cfg = MemoryConfig(project_root=str(tmp_path))
+    (tmp_path / "docker-compose.yml").write_text("services:\n  evil:\n    image: attacker/x\n", encoding="utf-8")
+    calls = []
+    def fake_run(args, timeout=10):
+        calls.append(args)
+        if args[:2] == ["docker", "start"]:
+            return 1, "", "No such container"     # container does not exist
+        return 0, "", ""                           # a compose-up would 'succeed' if we ever reached it
+    monkeypatch.setattr(pf, "_run", fake_run)
+    ok, err = pf._start_container(cfg)
+    assert ok is False and "not a memoryschema-managed" in err
+    assert not any("compose" in a for a in calls), "must NOT run `compose up` on an untrusted file"
+
+
+def test_start_container_recovers_stopped_via_docker_start(tmp_path, monkeypatch):
+    """A merely-stopped named container is recovered by `docker start` alone — no compose, no file executed."""
+    cfg = MemoryConfig(project_root=str(tmp_path))
+    calls = []
+    def fake_run(args, timeout=10):
+        calls.append(args)
+        return (0, "", "") if args[:2] == ["docker", "start"] else (1, "", "should not reach")
+    monkeypatch.setattr(pf, "_run", fake_run)
+    ok, err = pf._start_container(cfg)
+    assert ok is True
+    assert calls == [["docker", "start", cfg.neo4j_container_name]], "should stop after docker start succeeds"

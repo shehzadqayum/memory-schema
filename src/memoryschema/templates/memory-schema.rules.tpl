@@ -5,7 +5,8 @@ These rules say nothing about when to write or what to capture — that is deter
 the scope guidelines (memory-working.md / memory-corpus.md).
 
 **Source of truth:** `docs/schema-specification.md` in the memory-schema package
-(§3 schema, §4 write path). This file is a derived quick reference.
+(the entity schema — format, fields, enums, grammars, invariants; the write-path *mechanics* live in
+`harness-manual.md` §4). This file is a derived quick reference.
 
 ---
 
