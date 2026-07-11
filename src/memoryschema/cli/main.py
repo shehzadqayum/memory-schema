@@ -249,7 +249,7 @@ def init(config, with_neo4j, scopes, neo4j_password):
 
     # 4. .claude/ artefacts — the memory-protocol kernel (always-loaded) + the on-demand schema reference
     # (always) + any scope-gated on-demand rules + the dream-pass skill, deployed from the SAME
-    # `.claude-plugin/` source that `plugin sync` uses (via the shared `deploy_artefacts`), so init and sync
+    # `src/memoryschema/claude_plugin/` source that `plugin sync` uses (via the shared `deploy_artefacts`), so init and sync
     # never diverge. On a non-source install where the plugin dir isn't packaged, hint at `plugin sync`.
     scope_list = [s.strip() for s in scopes.split(",")]
     from memoryschema.cli.plugin_cmd import (
@@ -260,7 +260,7 @@ def init(config, with_neo4j, scopes, neo4j_password):
         created.extend(deploy_artefacts(
             plugin_dir, config.project_root / ".claude", artefact_pairs_for_scopes(scope_list)))
     else:
-        click.echo("Warning: package .claude-plugin/ not found — run `memoryschema plugin sync` after install.",
+        click.echo("Warning: package src/memoryschema/claude_plugin/ not found — run `memoryschema plugin sync` after install.",
                    err=True)
 
     # 5. memoryschema.toml

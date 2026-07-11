@@ -40,7 +40,7 @@ memoryschema = "memoryschema.cli.main:cli"
 where = ["src"]
 
 [tool.setuptools.package-data]
-memoryschema = ["templates/*", "hooks/*"]
+memoryschema = ["templates/*", "hooks/*", "claude_plugin/**/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

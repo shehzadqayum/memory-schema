@@ -25,7 +25,7 @@ CLAUDE_DIR = Path.home() / ".claude"
 MANIFEST_PATH = CLAUDE_DIR / "memory-schema-manifest.json"
 
 # The CANONICAL operational artefacts (source relative to the plugin dir → target relative to a `.claude/`).
-# The package's `.claude-plugin/` is the SINGLE SOURCE OF TRUTH; BOTH `plugin sync` and `init` deploy from it
+# The package's `src/memoryschema/claude_plugin/` is the SINGLE SOURCE OF TRUTH; BOTH `plugin sync` and `init` deploy from it
 # via `deploy_artefacts` — there is no second (template) copy of these to drift against.
 _KERNEL_PAIR = ("rules/memory-working.md", "rules/memory-working.md")                    # always-loaded kernel
 _SCHEMA_PAIR = ("rules-ondemand/memory-schema.md", "rules-ondemand/memory-schema.md")    # on-demand v5 schema ref
@@ -63,20 +63,18 @@ def deploy_artefacts(src_dir, base, pairs):
 
 
 def _find_plugin_dir():
-    """Find the .claude-plugin/ directory relative to the package source."""
-    pkg_dir = Path(__file__).resolve().parent.parent  # src/memoryschema/
-    repo_root = pkg_dir.parent.parent  # repo root (contains src/ and .claude-plugin/)
-    plugin_dir = repo_root / ".claude-plugin"
-    if plugin_dir.is_dir():
-        return plugin_dir
+    """Locate the deployable-artefacts dir (the plugin SSOT). Packaged UNDER the module (`claude_plugin/`,
+    shipped as package-data), so it resolves from ANY install — editable OR a real wheel — not just a source
+    checkout. This is what lets `plugin sync`/`init` work in a project that merely `pip install`ed the module."""
     try:
         from importlib.resources import files as pkg_files
-        candidate = Path(str(pkg_files("memoryschema"))) / ".." / ".." / ".claude-plugin"
-        if candidate.resolve().is_dir():
-            return candidate.resolve()
+        cand = Path(str(pkg_files("memoryschema"))) / "claude_plugin"
+        if cand.is_dir():
+            return cand
     except Exception:
         pass
-    return None
+    cand = Path(__file__).resolve().parent.parent / "claude_plugin"  # src/memoryschema/ (source-tree fallback)
+    return cand if cand.is_dir() else None
 
 
 def _write_manifest(manifest):
@@ -114,7 +112,7 @@ def deploy(config, force):
     """
     plugin_dir = _find_plugin_dir()
     if plugin_dir is None:
-        click.echo("Error: .claude-plugin/ directory not found.", err=True)
+        click.echo("Error: src/memoryschema/claude_plugin/ directory not found.", err=True)
         raise SystemExit(1)
 
     manifest = {
@@ -454,7 +452,7 @@ def sync(config, check, target, use_global, as_json):
     verified by MD5.
 
     The canonical artefacts (the dream-pass skill, the kernel, the on-demand rules) live
-    in the package at .claude-plugin/ — the SINGLE SOURCE OF TRUTH. This makes a
+    in the package at src/memoryschema/claude_plugin/ — the SINGLE SOURCE OF TRUTH. This makes a
     deployment's .claude/ a verifiable derived copy:
 
       --check   report drift and exit non-zero (a CI / pre-commit gate); writes nothing.
@@ -465,7 +463,7 @@ def sync(config, check, target, use_global, as_json):
     """
     src_dir = _find_plugin_dir()
     if not src_dir:
-        click.echo("Error: package .claude-plugin/ not found — the source of truth is missing.", err=True)
+        click.echo("Error: package src/memoryschema/claude_plugin/ not found — the source of truth is missing.", err=True)
         sys.exit(1)
     if use_global:
         base = CLAUDE_DIR

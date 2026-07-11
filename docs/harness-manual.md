@@ -785,13 +785,13 @@ consoles).
 ### 12.1 Operational artefacts (skills & rules) — the single source of truth
 
 The runnable operating system (the skill(s) + the injected rules) is versioned IN the
-package at **`packages/memory-schema/.claude-plugin/`** — not just described in this spec
+package at **`packages/memory-schema/src/memoryschema/claude_plugin/`** — not just described in this spec
 — so a deployment can be reconstructed and the package never drifts from what actually
 runs. `memoryschema plugin deploy` installs these into `~/.claude/`; the manifest at
 `~/.claude/memory-schema-manifest.json` records exactly what was placed, and `plugin
 status`/`uninstall` read it.
 
-| artefact (`.claude-plugin/…`) | deploys to | role |
+| artefact (`src/memoryschema/claude_plugin/…`) | deploys to | role |
 |-------------------------------|-----------|------|
 | `skills/dream-pass/SKILL.md` | `~/.claude/skills/dream-pass/` | the consolidation procedure (§8.2) |
 | `rules/memory-working.md` | `~/.claude/rules/` | the always-loaded ~534-token protocol kernel (§1 principle 5) |
@@ -800,7 +800,7 @@ status`/`uninstall` read it.
 
 `SKILL_FILES`/`RULE_FILES` in `cli/plugin_cmd.py` MUST stay in sync with that directory.
 Separately, `src/memoryschema/templates/*.tpl` are the GENERIC scaffolds `init` writes
-into a fresh project (the `.claude-plugin/` copies are the deployed, possibly-tuned
+into a fresh project (the `src/memoryschema/claude_plugin/` copies are the deployed, possibly-tuned
 operational versions — edit those, then re-deploy; do not hand-maintain divergent copies
 in a project's `.claude/`).
 

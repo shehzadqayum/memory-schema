@@ -32,8 +32,9 @@ safe unless you replace the package files.
 - `tests/test_schema_conformance.py` is the **anti-drift gate** — it asserts the harness single-sources the
   grammar and that validator + parser agree with the authority. Keep it green; add an xfail→pass when a
   harness gap is closed.
-- `.claude-plugin/` is the **SSOT for deployed rules/skills**; deploy with `memoryschema plugin sync`
-  (`--check` is a CI/session-start drift gate). Editing the deployed `.claude/` copy directly drifts.
+- `src/memoryschema/claude_plugin/` is the **SSOT for deployed rules/skills** (packaged, so it resolves from
+  any install); `init` and `plugin sync` both deploy it via the shared `deploy_artefacts`. `plugin sync
+  --check` is a CI/session-start drift gate. Editing the deployed `.claude/` copy directly drifts.
 - Keep `CHANGELOG.md` `[Unreleased]` current — the audit found it drifts; bake the habit in.
 - Always `export PYTHONUTF8=1 PYTHONIOENCODING=utf-8` before any CLI call (Windows cp1252 crashes on Unicode).
 

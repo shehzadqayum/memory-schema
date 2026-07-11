@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+### Changed (2026-07-11 — standalone deployability: the plugin artefacts install & unify)
+- **M1 — `plugin sync` / `plugin deploy` now work from a real `pip install`.** The deployable-artefacts SSOT
+  lived at the repo root (`.claude-plugin/`) and was packaged by nothing, so `_find_plugin_dir()` resolved it
+  only in a source checkout — a wheel install exited 1 ("source of truth missing"). Moved it UNDER the module
+  to `src/memoryschema/claude_plugin/` (shipped as `package-data`), and `_find_plugin_dir()` now resolves it via
+  `importlib.resources`, so it works from any install. Verified end-to-end: built a wheel, installed it into an
+  isolated venv (no source tree), and `plugin sync` deployed all four artefacts from `site-packages`.
+- **M2 — `init` and `plugin sync` deploy from ONE source.** `init` used to write rules from `templates/*.tpl`
+  while `plugin sync` wrote the same logical artefacts from the plugin dir — two divergent kernels for one
+  path, and a schema ref duplicated across two load tiers. Both now call a shared `deploy_artefacts` over the
+  single `claude_plugin/` source; `init --scopes` selects the on-demand rule set. Deleted the three orphaned
+  templates (`memory-working.tpl`, `memory-schema.rules.tpl`, `memory-corpus.tpl`).
+
 ### Fixed (2026-07-11 — adversarial-review follow-ups on Part B/C)
 - **B3 corruption marker was both too broad AND too narrow.** `_V5_SCHEMA5_MARKER` scanned the whole file
   (`re.MULTILINE`), so a non-entity note whose *body* contained a `schema: 5` line was misclassified as a
