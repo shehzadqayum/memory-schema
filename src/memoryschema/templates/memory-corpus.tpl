@@ -23,7 +23,7 @@ All corpus memory is `semantic` — facts and content that persist indefinitely.
 
 Write an ingest script that:
 1. Reads source files (any format)
-2. Builds one entity per item — current format is schema v5 via `write_index.create_entity_file` with `MEMORYSCHEMA_V5=1` (the shipped example scripts still emit legacy v4 XML, which parses fine); see `docs/harness-manual.md` §3 for the format
+2. Builds one entity per item — current format is schema v5 via `write_index.create_entity_file` with `MEMORYSCHEMA_V5=1` (the shipped example scripts still emit legacy v4 XML, which parses fine); see `docs/schema-specification.md` for the format
 3. Embeds in batches via Voyage AI
 4. Writes `.md` files to `memory/<subdir>/`
 5. Bulk-writes to store (Neo4j or JSONL)
