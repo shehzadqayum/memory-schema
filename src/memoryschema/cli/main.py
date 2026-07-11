@@ -247,32 +247,21 @@ def init(config, with_neo4j, scopes, neo4j_password):
         except Exception:
             click.echo("Warning: env.example template not found. Skipping.", err=True)
 
-    # 4. .claude/rules/
-    config.rules_dir.mkdir(parents=True, exist_ok=True)
+    # 4. .claude/ artefacts — the memory-protocol kernel (always-loaded) + the on-demand schema reference
+    # (always) + any scope-gated on-demand rules + the dream-pass skill, deployed from the SAME
+    # `.claude-plugin/` source that `plugin sync` uses (via the shared `deploy_artefacts`), so init and sync
+    # never diverge. On a non-source install where the plugin dir isn't packaged, hint at `plugin sync`.
     scope_list = [s.strip() for s in scopes.split(",")]
-
-    try:
-        # Schema rules (always)
-        schema_rules = (pkg_files("memoryschema.templates") / "memory-schema.rules.tpl").read_text()
-        rules_path = config.rules_dir / "memory-schema.md"
-        if not rules_path.exists():
-            rules_path.write_text(schema_rules)
-            created.append(str(rules_path))
-
-        # Scope guidelines
-        for scope in scope_list:
-            tpl_name = f"memory-{scope}.tpl"
-            try:
-                tpl = (pkg_files("memoryschema.templates") / tpl_name).read_text()
-                scope_path = config.rules_dir / f"memory-{scope}.md"
-                if not scope_path.exists():
-                    content = tpl.format(project_name=config.project_name)
-                    scope_path.write_text(content)
-                    created.append(str(scope_path))
-            except Exception:
-                click.echo(f"Warning: Template {tpl_name} not found. Skipping.", err=True)
-    except Exception:
-        click.echo("Warning: Templates not found. Skipping rules setup.", err=True)
+    from memoryschema.cli.plugin_cmd import (
+        _find_plugin_dir, artefact_pairs_for_scopes, deploy_artefacts,
+    )
+    plugin_dir = _find_plugin_dir()
+    if plugin_dir is not None:
+        created.extend(deploy_artefacts(
+            plugin_dir, config.project_root / ".claude", artefact_pairs_for_scopes(scope_list)))
+    else:
+        click.echo("Warning: package .claude-plugin/ not found — run `memoryschema plugin sync` after install.",
+                   err=True)
 
     # 5. memoryschema.toml
     toml_path = config.config_file_path

@@ -24,20 +24,42 @@ from memoryschema.cli._hooks_util import (
 CLAUDE_DIR = Path.home() / ".claude"
 MANIFEST_PATH = CLAUDE_DIR / "memory-schema-manifest.json"
 
-# Files to deploy: (source relative to the .claude-plugin/ dir, target relative to
-# ~/.claude/). These are the CANONICAL operational artefacts, versioned in the package
-# at packages/memory-schema/.claude-plugin/ — the single source of truth for what runs
-# (mirrors the layout a Helios-style deployment uses: an always-loaded kernel + on-demand
-# references + the consolidation skill). Keep this list in sync with that directory.
+# The CANONICAL operational artefacts (source relative to the plugin dir → target relative to a `.claude/`).
+# The package's `.claude-plugin/` is the SINGLE SOURCE OF TRUTH; BOTH `plugin sync` and `init` deploy from it
+# via `deploy_artefacts` — there is no second (template) copy of these to drift against.
+_KERNEL_PAIR = ("rules/memory-working.md", "rules/memory-working.md")                    # always-loaded kernel
+_SCHEMA_PAIR = ("rules-ondemand/memory-schema.md", "rules-ondemand/memory-schema.md")    # on-demand v5 schema ref
+_CORPUS_PAIR = ("rules-ondemand/memory-corpus.md", "rules-ondemand/memory-corpus.md")    # on-demand corpus rule
+
 SKILL_FILES = [
     ("skills/dream-pass/SKILL.md", "skills/dream-pass/SKILL.md"),
 ]
+RULE_FILES = [_KERNEL_PAIR, _SCHEMA_PAIR, _CORPUS_PAIR]
 
-RULE_FILES = [
-    ("rules/memory-working.md", "rules/memory-working.md"),                  # always-loaded kernel
-    ("rules-ondemand/memory-schema.md", "rules-ondemand/memory-schema.md"),  # v5 schema reference
-    ("rules-ondemand/memory-corpus.md", "rules-ondemand/memory-corpus.md"),  # corpus guidelines
-]
+# Scope-gated on-demand rules (the kernel + schema ref always deploy; these are opt-in via `init --scopes`).
+_SCOPE_RULE_PAIRS = {"corpus": _CORPUS_PAIR}
+
+
+def artefact_pairs_for_scopes(scopes):
+    """The (src_rel, dst_rel) artefacts a deployment with these scopes carries: the dream-pass skill, the
+    always-loaded kernel, the on-demand schema reference, plus any scope-specific on-demand rules. Used by
+    `init` so it deploys the SAME artefacts (from the SAME source) as `plugin sync`."""
+    pairs = list(SKILL_FILES) + [_KERNEL_PAIR, _SCHEMA_PAIR]
+    pairs += [_SCOPE_RULE_PAIRS[s] for s in scopes if s in _SCOPE_RULE_PAIRS]
+    return pairs
+
+
+def deploy_artefacts(src_dir, base, pairs):
+    """MD5-gated copy of `pairs` from src_dir into `base` (a `.claude/` dir). Writes only missing/changed
+    files (so a re-run is a no-op on in-sync files); returns the dst paths actually written. The one
+    deployment path shared by `plugin sync` and `init`."""
+    written = []
+    for r in compute_artefact_sync(src_dir, base, pairs=pairs):
+        if r["status"] in ("missing", "drift"):
+            r["dst"].parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(r["src"], r["dst"])
+            written.append(str(r["dst"]))
+    return written
 
 
 def _find_plugin_dir():
@@ -391,15 +413,16 @@ def _artefact_pairs():
     return list(SKILL_FILES) + list(RULE_FILES)
 
 
-def compute_artefact_sync(src_dir, base):
-    """Compare each canonical artefact's MD5 against its deployed copy.
+def compute_artefact_sync(src_dir, base, pairs=None):
+    """Compare each artefact's MD5 against its deployed copy.
 
-    Returns a list of {file, status, src_md5, dst_md5, src, dst}. Status is one of
-    src-missing (source of truth absent — a package defect), missing (not deployed),
-    drift (deployed copy differs), in-sync (MD5 match). Pure/read-only.
+    `pairs` defaults to the complete canonical set (`_artefact_pairs()`); pass a subset (e.g. from
+    `artefact_pairs_for_scopes`) to scope a deployment. Returns a list of
+    {file, status, src_md5, dst_md5, src, dst}. Status is one of src-missing (source of truth absent — a
+    package defect), missing (not deployed), drift (deployed copy differs), in-sync (MD5 match). Read-only.
     """
     rows = []
-    for src_rel, dst_rel in _artefact_pairs():
+    for src_rel, dst_rel in (pairs if pairs is not None else _artefact_pairs()):
         s = Path(src_dir) / src_rel
         d = Path(base) / dst_rel
         s_md5 = _md5(s) if s.exists() else None

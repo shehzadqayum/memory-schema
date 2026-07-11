@@ -36,7 +36,9 @@ class TestInit:
         result = runner.invoke(cli, ["--project", "test-proj", "--root", str(tmp_path), "init"])
         assert result.exit_code == 0
         assert (tmp_path / "memory" / "MEMORY.md").exists()
-        assert (tmp_path / ".claude" / "rules" / "memory-schema.md").exists()
+        # schema ref is deployed on-demand (from the .claude-plugin SSOT), not always-loaded
+        assert (tmp_path / ".claude" / "rules-ondemand" / "memory-schema.md").exists()
+        assert (tmp_path / ".claude" / "rules" / "memory-working.md").exists()   # the always-loaded kernel
 
     def test_scopes_working(self, runner, tmp_path):
         result = runner.invoke(cli, ["--project", "t", "--root", str(tmp_path), "init", "--scopes", "working"])
@@ -46,7 +48,10 @@ class TestInit:
     def test_scopes_corpus(self, runner, tmp_path):
         result = runner.invoke(cli, ["--project", "t", "--root", str(tmp_path), "init", "--scopes", "working,corpus"])
         assert result.exit_code == 0
-        assert (tmp_path / ".claude" / "rules" / "memory-corpus.md").exists()
+        assert (tmp_path / ".claude" / "rules-ondemand" / "memory-corpus.md").exists()
+        # a non-corpus init must NOT deploy the corpus rule
+        result2 = runner.invoke(cli, ["--project", "t", "--root", str(tmp_path / "no-corpus"), "init", "--scopes", "working"])
+        assert not (tmp_path / "no-corpus" / ".claude" / "rules-ondemand" / "memory-corpus.md").exists()
 
     def test_idempotent(self, runner, tmp_path):
         runner.invoke(cli, ["--project", "t", "--root", str(tmp_path), "init"])
