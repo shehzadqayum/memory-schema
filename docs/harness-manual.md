@@ -562,10 +562,10 @@ canonical (carries the derived layer); Neo4j is a rebuildable projection.**
 `memoryschema reconcile [--dry-run] [--prune/--no-prune] [--no-verify] [--allow-empty]`:
 
 1. Parse the `.md` set. **Malformed guard** (not overridable): any unparseable file that
-   contains `<memory:entity` aborts the run — a parse failure must never be mistaken for
-   an intentional deletion. (v5 caveat: a corrupt v5 file has no XML marker, so it reads
-   as a non-entity and its store entry becomes a prunable orphan — v5 safety lives in
-   the writers' round-trip checks, not this tripwire.)
+   declares an entity — `<memory:entity` (v4) or a `schema: 5` frontmatter line (v5, via
+   `_declares_v5_in_frontmatter`, which delegates to the parser's own grammar) — aborts the
+   run rather than pruning it; a parse failure must never be mistaken for an intentional
+   deletion. (Only the unterminated-fence last-wins edge can slip; see §14.)
 2. **Shrink/empty guard** (`--allow-empty` bypasses): abort when the `.md` set is empty
    or < 50% of the JSONL count — protects against a misconfigured root wiping the store.
 3. Rebuild JSONL to EXACTLY the `.md` set, **reusing the derived layer**
@@ -730,7 +730,7 @@ config resolution → throttled banner-only preflight (§9.1). `--json` on query
 | `sync` | §9.2 read-only name-set drift |
 | `reconcile [--dry-run] [--prune/--no-prune] [--no-verify] [--allow-empty]` | §9.3; exit 1 on abort/verify-fail |
 | `doctor [--json] [--fix]` | 22 live checks (python→tests); `--fix` prints fix commands, advisory only; always exit 0 |
-| `validate [PATH] [--strict] [--json]` | v4 rule validator (v5 files report V1 — schema-specification.md) |
+| `validate [PATH] [--strict] [--json]` | rule validator; format-dispatched — v5 via `_validate_v5`, v4 XML via the legacy path (an unparseable `schema: 5` file reports a single V1). schema-specification.md |
 | `index [--base-path] [--project] [--embed]` | bulk consolidate (hard-requires Neo4j) |
 | `embed [--prefix\|--all] [--space X] [--all-spaces] [--coverage] [--batch-size 20] [--dry-run]` | §6.5 |
 | `associations [--recompute] [--k 10]` | k-NN edge stats/recompute |

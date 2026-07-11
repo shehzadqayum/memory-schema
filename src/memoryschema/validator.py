@@ -1,9 +1,10 @@
 """
 Memory schema validator.
 
-Validates <memory:> tagged files against the schema specification.
+Validates memory entity files against the schema specification. `validate()` format-dispatches on
+`is_v5_content`: a v5 (frontmatter) file is validated by `_validate_v5`, a v4 XML file by the legacy path.
 
-Validation rules (as implemented — v4 XML only):
+Validation rules (rule IDs shared across both formats; the v4 XML path below, v5 in `_validate_v5`):
   V1-V12: Structure (V8 retired; the filename-match check is emitted as V3)
   R1-R6:  Relations (attributes, types, self-reference, duplicates, referential integrity)
           — SUPERSEDES cycle detection (R7) lives in the store, not here

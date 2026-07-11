@@ -183,14 +183,15 @@ def reconcile(config, dry_run=False, prune=True, verify=True, allow_empty=False)
 
     # MALFORMED GUARD (always on; precedes the empty/shrink guard; NOT overridable): a file that EXISTS
     # but fails to parse is CORRUPTION, not a deletion — reconciling would PRUNE its entity from
-    # JSONL+Neo4j (the silent-loss bug this fixes). Refuse + name the files; the operator fixes the XML
-    # (commonly an unescaped & / < / >) or deletes the file (an intentional removal), then re-runs.
+    # JSONL+Neo4j (the silent-loss bug this fixes). Refuse + name the files; the operator fixes the
+    # corruption (an unescaped & / < / > in v4 XML, or a broken `---` frontmatter fence in v5) or deletes
+    # the file (an intentional removal), then re-runs.
     if malformed and not dry_run:
         result["aborted"] = (
             f"refusing to reconcile: {len(malformed)} memory file(s) exist but FAILED TO PARSE "
-            f"(corruption, not deletion) — reconciling would prune their entities. Fix the XML "
-            f"(commonly an unescaped & / < / >), or delete the file for an intentional removal, "
-            f"then re-run. Files: " + ", ".join(result["malformed"][:10]))
+            f"(corruption, not deletion) — reconciling would prune their entities. Fix the corruption "
+            f"(an unescaped & / < / > in v4 XML, or a broken `---` frontmatter fence in v5), or delete "
+            f"the file for an intentional removal, then re-run. Files: " + ", ".join(result["malformed"][:10]))
         if neo4j_store is not None:
             neo4j_store.close()
         return result

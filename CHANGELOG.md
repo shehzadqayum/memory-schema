@@ -21,6 +21,10 @@
 - **Honesty:** preflight's compose-trust-gate comments now state it is an anti-footgun, not an adversarial
   boundary (the sentinel is a copyable token). Added regression tests for the trust gate, the hook `.env`
   allowlist, the V10 v4-ceiling boundary, and the B1 Q6/Q7 log-slice.
+- **Final-state coherence pass (fresh-eyes review of the whole arc):** fixed doc/comment staleness in sections
+  no delta had touched — harness-manual §9.3 reconcile step (pre-B3 v5 caveat) and §11 `validate` CLI row
+  (pre-B1 "v5 files report V1"), `validator.py` module docstring ("v4 XML only"), and the reconcile
+  malformed-guard comment + operator abort message ("Fix the XML" → both formats). No behavior change.
 
 ### Security (2026-07-11 — pre-extraction hardening, Part C)
 - **HIGH — preflight no longer auto-runs an untrusted compose file.** `preflight._start_container` ran
