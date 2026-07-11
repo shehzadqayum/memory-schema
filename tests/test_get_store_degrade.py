@@ -2,7 +2,7 @@
 
 Uses a bogus bolt URI so the Neo4j probe fails fast and deterministically (no live backend).
 require_neo4j=True -> raises (write-class callers); default -> degrades to the JSONL store.
-(helios local patch test.)
+(hermetic test.)
 """
 import pytest
 from click.testing import CliRunner

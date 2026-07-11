@@ -164,11 +164,11 @@ class TestUnregisterHooks:
                     {"command": "bash /other/hook.sh"},
                 ]},
                 {"matcher": "*", "hooks": [
-                    {"command": "node /aurora/hook.js"}
+                    {"command": "node /example/hook.js"}
                 ]}
             ],
             "Stop": [
-                {"hooks": [{"command": "node /aurora/stop.js"}]},
+                {"hooks": [{"command": "node /example/stop.js"}]},
                 {"hooks": [{"command": "bash /path/hook-stop.sh"}]}
             ]
         }}
@@ -179,7 +179,7 @@ class TestUnregisterHooks:
 
     def test_no_matching_hooks(self):
         settings = {"hooks": {"PostToolUse": [
-            {"matcher": "*", "hooks": [{"command": "node /aurora/hook.js"}]}
+            {"matcher": "*", "hooks": [{"command": "node /example/hook.js"}]}
         ]}}
         result, removed = unregister_hooks(settings)
         assert len(removed) == 0

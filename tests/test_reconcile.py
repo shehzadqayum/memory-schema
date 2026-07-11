@@ -3,7 +3,7 @@
 Hermetic: a tmp project with .md files + a drifted store.jsonl, a bogus Neo4j URI (so the
 Neo4j path is skipped), and a mocked embedder (no Voyage). Asserts that JSONL is rewritten
 to EXACTLY the .md name-set (orphans pruned, missing added) and that a second run is a no-op.
-(helios local patch test.)
+(hermetic test.)
 """
 import json
 

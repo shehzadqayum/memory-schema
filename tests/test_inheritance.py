@@ -256,7 +256,7 @@ class TestResolveConfigChain:
         from memoryschema.config import MemoryConfig
         # Isolate from an ambient MEMORY_PROJECT/MEMORY_ROOT: env overrides TOML by design
         # (see test_from_toml_env_var_beats_toml), so clear them to exercise the TOML path
-        # even when run under a configured project (helios .env sets MEMORY_PROJECT).
+        # even when run under a configured project (a configured project's .env sets MEMORY_PROJECT).
         with patch.dict(os.environ, {}, clear=False):
             os.environ.pop('MEMORY_PROJECT', None)
             os.environ.pop('MEMORY_ROOT', None)

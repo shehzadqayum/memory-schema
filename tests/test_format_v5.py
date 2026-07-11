@@ -18,7 +18,7 @@ V5_DOC = """---
 schema: 5
 type: semantic
 importance: 8
-project: helios
+project: my-project
 relations:
   - USES evidence-one
   - SUPERSEDES old-plan
@@ -117,7 +117,7 @@ class TestRoundtrip:
         """A newline in a frontmatter scalar must not inject a frontmatter key
         (e.g. status: archived) or close the fence early."""
         m = {"schema": 5, "name": "inj", "description": "d",
-             "key": "EURUSD.bias\nstatus: archived", "valid_from": "2026-07-01"}
+             "key": "config.timeout\nstatus: archived", "valid_from": "2026-07-01"}
         back = parse_v5_content(serialize_v5(m), filepath="inj.md")
         assert back.get("status", "active") == "active"     # not injected
         assert "\n" not in back["key"]

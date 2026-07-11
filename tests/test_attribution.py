@@ -179,13 +179,13 @@ class TestStoreMergePreservesLifecycle:
         store = MemoryStore(str(sp))
         store.upsert({"name": "m", "description": "d"})
         store.upsert({"name": "m", "description": "d",
-                      "promoted_to": "CLAUDE.md#x", "key": "EURUSD.bias",
+                      "promoted_to": "CLAUDE.md#x", "key": "config.timeout",
                       "valid_from": "2026-07-01", "superseded_at": "2026-07-02",
                       "superseded_by": "successor"})
         entry = next(json.loads(l) for l in open(sp, encoding="utf-8")
                      if json.loads(l).get("name") == "m")
         assert entry["promoted_to"] == "CLAUDE.md#x"
-        assert entry["key"] == "EURUSD.bias"
+        assert entry["key"] == "config.timeout"
         assert entry["valid_from"] == "2026-07-01"
         assert entry["superseded_at"] == "2026-07-02"
         assert entry["superseded_by"] == "successor"

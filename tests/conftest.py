@@ -1,12 +1,12 @@
 """Shared pytest fixtures + suite-wide isolation from any live backend.
 
-HERMETIC ISOLATION (helios local patch — re-apply on package re-vendor):
+HERMETIC ISOLATION:
 The CLI tests (index/import/embed/…) correctly isolate their *files* via ``--root <tmp>``, but the
 Neo4j and Voyage backends are driven by the *environment* (NEO4J_URI/USER/PASSWORD, VOYAGE_API_KEY),
 not by ``--root``. So when the suite is run in a shell that has the live ``.env`` loaded — which is the
-normal Helios working state, and exactly how ``memoryschema doctor`` spawns pytest — those tests write
-fixture entities (``test``, ``imported``) into whatever Neo4j the env points at: the **live**
-``trading-journal`` container. Likewise a real ``VOYAGE_API_KEY`` triggers real embedding calls.
+normal working state, and exactly how ``memoryschema doctor`` spawns pytest — those tests write
+fixture entities (``test``, ``imported``) into whatever Neo4j the env points at: the developer's **live** memory
+container. Likewise a real ``VOYAGE_API_KEY`` triggers real embedding calls.
 
 This autouse fixture strips those backend vars (plus ``MEMORY_ROOT``/``MEMORY_PROJECT``, which otherwise
 leak the ambient project into config-resolution tests) for every **non-integration** test, forcing the
@@ -31,7 +31,7 @@ _LIVE_BACKEND_ENV = (
     "VOYAGE_API_KEY",
     "MEMORY_ROOT",
     "MEMORY_PROJECT",
-    # helios default-mode flags: their factory default is ON, so they must be stripped AND
+    # default-mode flags: their factory default is ON, so they must be stripped AND
     # forced off below, or non-integration tests would hard-require a (hermetically absent) Neo4j.
     "MEMORYSCHEMA_REQUIRE_NEO4J",
     "MEMORYSCHEMA_REQUIRE_VOYAGE",

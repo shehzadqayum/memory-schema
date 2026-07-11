@@ -76,7 +76,7 @@ frontmatter markdown (wiki notes) is skipped exactly like non-entity files.
 | `status` | string; default `active` — v5 parse always emits status (the file-first lifecycle carrier) |
 | `importance` | int; a non-int value is **silently dropped** |
 | `project` | string, kept only if truthy |
-| `key` | fact key for temporal validity (e.g. `EURUSD.bias`) (§4.6-temporal, harness manual) |
+| `key` | fact key for temporal validity (e.g. `config.timeout`) (§4.6-temporal, harness manual) |
 | `valid_from` / `superseded_at` / `superseded_by` | validity interval + successor (supersession) |
 | `promoted_to` | standing-surface marker (e.g. `CLAUDE.md#section`) |
 | `relations` | list of `- TYPE target` lines |
@@ -145,7 +145,7 @@ stay graph-traversable.
 
 ## 7. Temporal validity & supersession (model)
 
-A fact `key` (e.g. `EURUSD.bias`) plus `valid_from` / `superseded_at` / `superseded_by` gives each fact a
+A fact `key` (e.g. `config.timeout`) plus `valid_from` / `superseded_at` / `superseded_by` gives each fact a
 validity interval. **Write-time deterministic supersession:** a `remember --key K` finds the current active
 holder of `K` and supersedes it file-first, indexing the new entity *before* retiring the old (so a key is
 never left without an active holder). Default recall returns only currently-valid facts; `--as-of <date>`

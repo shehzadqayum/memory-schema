@@ -3,7 +3,7 @@
 Hermetic: instantiate Neo4jMemoryStore WITHOUT connecting (object.__new__) and mock the graph seams
 (_vector_search, _get_neighbors_batch, _score_entry, embed_text). Asserts the must-test equivalence
 cases: dedup-keeps-MAX-score, hop decay, association vs relation channel scoring, depth cap.
-(helios local patch.)
+(hermetic test.)
 """
 import pytest
 

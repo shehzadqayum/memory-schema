@@ -50,9 +50,9 @@ def eval_cmd(config, mode, store_path, as_json):
 
 def _run_ablation_eval(config, as_json):
     """Move 2: single-space (default only) vs multi-space (variance-weighted) retrieval on the
-    helios gold set — does the 7-space scoring earn its keep at the current corpus size?"""
+    gold set — does the 7-space scoring earn its keep at the current corpus size?"""
     from memoryschema.store import MemoryStore
-    from memoryschema.eval.fixtures import build_helios_gold_set
+    from memoryschema.eval.fixtures import load_gold_set
     from memoryschema.eval.ablation import run_ablation
 
     entries = [e for e in MemoryStore(str(config.store_path)).list_all()
@@ -65,7 +65,7 @@ def _run_ablation_eval(config, as_json):
         def embed_fn(t):
             return None
 
-    r = run_ablation(entries, build_helios_gold_set(), embed_fn)
+    r = run_ablation(entries, load_gold_set(config.project_root / "eval-gold.jsonl"), embed_fn)
     if as_json:
         click.echo(json.dumps(r, indent=2))
         return
@@ -87,14 +87,14 @@ def _run_ablation_eval(config, as_json):
 
 
 def _run_backend_eval(config, as_json):
-    """Move 3: Neo4j vs JSONL recall — retrieval quality + latency on the helios gold set."""
+    """Move 3: Neo4j vs JSONL recall — retrieval quality + latency on the gold set."""
     import time
     from statistics import median
     from memoryschema.store import MemoryStore
-    from memoryschema.eval.fixtures import build_helios_gold_set
+    from memoryschema.eval.fixtures import load_gold_set
     from memoryschema.eval.metrics import evaluate_all
 
-    gold = build_helios_gold_set()
+    gold = load_gold_set(config.project_root / "eval-gold.jsonl")
 
     def bench(store):
         lat = []
@@ -122,7 +122,7 @@ def _run_backend_eval(config, as_json):
     if as_json:
         click.echo(json.dumps(results, indent=2))
         return
-    click.echo("Backend benchmark — Neo4j vs JSONL recall (helios gold set)")
+    click.echo("Backend benchmark — Neo4j vs JSONL recall (gold set)")
     click.echo("=" * 58)
     for backend in ("neo4j", "jsonl"):
         r = results[backend]

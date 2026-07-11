@@ -2,6 +2,25 @@
 
 ## [Unreleased]
 
+### Changed (2026-07-11 — project-agnosticism: the package no longer references any specific deployment)
+- **The entire package is now project-agnostic — zero references to any deployment (no "Helios", "Aurora",
+  "trading-journal", or trading-domain examples) in any live file** (code, tests, deployed rules/skill, docs).
+  Toward a truly standalone, reusable module:
+  - Comments: removed the ~35 "helios local patch — re-apply on re-vendor" / "(helios local patch)" markers
+    across src + tests (the re-vendor premise dissolved under the canonical-source doctrine); comment-only.
+  - Deployed artefacts (ship to every project): dream-pass skill + on-demand rules genericized
+    (`project: my-project`, generic key/relation examples, "tune via `retrieval.semantic_weights`", no
+    `.venv/Scripts` assumption).
+  - `l0_token_budget` module default 3000 → **2000** (the honest default); a deployment raises it via
+    `retrieval.l0_token_budget` in its `memoryschema.toml` (behaviour-preserving for deployments that already
+    set it).
+  - The eval gold set is externalized: `fixtures.build_helios_gold_set` → a generic `build_gold_set` (smoke)
+    plus `load_gold_set(path)` that reads a deployment-supplied JSONL (e.g. `<project>/eval-gold.jsonl`), so no
+    corpus-specific data lives in the package.
+  - Docs (README, harness-manual, docs/README) + the package CLAUDE.md: genericized the deployment examples,
+    corrected the false "hook upgrade overwrites the script" claim, and removed the Helios-specific operating-
+    context appendix (deployment specifics belong with the deployment).
+
 ### Changed (2026-07-11 — standalone deployability: the plugin artefacts install & unify)
 - **M1 — `plugin sync` / `plugin deploy` now work from a real `pip install`.** The deployable-artefacts SSOT
   lived at the repo root (`.claude-plugin/`) and was packaged by nothing, so `_find_plugin_dir()` resolved it

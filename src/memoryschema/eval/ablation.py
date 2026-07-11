@@ -4,8 +4,6 @@ Compares SINGLE-space (default embedding only) vs MULTI-space (variance-weighted
 on a labeled gold set, to decide whether the 7-space scoring earns its keep at the corpus's actual
 size. Re-scores the same query/entity cosines two ways via spaces.combine_similarities — it never
 re-embeds and never touches the store.
-
-helios local patch — re-apply on re-vendor.
 """
 from memoryschema.spaces import combine_similarities, _cos
 from memoryschema.eval.metrics import recall_at_k, mrr, ndcg_at_k

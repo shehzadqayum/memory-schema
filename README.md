@@ -11,7 +11,7 @@ multi-space embeddings, and Claude Code hook integration.
 ## Quickstart
 
 ```bash
-pip install memory-schema[all]          # in Helios: vendored, installed in .venv only
+pip install memory-schema[all]          # or vendor it (git subtree) into your project
 cd ~/Projects/my-project
 memoryschema --project my-project init --scopes working --with-neo4j
 memoryschema hook install
@@ -36,14 +36,14 @@ EOF
 memoryschema chain release
 
 # durable facts
-memoryschema remember eurusd-support-zone \
-  --desc "EURUSD support at 1.0850 (weekly)" \
-  --obs "three weekly rejections since March" \
+memoryschema remember api-rate-limit \
+  --desc "The upstream API caps at 100 req/min per key" \
+  --obs "429s observed above ~100/min; back off 60s" \
   --importance 6 --uses chain-my-investigation
 
 # temporal facts: same --key => deterministic supersession + point-in-time recall
-memoryschema remember eurusd-bias-july --desc "..." --obs "..." --key EURUSD.bias
-memoryschema recall "eurusd bias" --as-of 2026-06-15
+memoryschema remember config-timeout-july --desc "..." --obs "..." --key config.timeout
+memoryschema recall "request timeout" --as-of 2026-06-15
 ```
 
 Every write parses → authorizes (active-chain model) → embeds (7 spaces, one batched
@@ -107,9 +107,10 @@ Nothing degrades silently (spec §9 + per-layer matrices).
 
 `memoryschema hook install` registers the PostToolUse (Write|Edit matcher, 10 s) and
 Stop (5 s) hooks in `~/.claude/settings.json` with the current interpreter path
-embedded. `hook status / check / scan / upgrade` manage them. ⚠ In Helios the installed
-PostToolUse script carries two local patches (Windows path normalization + project
-`.env` autoload) — **re-apply them after any `hook upgrade`** (spec §9.4).
+embedded. `hook status / check / scan / upgrade` manage them. The PostToolUse script (package source)
+carries local patches — Windows path normalization, project `.env` autoload, and an allowlisted `.env`
+export — that change only if the package files are replaced; no `memoryschema` command regenerates the
+script (`hook upgrade` only edits `settings.json`).
 
 Hybrid scope: the hook writes to the project's `memory/` when the written file is under
 one, falling back to `~/.claude/memory/` for user-level knowledge.
@@ -128,7 +129,7 @@ rebuild-verification map (spec §13). `memoryschema doctor` verifies a live depl
 
 | Problem | Fix |
 |---------|-----|
-| `memoryschema: command not found` | `pip install memory-schema` (Helios: activate `.venv`) |
+| `memoryschema: command not found` | `pip install memory-schema` (or activate the venv it's installed in) |
 | Neo4j connection refused | `memoryschema preflight` (auto-starts the container) or `neo4j up` |
 | No semantic search results | set `VOYAGE_API_KEY` (`.env`), then `memoryschema embed --all` |
 | Hook not firing | `memoryschema hook status` / `hook check` |

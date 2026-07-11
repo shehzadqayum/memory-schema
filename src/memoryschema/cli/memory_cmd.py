@@ -726,7 +726,7 @@ def decline_cmd(config, reason, name_hint):
 @click.option("--supersedes", multiple=True, help="SUPERSEDES relation target (repeatable).")
 @click.option("--body", default=None, help="Markdown body after the entity block.")
 @click.option("--key", "fact_key", default=None,
-              help="Fact identity (e.g. EURUSD.bias): an ACTIVE memory holding the same key "
+              help="Fact identity (e.g. config.timeout): an ACTIVE memory holding the same key "
                    "is deterministically superseded — bi-temporal, non-lossy, no LLM judgment.")
 @click.option("--valid-from", default=None, help="Validity start (ISO date; default today when --key given).")
 @click.option("--no-index", is_flag=True, help="Write the file only; skip indexing.")

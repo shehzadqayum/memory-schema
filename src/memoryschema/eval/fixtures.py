@@ -237,42 +237,45 @@ def build_real_data_query_set():
     ]
 
 
-def build_helios_gold_set():
-    """Helios-corpus gold set (query -> expected entity names) for the multi-space ablation + the
-    backend benchmark. Deliberately mixes VOCAB-MISMATCH queries (no shared words with the target —
-    where embeddings should matter) and exact-term queries (where keyword would tie). Names are real
-    active entities. (helios local patch — extend as the corpus grows; seed from the recall log.)
-    """
-    M = "mismatch"  # query shares little/no vocabulary with the target memory
-    X = "exact"     # query shares the target's vocabulary
+def build_gold_set():
+    """A small GENERIC smoke gold set (query -> expected entity names) for exercising the eval machinery + the
+    tests. A real deployment supplies its OWN corpus-specific gold set via `load_gold_set(path)` (a JSONL of
+    {query, relevant, kind}); this generic set references memory-system concepts so the metrics have something
+    to score. Deliberately mixes VOCAB-MISMATCH (M — no shared words, where embeddings should matter) and
+    exact-term (X — where keyword would tie) queries."""
+    M = "mismatch"
+    X = "exact"
     rows = [
-        ("how much can I lose before the account is stopped out", ["account-rdd-waterline"], M),
-        ("relative drawdown waterline 5 percent of deposit", ["account-rdd-waterline"], X),
-        ("counting a profitable trade as a loss", ["win-loss-profit-basis"], M),
-        ("classify wins by dollars not the R-multiple", ["win-loss-profit-basis"], X),
-        ("where do the trades and prices actually come from", ["helios-bridge"], M),
-        ("the live read-only MT5 bridge data feed", ["helios-bridge"], X),
-        ("is the multi-space embedding scoring switched on", ["seven-space-scoring-activated"], X),
-        ("the robot that places the three scaled entry legs", ["riskparameters-ea-model"], M),
-        ("RiskParameters EA RR1 RR2 runner scaled entry", ["riskparameters-ea-model"], X),
-        ("trade times are an hour off the candle bars", ["ohlc-trade-time-offset"], M),
-        ("the broker symbols have a C suffix", ["cti-c-suffix-symbols"], X),
-        ("what happens to a memory write when the database is down", ["memory-schema-reliability-hardened"], M),
-        ("idempotent schema reconcile preflight loud degradation", ["memory-schema-reliability-hardened"], X),
-        ("is the memory system actually worth its complexity", ["memory-module-value-evaluation"], M),
-        ("plan to measure whether memory is really used", ["plan-memory-value-measurement"], X),
-        ("the MT5 terminal has to run in portable mode", ["helios-mt5-portable"], X),
-        ("daily trading discipline rules and grading", ["trading-rules"], X),
-        ("dollar is the king currency this week", ["usd-strength-20260619"], M),
-        ("round prices to the instrument's decimal digits", ["price-rounding-digits"], X),
-        ("are aurora and helios the same trading account", ["aurora-helios-relationship"], M),
-        ("redesign the day chart workspace with multi-timeframe", ["plan-chart-workspace-redesign"], X),
-        ("version control repository for the project", ["helios-git-repo"], M),
-        ("let the assistant close orders on a demo account", ["plan-order-close-capability"], M),
-        ("the upsert bug where observations could not be appended", ["neo4j-upsert-null-observations-bug"], X),
+        ("what keeps a memory write consistent when the database is down", ["memory-reliability"], M),
+        ("idempotent reconcile preflight loud degradation", ["memory-reliability"], X),
+        ("what makes an entity findable when recalling", ["retrieval-scoring"], M),
+        ("multi-space embedding variance-weighted relevance", ["retrieval-scoring"], X),
+        ("stop a corrupt file from silently wiping the store", ["corruption-guard"], M),
+        ("reconcile malformed-guard aborts instead of pruning", ["corruption-guard"], X),
     ]
     return [{"query": q, "relevant": rel, "project": None, "kind": kind,
              "description": f"[{kind}] {q}"} for (q, rel, kind) in rows]
+
+
+def load_gold_set(path=None):
+    """Load a corpus-specific gold set from a JSONL file (one {query, relevant, kind} object per line), or
+    fall back to the generic smoke set (`build_gold_set`) when `path` is None or the file is absent. This is
+    how a deployment plugs in its own eval corpus without any project-specific data living in the package."""
+    import json
+    import os
+    if path and os.path.isfile(path):
+        out = []
+        with open(path, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                r = json.loads(line)
+                kind = r.get("kind", "exact")
+                out.append({"query": r["query"], "relevant": r["relevant"], "project": r.get("project"),
+                            "kind": kind, "description": f"[{kind}] {r['query']}"})
+        return out
+    return build_gold_set()
 
 
 # Poisoning test entries

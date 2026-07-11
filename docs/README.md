@@ -12,5 +12,5 @@
 Deleted 2026-07-05 (superseded by the specification; recover via git history):
 `schema.md`, `technical-reference.md`, `implementation-guide.md`, `system-overview.md`.
 
-LLM-facing derived references (Helios deployment): the always-loaded kernel
+LLM-facing derived references (deployed to a project's `.claude/`): the always-loaded kernel
 `.claude/rules/memory-working.md` and the on-demand `.claude/rules-ondemand/memory-schema.md`.

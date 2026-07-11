@@ -1,4 +1,4 @@
-"""CLI-level (CliRunner) tests for the always-on reconcile/preflight commands. (helios local patch.)"""
+"""CLI-level (CliRunner) tests for the always-on reconcile/preflight commands."""
 import json
 
 from click.testing import CliRunner

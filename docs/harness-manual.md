@@ -191,7 +191,7 @@ list/review/release/reject`.
 
 ### 4.6 Temporal validity & lifecycle (file-first)
 
-- **Fact keys**: `remember --key EURUSD.bias` stamps `key` + `valid_from` (default
+- **Fact keys**: `remember --key config.timeout` stamps `key` + `valid_from` (default
   today). At write time, `find_active_by_key(store_path, key, exclude=new_name)` finds
   the ACTIVE holder of the same key — exact match, no LLM judgment — and the CLI
   supersedes it: a `SUPERSEDES` relation on the new entity, plus
@@ -329,7 +329,7 @@ a full REGENERATE, never an append:
 - Grouped: `### Knowledge` (semantic/unknown) · `### Procedures` (procedural) ·
   `### Session History` (episodic).
 - Budget: `len(text)//4` estimated tokens; lowest-ranked entries popped until under
-  budget (module default 2000; Helios config 3000). Truncation is never silent — the
+  budget (module default 2000; raise via TOML for a large corpus). Truncation is never silent — the
   header note says "N of M active memory entities shown (lowest-importance K dropped)".
 
 Legacy `enforce_budget` (evict-only) and `categorize_index` exist but are no longer the
@@ -596,8 +596,8 @@ need the vector) → gate (REJECT → exit 2; QUARANTINE → saved unembedded) �
 index with JSONL fallback** (both fail → exit 2) → L0 rebuild from the store just
 written.
 
-Two Helios-local patches (⚠ **`memoryschema hook upgrade` overwrites the script — 
-re-apply both after any upgrade**): (1) Windows backslash normalization
+Local patches carried in the hook script (package source — `hook upgrade` edits only
+`settings.json`, never the script): (1) Windows backslash normalization
 (`FILE_PATH="${FILE_PATH//\\//}"`) so the `/memory/` match works on Windows paths;
 (2) project `.env` autoload (root = path prefix before `/memory/`; safe line parser,
 values never eval'd) so the hook has DB/API credentials in any shell.
@@ -645,7 +645,7 @@ PostToolUse hook does the same from the written file's project root. Secrets bel
 | `rerank_model` | `rerank-2` | |
 | `require_neo4j` | **true** | env `MEMORYSCHEMA_REQUIRE_NEO4J`; gates preflight + index/write/import |
 | `require_voyage` | false | env `MEMORYSCHEMA_REQUIRE_VOYAGE` |
-| `l0_token_budget` | **3000** (Helios patch; upstream 2000 — call sites fall back to 2000) | TOML `retrieval.l0_token_budget` |
+| `l0_token_budget` | **2000** (raise via TOML for a large active corpus) | TOML `retrieval.l0_token_budget` |
 | `recency_decay` | 0.995 | display/TOML only — scorers hardcode 0.995 |
 | `association_k` | 10 | |
 | `recall_depth` / `recall_decay` | 2 / 0.8 | TOML-mappable but the CLI never passes them — store defaults rule |
@@ -662,14 +662,15 @@ Canonical constant sets are defined in `entity_schema.py` (the single authority)
 `SCHEMA_VERSION = 5` (tracks the current entity format). The legacy v4-XML `schema=` attribute ceiling is the
 separate constant `V4_XML_SCHEMA_VERSION = 4`, used only by the validator's V10 range check.
 
-### 10.3 The Helios deployment (`memoryschema.toml`)
+### 10.3 Example deployment config (`memoryschema.toml`)
 
 ```toml
 [project]
-name = "helios"                          # env MEMORY_PROJECT wins
+name = "my-project"                      # env MEMORY_PROJECT wins
 [retrieval]
-semantic_weights = [0.15, 0.15, 0.70]    # relevance-heavy (package default [0.2, 0.3, 0.5])
-l0_token_budget = 3000
+semantic_weights = [0.2, 0.3, 0.5]       # default; tune relevance-heavy (e.g. [0.15, 0.15, 0.70]) for a
+                                         # recall-driven corpus
+l0_token_budget = 2000                   # raise (e.g. 3000) for a large active corpus
 ```
 
 ### 10.4 Project hierarchy & inheritance
@@ -745,7 +746,7 @@ config resolution → throttled banner-only preflight (§9.1). `--json` on query
 | `init [--with-neo4j] [--scopes working,corpus] [--neo4j-password]` | scaffolds memory/, MEMORY.md, docker-compose.yml, .env.example, memoryschema.toml, rules templates (never overwrites) |
 | `neo4j deploy / up / down / status / logs [--tail 50] / schema / reset --confirm / shell` | §9.5 |
 | `voyage status / test TEXT` | key check + live embed probe |
-| `hook install [--per-project] / uninstall / status / upgrade [--dry-run] / check / scan / test FILE` | hook management; HOOK_VERSION=2 = Write\|Edit matcher + Stop hook; timeouts 10 s / 5 s. ⚠ `upgrade` overwrites the Helios-patched script (§9.4) |
+| `hook install [--per-project] / uninstall / status / upgrade [--dry-run] / check / scan / test FILE` | hook management; HOOK_VERSION=2 = Write\|Edit matcher + Stop hook; timeouts 10 s / 5 s. `upgrade` edits `settings.json` only, never the hook script (§9.4) |
 | `plugin deploy [--force] / uninstall [--confirm] [--keep-data] / status` | deploys skills/rules to `~/.claude/` with a manifest |
 | `backup [--output] [--jsonl-only\|--files-only]` / `restore ARCHIVE --confirm` / `export [--format tar\|jsonl\|md]` / `import SOURCE` / `reset --confirm [...]` / `clean [--confirm] [--dry-run]` | archival & teardown; `import` jsonl/md hard-requires Neo4j |
 | `config [--json] [--chain]` / `rules [--json] [--conflicts]` | resolved config / rules inheritance inspection |
@@ -770,14 +771,11 @@ consoles).
 - Required dependency: `click>=8.0` only. Extras: `[neo4j]` neo4j≥5.0, `[embeddings]`
   voyageai≥0.3 (lazy-imported), `[numpy]` numpy≥1.24 (pure-Python fallbacks
   everywhere), `[all]`, `[dev]` pytest + cov/mock/timeout.
-- **In Helios this package is VENDORED** at `packages/memory-schema` and installed only
-  into `helios/.venv` — it is not consumed from PyPI. Local patches marked
-  "helios local patch — re-apply on re-vendor" exist in: `cli/main.py` (.env autoload,
-  implicit preflight), `hooks/hook-post-write.sh` (Windows paths, .env autoload),
-  `preflight.py`, `reconcile.py`, `recall_log.py`, `schema.py` (idempotent vector
-  index), `neo4j_store.py` (batched BFS, connect chokepoint), `config.py`
-  (l0_token_budget 3000), `tests/conftest.py` (hermetic isolation + wipe tripwire), and
-  several test files.
+- **Vendoring:** a host project can vendor this package (e.g. at `packages/memory-schema`, installed editable
+  into the project venv) instead of consuming it from PyPI — the vendored copy is then the canonical source,
+  and any local modifications are ordinary committed code (there is no upstream to re-sync from). The
+  deployable `.claude/` artefacts ship as package-data under `claude_plugin/`, so `plugin sync`/`init` work
+  from any install.
 - Public API: eager exports (MemoryConfig, MemoryStore, get_store, parsers, validators,
   consolidate/reflect, hierarchy/inheritance helpers) + PEP 562 lazy exports
   (`Neo4jMemoryStore`, `embed_text/embed_batch/rerank`, the `embeddings` submodule).
@@ -796,7 +794,7 @@ status`/`uninstall` read it.
 | `skills/dream-pass/SKILL.md` | `~/.claude/skills/dream-pass/` | the consolidation procedure (§8.2) |
 | `rules/memory-working.md` | `~/.claude/rules/` | the always-loaded ~534-token protocol kernel (§1 principle 5) |
 | `rules-ondemand/memory-schema.md` | `~/.claude/rules-ondemand/` | the v5 authoring reference (schema-specification.md), loaded on demand |
-| `rules-ondemand/memory-corpus.md` | `~/.claude/rules-ondemand/` | corpus-ingestion guidelines (unused in Helios) |
+| `rules-ondemand/memory-corpus.md` | `~/.claude/rules-ondemand/` | corpus-ingestion guidelines (deploy with `init --scopes corpus`) |
 
 `SKILL_FILES`/`RULE_FILES` in `cli/plugin_cmd.py` MUST stay in sync with that directory.
 Separately, `src/memoryschema/templates/*.tpl` are the GENERIC scaffolds `init` writes
@@ -809,9 +807,9 @@ artefacts into a project's `.claude/` (default `<project_root>/.claude`; `--glob
 `~/.claude`) as a **verifiable derived copy**: it MD5s each source against its deployed
 copy and writes only the files that are missing or differ. `plugin sync --check` is
 read-only — it reports drift and **exits non-zero** (a CI / pre-commit / session-start
-gate) without writing. In Helios the session-start self-heal (`scripts/ensure-deps.ps1`)
-runs `plugin sync --check` each session and warns on drift, so the deployment can never
-silently diverge from the package source of truth.
+gate) without writing. A deployment may run `plugin sync --check` at session start (e.g. via a
+session-start hook / bootstrap script) and warn on drift, so it never silently diverges from the
+package source of truth.
 
 The session-start hook is **advisory** by decision (2026-07-07): it detects-and-warns,
 never overwrites, so a session start cannot silently revert a file mid-edit. It MAY become
@@ -819,10 +817,9 @@ never overwrites, so a session start cannot silently revert a file mid-edit. It 
 treated purely as a build output — the flip is dropping `--check` from the hook line.
 
 **Package-source vs. deployment-local.** Machine/ops-specific artefacts are deliberately
-NOT in the package (they carry absolute paths or non-portable ops): the Helios SessionStart
-hook (`.claude/settings.local.json`), `scripts/ensure-deps.ps1` (Docker/MT5/web
-auto-start), and the tuned `memoryschema.toml` (relevance-heavy weights). Those live in the
-deployment repo, by design.
+NOT in the package (they carry absolute paths or non-portable ops): a deployment's SessionStart
+hook, its ops/bootstrap scripts (dependency auto-start), and its tuned `memoryschema.toml`. Those
+live in the deployment repo, by design.
 
 ---
 
@@ -890,12 +887,6 @@ record.
   v5 safety also lives in the writers' round-trip checks (schema-specification.md).
 - `remember --body` survives only on the v4 branch; fact keys survive only on v5.
 - The chain bootstrap always writes v5 regardless of `MEMORYSCHEMA_V5`.
-
-**The Helios deployment (operating context for this repo):** vendored package;
-`MEMORYSCHEMA_V5=1` set in `.env` (v5 creation everywhere); corpus fully v5; kernel
-`.claude/rules/memory-working.md` (~534 tokens, always loaded) + on-demand references
-in `.claude/rules-ondemand/`; the `/dream-pass` skill runs consolidation; venv-only
-install (`helios/.venv`); `PYTHONUTF8=1` required; Neo4j container `helios-neo4j`.
 
 ---
 

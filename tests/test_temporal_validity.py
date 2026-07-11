@@ -33,12 +33,12 @@ def project_dir(tmp_path, monkeypatch):
 class TestFormatTemporalFields:
     def test_roundtrip(self):
         m = {"schema": 5, "name": "fact-x", "description": "d",
-             "observations": ["o"], "key": "EURUSD.bias",
+             "observations": ["o"], "key": "config.timeout",
              "valid_from": "2026-07-01", "superseded_at": "2026-07-05",
              "superseded_by": "fact-y", "status": "superseded"}
         out = serialize_v5(m)
         back = parse_v5_content(out, filepath="fact-x.md")
-        assert back["key"] == "EURUSD.bias"
+        assert back["key"] == "config.timeout"
         assert back["valid_from"] == "2026-07-01"
         assert back["superseded_at"] == "2026-07-05"
         assert back["superseded_by"] == "fact-y"
@@ -87,15 +87,15 @@ class TestFindActiveByKey:
 class TestRememberKeySupersession:
     def test_end_to_end(self, runner, project_dir):
         r1 = runner.invoke(cli, ["--root", str(project_dir), "remember", "bias-v1",
-                                 "--desc", "EURUSD bearish", "--obs", "below the level",
-                                 "--key", "EURUSD.bias", "--valid-from", "2026-07-01"])
+                                 "--desc", "feature disabled", "--obs", "turned off in config",
+                                 "--key", "config.timeout", "--valid-from", "2026-07-01"])
         assert r1.exit_code == 0, r1.output
         f1 = parse_memory_file(str(project_dir / "memory" / "bias-v1.md"))
-        assert f1["key"] == "EURUSD.bias" and f1["valid_from"] == "2026-07-01"
+        assert f1["key"] == "config.timeout" and f1["valid_from"] == "2026-07-01"
 
         r2 = runner.invoke(cli, ["--root", str(project_dir), "remember", "bias-v2",
-                                 "--desc", "EURUSD bullish now", "--obs", "reclaimed the level",
-                                 "--key", "EURUSD.bias"])
+                                 "--desc", "feature enabled now", "--obs", "turned on in config",
+                                 "--key", "config.timeout"])
         assert r2.exit_code == 0, r2.output
         assert "superseded: bias-v1" in r2.output
 

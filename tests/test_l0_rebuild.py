@@ -1,5 +1,5 @@
 """L0 self-heal: rebuild_index regenerates MEMORY.md as a faithful, status-filtered, importance-ranked
-index of the store's ACTIVE set (helios local patch).
+index of the store's ACTIVE set.
 
 Regression for the drift where the append-only hook + evict-only budget lingered superseded/archived
 entries and lost active ones, and reconcile ignored L0 entirely.

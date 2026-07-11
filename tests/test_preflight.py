@@ -3,7 +3,7 @@
 Mocks the dep probes so the suite stays hermetic (no Docker/Neo4j/Voyage). The key
 guarantee under test: a hard-required dependency being DOWN yields ok=False (anti-silent),
 while a soft dependency (Voyage when not required) degrades with a warning rather than
-failing. (helios local patch test.)
+failing.
 """
 import memoryschema.preflight as pf
 from memoryschema.config import MemoryConfig

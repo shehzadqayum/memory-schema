@@ -1,7 +1,7 @@
 """Move 2/3: the multi-space ablation runner + the backend-benchmark CLI mode.
 
 Hermetic: run_ablation is pure (mocked embed_fn, tiny in-memory entries); the backend CLI smoke uses
-a dead Neo4j (-> UNAVAILABLE) + a tmp JSONL store. (helios local patch.)
+a dead Neo4j (-> UNAVAILABLE) + a tmp JSONL store.
 """
 from click.testing import CliRunner
 

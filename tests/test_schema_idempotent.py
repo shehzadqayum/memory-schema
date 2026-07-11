@@ -2,7 +2,7 @@
 
 The old code used the legacy `CALL db.index.vector.createNodeIndex(...)` which has no
 IF NOT EXISTS and threw EquivalentSchemaRuleAlreadyExistsException on the 2nd run, breaking
-`neo4j reset`/`schema`/`deploy`. (helios local patch test — re-apply on re-vendor.)
+`neo4j reset`/`schema`/`deploy`.
 """
 from unittest.mock import MagicMock
 

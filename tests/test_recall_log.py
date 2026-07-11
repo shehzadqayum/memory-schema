@@ -1,7 +1,7 @@
 """Move 1: recall-usage telemetry — log_recall writes events; compute_stats summarises them.
 
 The autouse conftest sets MEMORYSCHEMA_RECALL_LOG=0 (no telemetry during the suite), so these tests
-re-enable it and use a tmp project so nothing touches a real log. (helios local patch.)
+re-enable it and use a tmp project so nothing touches a real log.
 """
 import json
 
