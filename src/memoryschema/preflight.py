@@ -38,13 +38,40 @@ def _container_running(config):
     return rc == 0 and name in (out or "").split()
 
 
+# preflight is ALWAYS-ON, so it must never auto-run an arbitrary docker-compose.yml found in the current
+# working directory (a hostile CWD file could `up` malicious services on any memoryschema invocation).
+# memoryschema-generated compose files carry this sentinel in their header; the auto path composes ONLY a
+# sentinel-bearing file, and prefers `docker start` (which executes NO file) for stopped-container recovery.
+_COMPOSE_SENTINEL = "memoryschema-managed"
+
+
+def _compose_is_trusted(compose_path):
+    """True iff the compose file is memoryschema-generated (carries the sentinel in its header). Guards the
+    automatic `compose up` against an untrusted docker-compose.yml sitting in the current working directory."""
+    try:
+        with open(compose_path, encoding="utf-8", errors="replace") as f:
+            head = f.read(4096)
+    except OSError:
+        return False
+    return _COMPOSE_SENTINEL in head
+
+
 def _start_container(config):
-    """Start the (existing) Neo4j container — never Docker Desktop itself."""
+    """Recover the (existing) Neo4j container — never Docker Desktop, never an untrusted compose file.
+
+    (1) `docker start <name>` first: recovers a merely-stopped named container and executes NO file — the
+        common case, and the safe one. (2) Only if the container does not exist do we bootstrap via
+        `docker compose up`, and ONLY when the compose file is memoryschema-managed (SECURITY: preflight is
+        always-on, so a hostile docker-compose.yml in the CWD must not be run automatically)."""
+    rc, _, err = _run(["docker", "start", config.neo4j_container_name], timeout=30)
+    if rc == 0:
+        return True, ""
     compose = str(config.docker_compose_path)
+    if not _compose_is_trusted(compose):
+        return False, (f"Neo4j container '{config.neo4j_container_name}' is not present and {compose} is not "
+                       f"a memoryschema-managed compose file — refusing to auto-run it. Bring it up in a "
+                       f"trusted project (`memoryschema neo4j up` / `memoryschema init`).")
     rc, _, err = _run(["docker", "compose", "-f", compose, "up", "-d"], timeout=60)
-    if rc != 0:
-        # fall back to starting the named container directly
-        rc, _, err = _run(["docker", "start", config.neo4j_container_name], timeout=30)
     return rc == 0, err
 
 

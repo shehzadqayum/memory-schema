@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+### Security (2026-07-11 — pre-extraction hardening, Part C)
+- **HIGH — preflight no longer auto-runs an untrusted compose file.** `preflight._start_container` ran
+  `docker compose -f <cwd>/docker-compose.yml up -d` unconditionally, so invoking any memoryschema command
+  inside an untrusted directory could `up` a hostile `docker-compose.yml` (arbitrary services/volumes/
+  entrypoints). It now (1) tries `docker start <container>` first — recovering a stopped container while
+  executing NO file — and (2) falls back to `compose up` ONLY when the file is memoryschema-generated
+  (carries a `memoryschema-managed` header sentinel), refusing an unrecognized CWD compose. The generated
+  template and the deployment compose carry the sentinel.
+- **HIGH — the post-write hook no longer exports the entire `.env`.** `hook-post-write.sh` loaded the
+  project `.env` and `export`ed *every* key into the indexer child process — leaking unrelated secrets
+  (cloud tokens, other services) far beyond the DB/embedding credentials it needs. The export is now
+  allowlisted to the memory backend's own namespaces (`NEO4J_*`, `VOYAGE_*`, `MEMORYSCHEMA_*`,
+  `MEMORY_PROJECT`, `MEMORY_GENERATOR`, `MEMORY_ROOT`).
+
 ### Changed (2026-07-11 — schema-split Part B: the harness conforms UP to the entity authority)
 - **B4 — `SCHEMA_VERSION` reflects the current format.** It was pinned at the legacy v4 marker (`4`) while
   entities carry `schema: 5`, so the schema mis-reported its own version. `SCHEMA_VERSION` now equals

@@ -83,7 +83,14 @@ if [ -f "$ENV_FILE" ]; then
                     "'"*"'") _val="${_val#\'}"; _val="${_val%\'}" ;;
                     *) _val="${_val%%[[:space:]]#*}" ;;   # unquoted: strip ' # comment', keep '#' in-word
                 esac
-                [ -n "$_key" ] && export "$_key=$_val"
+                # SECURITY: export ONLY the keys the indexer needs. The .env may hold unrelated secrets
+                # (cloud tokens, other services); leaking the whole file into every hook child process is
+                # needless exposure. Allowlist the memory backend's own namespaces.
+                case "$_key" in
+                    NEO4J_*|VOYAGE_*|MEMORYSCHEMA_*|MEMORY_PROJECT|MEMORY_GENERATOR|MEMORY_ROOT)
+                        [ -n "$_key" ] && export "$_key=$_val" ;;
+                    *) : ;;   # ignore keys outside the memory backend's namespace
+                esac
                 ;;
         esac
     done < "$ENV_FILE"
