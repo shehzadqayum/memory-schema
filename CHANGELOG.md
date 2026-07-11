@@ -7,8 +7,9 @@
   (`re.MULTILINE`), so a non-entity note whose *body* contained a `schema: 5` line was misclassified as a
   corrupt entity and aborted the entire reconcile (false positive); it also missed a quoted `schema: "5"`
   that the parser accepts, so a corrupt quoted-schema file evaded the guard and was silently pruned (false
-  negative). Replaced with `_declares_v5_in_frontmatter` — frontmatter-scoped, quote-tolerant, and top-level
-  scalars only (an indented/nested `schema: 5` is not a v5 declaration, mirroring the parser). All cases tested.
+  negative). Replaced with `_declares_v5_in_frontmatter`, which **delegates to `format_v5._parse_frontmatter`**
+  (the same parser `parse_v5_content` uses) and applies its exact discriminator — so the guard cannot drift
+  from what the parser accepts across quoted / `schema :` / indented spellings. All cases tested.
 - **`init` .env/.gitignore append was not newline-safe.** Appending `.env`/`NEO4J_PASSWORD=…` to a file whose
   last line lacked a trailing newline glued the entry onto the prior line (`.env` never ignored → secret
   committable; or a corrupted `.env` key/value). Appends now insert a leading newline when needed.

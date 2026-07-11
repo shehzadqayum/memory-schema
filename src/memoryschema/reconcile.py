@@ -74,26 +74,19 @@ def _embed_text(entry):
 
 
 def _declares_v5_in_frontmatter(text):
-    """True iff the file's LEADING frontmatter block declares `schema: 5` (quotes tolerated). Scans only the
-    region between the opening `---` and the next `---` (or EOF when the fence is unterminated) — never the
-    body — so a non-entity note that merely mentions `schema: 5` in its prose is not mistaken for a corrupt
-    entity, and a quoted `schema: "5"` (which parse_v5_content accepts) is still detected. Mirrors
-    format_v5.parse_v5_content's own discriminator (strip surrounding quotes, compare to "5"). This is the v5
-    analogue of the `<memory:entity` marker used to detect a corrupt v4 file."""
+    """True iff the file's LEADING frontmatter block declares `schema: 5`. DELEGATES the frontmatter grammar to
+    `format_v5._parse_frontmatter` — the SAME parser `parse_v5_content` uses — so this corruption guard cannot
+    drift from what the parser accepts (hand-rolled scans diverged on quoted / `schema :` / indented spellings,
+    each a data-loss regression). Scans only the region between the opening `---` and the closing `---`, or to
+    EOF when the fence is unterminated (the corrupt case the guard exists for) — never the terminated body. The
+    discriminator is exactly `parse_v5_content`'s: the parsed `schema` scalar equals "5"."""
+    from memoryschema.format_v5 import _parse_frontmatter
     lines = text.lstrip('﻿').lstrip().splitlines()
     if not lines or lines[0].strip() != '---':
         return False
-    for line in lines[1:]:
-        s = line.strip()
-        if s == '---':                     # end of frontmatter — stop before the body
-            break
-        if line.startswith((' ', '-')):    # indented / list lines are not top-level scalars (parser rule) —
-            continue                        # a nested `schema: 5` does not make the file a v5 entity
-        if s.startswith('schema:'):
-            val = s[len('schema:'):].strip().strip('"').strip("'")
-            if val == '5':
-                return True
-    return False
+    end = next((i for i in range(1, len(lines)) if lines[i].strip() == '---'), len(lines))
+    meta, _ = _parse_frontmatter(lines[1:end])
+    return str(meta.get('schema', '')).strip() == '5'
 
 
 def _parse_md(memory_dir):

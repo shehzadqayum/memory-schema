@@ -170,6 +170,11 @@ def test_b3_malformed_v5_is_guarded_not_pruned(tmp_path):
     (mem / "broken-quoted.md").write_text(
         "---\nschema: \"5\"\nname: broken-quoted\ntype: semantic\n"
         "## Observations\n- quoted schema, missing closing fence\n", encoding="utf-8")
+    # a corrupt v5 entity spelled `schema : 5` (space before the colon) — the parser accepts it, so the guard
+    # must too (it delegates to the parser's own frontmatter grammar rather than a hand-rolled prefix match)
+    (mem / "broken-spaced.md").write_text(
+        "---\nschema : 5\nname: broken-spaced\ntype: semantic\n"
+        "## Observations\n- spaced colon, missing closing fence\n", encoding="utf-8")
     # negative control 1: a plain frontmatter wiki note (schema != 5) is NOT an entity -> neither map nor malformed
     (mem / "plain-note.md").write_text(
         "---\ntitle: not an entity\ntags: [x]\n---\n\n# Note\nprose only\n", encoding="utf-8")
@@ -189,6 +194,7 @@ def test_b3_malformed_v5_is_guarded_not_pruned(tmp_path):
     flagged = {os.path.basename(f) for f in malformed}
     assert "broken-v5.md" in flagged, "corrupt v5 entity must be guarded, not pruned (B3)"
     assert "broken-quoted.md" in flagged, "corrupt v5 with a QUOTED schema must be guarded (parser accepts it)"
+    assert "broken-spaced.md" in flagged, "corrupt v5 with `schema : 5` (spaced colon) must be guarded"
     assert "broken-v4.md" in flagged, "corrupt v4 entity must stay guarded"
     assert "plain-note.md" not in flagged, "a non-entity note must NOT be flagged as corruption"
     assert "doc-note.md" not in flagged, "a note that mentions `schema: 5` in its BODY must NOT be flagged"
