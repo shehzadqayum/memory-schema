@@ -131,6 +131,27 @@ def test_b1_v5_entities_are_validated():
     assert 'Q7' in rules(long_obs), "a >50-word observation must trip Q7"
 
 
+def test_b1_v5_filepath_and_relation_rules(tmp_path):
+    """B1 extended: the filepath-gated (V3/F3) and relation/quality (R6/Q8/V5-range) branches of _validate_v5
+    that the filepath=None `rules()` helper cannot reach."""
+    from memoryschema import validator
+    def rules_at(md, filepath=None, known_names=None):
+        return {r for r, _ in validator.validate(md, filepath=filepath, strict=True, known_names=known_names)}
+
+    # V3: frontmatter name doesn't match the filename stem
+    assert 'V3' in rules_at("---\nschema: 5\nname: right-name\n---\n\nd\n\n## Observations\n- o\n",
+                            filepath=str(tmp_path / "wrong-name.md"))
+    # F3: filesystem-unsafe name (a space) — needs filepath
+    assert 'F3' in rules_at('---\nschema: 5\nname: "bad name"\n---\n\nd\n', filepath=str(tmp_path / "bad name.md"))
+    # R6: relation target absent from known_names
+    assert 'R6' in rules_at("---\nschema: 5\nname: e\nrelations:\n- USES ghost-target\n---\n\nd\n",
+                            known_names={'e'})
+    # Q8: reasoning > 500 words
+    assert 'Q8' in rules_at("---\nschema: 5\nname: e\n---\n\nd\n\n## Reasoning\n" + ("word " * 600) + "\n")
+    # V5: a valid-integer importance out of the 1-10 range
+    assert 'V5' in rules_at("---\nschema: 5\nname: e\nimportance: 99\n---\n\nd\n")
+
+
 def test_b2_new_entities_default_to_v5(tmp_path, monkeypatch):
     """B2 (LANDED): create_entity_file authors v5 by default; legacy v4 only on explicit opt-out. Hermetic:
     a tmp dir, no backend."""

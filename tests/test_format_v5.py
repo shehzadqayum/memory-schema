@@ -229,6 +229,17 @@ class TestRememberV5:
         create_entity_file(fp, "v5zero", "d", ["o"])
         assert open(fp, encoding="utf-8").read().startswith("<memory:entity")
 
+    def test_create_both_set_v4_optout_wins(self, tmp_path, monkeypatch):
+        # Conflicting env: the v4 opt-out (MEMORYSCHEMA_V4=1) wins even when MEMORYSCHEMA_V5=1 is also set —
+        # pins the emergent precedence of the `or` predicate so a refactor can't silently flip it.
+        monkeypatch.setenv("MEMORYSCHEMA_V5", "1")
+        monkeypatch.setenv("MEMORYSCHEMA_V4", "1")
+        d = tmp_path / "memory"
+        d.mkdir()
+        fp = str(d / "both.md")
+        create_entity_file(fp, "both", "d", ["o"])
+        assert open(fp, encoding="utf-8").read().startswith("<memory:entity")
+
     def test_remember_cli_v5(self, tmp_path, monkeypatch):
         monkeypatch.setenv("MEMORYSCHEMA_V5", "1")
         (tmp_path / "memory").mkdir()

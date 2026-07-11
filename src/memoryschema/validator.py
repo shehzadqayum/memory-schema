@@ -267,9 +267,7 @@ def _validate_v5(content, filepath=None, strict=False, known_names=None):
         return [('V1', 'v5 entity failed to parse (unterminated fence or missing `schema: 5`)')]
 
     errors = []
-    name = mem.get('name')
-    if not name:
-        errors.append(('V2', 'Missing name (no frontmatter name and no filename stem)'))
+    name = mem.get('name')   # parse_v5_content guarantees a truthy name (else it returns None -> V1 above)
 
     # V3: name matches filename
     if filepath and name:

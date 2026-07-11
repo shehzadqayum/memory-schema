@@ -25,6 +25,9 @@
   no delta had touched — harness-manual §9.3 reconcile step (pre-B3 v5 caveat) and §11 `validate` CLI row
   (pre-B1 "v5 files report V1"), `validator.py` module docstring ("v4 XML only"), and the reconcile
   malformed-guard comment + operator abort message ("Fix the XML" → both formats). No behavior change.
+- **Pre-extraction coverage batch:** added the deferred `_validate_v5` branch tests (V3 filename-mismatch, F3
+  unsafe-name, R6 referential-integrity, Q8 reasoning length, V5 importance range) and the B2 both-set-env
+  precedence case; removed the unreachable `V2` branch in `_validate_v5` (the parser guarantees a name).
 
 ### Security (2026-07-11 — pre-extraction hardening, Part C)
 - **HIGH — preflight no longer auto-runs an untrusted compose file.** `preflight._start_container` ran
