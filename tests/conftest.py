@@ -35,10 +35,12 @@ _LIVE_BACKEND_ENV = (
     # forced off below, or non-integration tests would hard-require a (hermetically absent) Neo4j.
     "MEMORYSCHEMA_REQUIRE_NEO4J",
     "MEMORYSCHEMA_REQUIRE_VOYAGE",
-    # The deployment .env sets MEMORYSCHEMA_V5=1; if it leaks in, create_entity_file takes
-    # the v5 branch and format-specific tests (v4 injection, v4-default creation) break.
-    # Strip it so each test opts into v5 explicitly via monkeypatch.setenv.
+    # v5 is now the authored default (schema-split B2). Strip both format flags so tests run against the
+    # real default; the few v4-specific tests (v4 injection/escaping) opt INTO v4 via monkeypatch.setenv.
+    # (The deployment .env may set MEMORYSCHEMA_V5=1 — now redundant with the default, but strip it anyway
+    # so a leaked MEMORYSCHEMA_V4 can never silently flip a test to the legacy branch.)
     "MEMORYSCHEMA_V5",
+    "MEMORYSCHEMA_V4",
 )
 
 

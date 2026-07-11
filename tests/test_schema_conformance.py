@@ -117,9 +117,24 @@ def test_b1_v5_entities_are_validated():
     assert 'V1' in rules("---\nschema: 5\nname: e\n## Observations\n- unterminated fence\n")         # corrupt v5
 
 
-@pytest.mark.skip(reason="B2 (tracked): create_entity_file defaults to v4 XML unless MEMORYSCHEMA_V5=1. Flip the default.")
-def test_b2_new_entities_default_to_v5():
-    ...
+def test_b2_new_entities_default_to_v5(tmp_path, monkeypatch):
+    """B2 (LANDED): create_entity_file authors v5 by default; legacy v4 only on explicit opt-out. Hermetic:
+    a tmp dir, no backend."""
+    monkeypatch.delenv("MEMORYSCHEMA_V5", raising=False)
+    monkeypatch.delenv("MEMORYSCHEMA_V4", raising=False)
+    from memoryschema.write_index import create_entity_file
+    from memoryschema.tags import parse_memory_file
+    d = tmp_path / "memory"
+    d.mkdir()
+    fp = str(d / "b2-default.md")
+    create_entity_file(fp, "b2-default", "a default entity", ["o"])
+    assert open(fp, encoding="utf-8").read().lstrip().startswith("---"), "default authored format must be v5"
+    assert parse_memory_file(fp)["schema"] == 5
+    # explicit opt-out still authors legacy v4 (retained for migration)
+    monkeypatch.setenv("MEMORYSCHEMA_V4", "1")
+    fp4 = str(d / "b2-optout.md")
+    create_entity_file(fp4, "b2-optout", "a legacy entity", ["o"])
+    assert open(fp4, encoding="utf-8").read().startswith("<memory:entity"), "opt-out must author v4"
 
 
 def test_b3_malformed_v5_is_guarded_not_pruned(tmp_path):

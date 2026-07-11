@@ -34,7 +34,7 @@ class TestV4AttributeInjection:
     def test_quote_in_name_does_not_inject_attributes(self, tmp_path, monkeypatch):
         """escape_text must escape '"' so a v4 name/attribute value cannot
         truncate and inject arbitrary attributes (e.g. status='superseded')."""
-        monkeypatch.delenv("MEMORYSCHEMA_V5", raising=False)  # exercise the v4 branch
+        monkeypatch.setenv("MEMORYSCHEMA_V4", "1")  # opt into the legacy v4 authoring branch (B2: v5 is now default)
         assert escape_text('a"b') == "a&quot;b"
         p = str(tmp_path / 'x.md')
         create_entity_file(p, 'inj" status="superseded', 'desc', ['o'])

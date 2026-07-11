@@ -198,8 +198,21 @@ class TestRememberV5:
         assert m["observations"] == ["obs with < & raw"]
         assert m["importance"] == 6
 
-    def test_create_v4_by_default(self, tmp_path, monkeypatch):
+    def test_create_v5_by_default(self, tmp_path, monkeypatch):
+        # schema-split B2: v5 is now the authored default (no env needed).
         monkeypatch.delenv("MEMORYSCHEMA_V5", raising=False)
+        monkeypatch.delenv("MEMORYSCHEMA_V4", raising=False)
+        d = tmp_path / "memory"
+        d.mkdir()
+        fp = str(d / "now-v5.md")
+        create_entity_file(fp, "now-v5", "d", ["o"])
+        assert open(fp, encoding="utf-8").read().lstrip().startswith("---")
+        assert parse_memory_file(fp)["schema"] == 5
+
+    def test_create_v4_on_optout(self, tmp_path, monkeypatch):
+        # v4 authoring is retained for legacy/migration behind an explicit opt-out.
+        monkeypatch.delenv("MEMORYSCHEMA_V5", raising=False)
+        monkeypatch.setenv("MEMORYSCHEMA_V4", "1")
         d = tmp_path / "memory"
         d.mkdir()
         fp = str(d / "still-v4.md")

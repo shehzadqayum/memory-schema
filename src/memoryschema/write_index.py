@@ -403,14 +403,16 @@ def create_entity_file(filepath, name, description, observations,
                        fact_key=None, valid_from=None):
     """Generate a well-formed entity .md from plain-text parts.
 
-    Emits v5 (YAML frontmatter + markdown body) when MEMORYSCHEMA_V5=1,
-    else v4 XML (the default until the corpus migrates). relations: list of
-    (TYPE, target) tuples. Refuses to overwrite an existing file.
+    Emits v5 (YAML frontmatter + markdown body) by DEFAULT (schema-split B2). v4 XML authoring is retained
+    only for legacy/migration and must be explicitly re-selected via MEMORYSCHEMA_V4=1 or MEMORYSCHEMA_V5=0;
+    v4 files still PARSE unconditionally. relations: list of (TYPE, target) tuples. Refuses to overwrite.
     """
     if os.path.exists(filepath):
         raise FileExistsError("%s already exists — entities are created once" % filepath)
 
-    if os.environ.get("MEMORYSCHEMA_V5") == "1":
+    # v5 is the authored default; opt back into legacy v4 authoring explicitly (MEMORYSCHEMA_V4=1 or =V5=0).
+    _want_v4 = os.environ.get("MEMORYSCHEMA_V4") == "1" or os.environ.get("MEMORYSCHEMA_V5") == "0"
+    if not _want_v4:
         from memoryschema.format_v5 import parse_v5_content, serialize_v5
         mem = {"schema": 5, "name": name, "description": description.strip(),
                "observations": list(observations),

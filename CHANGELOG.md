@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Changed (2026-07-11 — schema-split Part B: the harness conforms UP to the entity authority)
+- **B2 — v5 is now the authored default.** `create_entity_file` (and therefore `remember` / new entities)
+  emitted **v4 XML** unless `MEMORYSCHEMA_V5=1` — the harness authored the *superseded* format by default. It
+  now authors **v5 by default**; v4 XML authoring is retained only for legacy/migration behind an explicit
+  opt-out (`MEMORYSCHEMA_V4=1` or `MEMORYSCHEMA_V5=0`), and v4 files still parse unconditionally. Deployments
+  that set `MEMORYSCHEMA_V5=1` (incl. helios) are unaffected. Spec §1 write-side note updated; the v4-specific
+  tests opt into v4 explicitly; the B2 conformance placeholder is now a real test (default v5 + opt-out v4).
+
 ### Fixed (2026-07-11 — schema-split Part B: the harness conforms UP to the entity authority)
 - **B1 — v5 entities are now validated.** `validate()` counted `<memory:entity` tags and returned a spurious
   `V1 "no entity"` on any v5 file, so v5 entities bypassed every V/R/Q rule (and `memory validate` rejected

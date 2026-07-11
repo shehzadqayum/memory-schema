@@ -46,9 +46,9 @@ Single parse entry point: `tags.parse_memory_content(content, filepath=None)`
   v5 and **never** falls through to XML. (Known edge: `str.lstrip()` does not strip a U+FEFF BOM, so a
   BOM-prefixed v5 file fails dispatch; `parse_v5_content` strips BOM if called directly.)
 - Otherwise the v4 XML path runs (§4).
-- Write-side selection: `write_index.create_entity_file` emits **v5 iff env `MEMORYSCHEMA_V5 == "1"`** (exact
-  string), else v4. *(Flipping this default to v5 is tracked as follow-up B2 — the current format is v5.)*
-  Exception: the chain-file bootstrap always writes a v5 skeleton.
+- Write-side selection: `write_index.create_entity_file` emits **v5 by default**; v4 XML authoring is retained
+  only for legacy/migration and must be explicitly re-selected (`MEMORYSCHEMA_V4=1` or `MEMORYSCHEMA_V5=0`).
+  The chain-file bootstrap always writes a v5 skeleton.
 
 ## 2. v5 format (current)
 
