@@ -69,10 +69,11 @@ or git — every action below is reversible and reviewable.
    - the kernel (`.claude/rules/memory-working.md`) for memory-protocol habits,
    - `CLAUDE.md` for project-wide operating rules,
    - a skill under `.claude/skills/` for multi-step procedures.
-   Then mark it: `set_lifecycle(memory/<name>.md, promoted_to="<surface>")` +
-   re-index — it drops off the candidate list but stays recallable with full
-   provenance. Promote at most 1–2 per pass; a bloated kernel is a regression
-   (the 7.9k→2.6k token cut is the budget being protected).
+   Then mark it (the `promoted_to` frontmatter is a standing-surface pointer):
+   `python -c "from memoryschema.write_index import set_lifecycle; set_lifecycle('memory/<name>.md', promoted_to='<surface>')"`
+   + re-index — it drops off the candidate list but stays recallable with full
+   provenance. Promote at most 1–2 per pass; a bloated kernel is a regression (the L0
+   token budget is what's being protected).
 
 8. **Verify + close**
    ```bash

@@ -27,10 +27,9 @@ All corpus memory is `semantic` — facts and content that persist indefinitely.
 ## Ingestion
 
 Write an ingest script that reads the source files, builds one entity dict per item
-(current format is schema v5 via `write_index.create_entity_file` with
-`MEMORYSCHEMA_V5=1`; the shipped example scripts still emit legacy v4 XML, which
-parses fine), embeds in batches, upserts to the store, and computes associations. See
-`packages/memory-schema/src/memoryschema/examples/` for reference implementations.
+(current format is schema v5, authored via `write_index.create_entity_file` — v5 is the
+default; no env flag needed), embeds in batches, upserts to the store, and computes
+associations. See the package's `examples/` directory for reference implementations.
 
 ## File path
 

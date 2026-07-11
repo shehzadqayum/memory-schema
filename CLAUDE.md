@@ -6,9 +6,10 @@ deterministic write path, a PostToolUse indexing hook, and a CLI. In Helios this
 private repo (this file travels with it as the repo's CLAUDE.md).
 
 **This vendored copy IS the canonical source** — there is no upstream to sync from, so historical "re-apply on
-re-vendor" local patches (7-space activation, hermetic-test isolation, the Neo4j fixes) are simply committed
-code now. The one thing an external command can still overwrite is the deployed hook — `memoryschema hook
-upgrade` regenerates it, so re-apply the **three hook patches** (below) if you ever run it.
+re-vendor" local patches (7-space activation, hermetic-test isolation, the Neo4j fixes, the three hook patches)
+are simply committed code now. **No `memoryschema` command regenerates the hook script** — `hook upgrade` only
+edits `~/.claude/settings.json` (the tool matcher + Stop registration), never the script — so the patches are
+safe unless you replace the package files.
 
 ## The doctrine: the schema is the authority, the code is its harness
 
@@ -50,10 +51,10 @@ upgrade` regenerates it, so re-apply the **three hook patches** (below) if you e
 
 ## Security posture
 
-- The vendored hook `src/memoryschema/hooks/hook-post-write.sh` carries **THREE local patches** (re-apply if
-  `memoryschema hook upgrade` overwrites it): (1) Windows backslash-path normalization, (2) `.env` autoload,
-  (3) **`.env`-export allowlist** — it exports only `NEO4J_*` / `VOYAGE_*` / `MEMORYSCHEMA_*` / `MEMORY_*`, never
-  the whole `.env` (the HIGH-2 fix).
+- The hook `src/memoryschema/hooks/hook-post-write.sh` carries **THREE local patches** (package source — no CLI
+  regenerates it): (1) Windows backslash-path normalization, (2) `.env` autoload, (3) **`.env`-export
+  allowlist** — it exports only `NEO4J_*` / `VOYAGE_*` / `MEMORYSCHEMA_*` / `MEMORY_*`, never the whole `.env`
+  (the HIGH-2 fix).
 - `preflight._start_container` prefers `docker start` (runs no file) and only `compose up`s a file carrying the
   `memoryschema-managed` sentinel — an **anti-footgun, not an adversarial boundary** (the token is copyable).
 - The generated compose references `${NEO4J_PASSWORD}` (secret in the gitignored `.env`, never baked at rest).

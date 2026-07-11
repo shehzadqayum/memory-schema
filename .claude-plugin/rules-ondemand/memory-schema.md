@@ -68,8 +68,8 @@ Rules:
   INFORMS CONTRADICTS MITIGATES`. SUPERSEDES flips the target to superseded;
   CONTRADICTS auto-creates the symmetric edge.
 - Validation is parse-based: if `memoryschema sync` reports the file malformed, the
-  frontmatter fence or discriminator is broken. (`memoryschema validate` is the v4 XML
-  validator — it reports every v5 file as V1; that is expected, not an error.)
+  frontmatter fence or discriminator is broken. `memoryschema validate` format-dispatches —
+  a v5 file is validated by the v5 rules; only an unparseable `schema: 5` file reports V1.
 
 ## Legacy v4 (parses; do not author)
 
@@ -83,8 +83,9 @@ frontmatter — lifecycle changes on v4 files revert on reconcile (the CLI warns
   chain** (`memory/.active_chain`, managed by `chain start/release`).
 - Merge on re-index: description/reasoning/status REPLACE; observations APPEND
   (deduped); relations MERGE (deduped by target+type); name/schema/project immutable.
-- Write gate: missing name REJECTS; numeric contradictions and L0-echo restatements
-  QUARANTINE (review via `memoryschema quarantine list/review/release/reject`).
+- Write gate: missing name REJECTS; an L0-echo restatement QUARANTINEs (review via
+  `memoryschema quarantine list/review/release/reject`); a numeric contradiction is a
+  WARNING by default (`numeric_probe_mode = log`), not a quarantine.
 - Temporal facts: `remember --key X.y` supersedes the previous ACTIVE holder of the key
   deterministically; `recall --as-of ISO-DATE` recalls what was valid then.
 

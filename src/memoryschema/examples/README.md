@@ -49,9 +49,9 @@ python consolidate_working.py \
    ```python
    memory = {
        'name': 'source-123',
-       'schema': 4,   # the scripts emit v4 XML files (still parses); current entity
-                      # creation is schema v5 via write_index.create_entity_file
-                      # with MEMORYSCHEMA_V5=1 — see docs/harness-manual.md §3
+       'schema': 4,   # these legacy scripts emit v4 XML files (still parses); the current
+                      # authored format is schema v5 via write_index.create_entity_file
+                      # (v5 is the default; no env flag) — see docs/schema-specification.md
        'type': 'semantic',
        'importance': 5,
        'description': 'One-line summary',
