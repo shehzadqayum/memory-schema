@@ -5,6 +5,11 @@ deterministic write path, a PostToolUse indexing hook, and a CLI. In Helios this
 `packages/memory-schema/` and installed editable into `helios\.venv`. On extraction it becomes a standalone
 private repo (this file travels with it as the repo's CLAUDE.md).
 
+**This vendored copy IS the canonical source** — there is no upstream to sync from, so historical "re-apply on
+re-vendor" local patches (7-space activation, hermetic-test isolation, the Neo4j fixes) are simply committed
+code now. The one thing an external command can still overwrite is the deployed hook — `memoryschema hook
+upgrade` regenerates it, so re-apply the **three hook patches** (below) if you ever run it.
+
 ## The doctrine: the schema is the authority, the code is its harness
 
 - `src/memoryschema/entity_schema.py` is the **single machine authority** for the entity model — fields,
