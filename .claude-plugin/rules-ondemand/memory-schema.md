@@ -4,7 +4,7 @@ What a valid memory entity looks like, and the write/merge semantics. Loaded on 
 needed only when hand-authoring or debugging entity files; the deterministic CLI
 (`chain step` / `remember`) writes valid entities for you.
 
-**Source of truth:** `packages/memory-schema/docs/memory-system-specification.md`
+**Source of truth:** `packages/memory-schema/docs/schema-specification.md`
 (§3 schema, §4 write path). This file is a derived quick reference.
 
 ---

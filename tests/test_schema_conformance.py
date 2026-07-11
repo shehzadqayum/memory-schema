@@ -110,6 +110,12 @@ def test_b3_malformed_v5_is_guarded_not_pruned():
     ...
 
 
-@pytest.mark.skip(reason="A2/A3 (tracked): schema-specification.md + on-demand rule not yet split out; doc-gen diff pending.")
 def test_doc_machine_sections_match_render_reference_tables():
-    ...
+    """The schema spec's generated block is diff-checked against the authority — the machine-checkable doc
+    sections cannot drift from entity_schema.py. Hermetic: reads a checked-in doc, not the live memory/ dir."""
+    import re
+    import pathlib
+    doc = (pathlib.Path(__file__).resolve().parent.parent / 'docs' / 'schema-specification.md').read_text(encoding='utf-8')
+    m = re.search(r'<!-- BEGIN generated[^>]*-->\n(.*?)\n<!-- END generated -->', doc, re.S)
+    assert m, 'generated markers missing from schema-specification.md'
+    assert m.group(1).strip() == SCH.render_reference_tables().strip(), 'doc generated block drifted from entity_schema.py'
