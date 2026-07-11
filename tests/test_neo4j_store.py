@@ -263,6 +263,34 @@ class TestNeo4jIntegration:
             store.delete(test_name)
             store.close()
 
+    def test_supersedes_cycle_not_persisted(self):
+        # R7: a SUPERSEDES cycle must be REJECTED WITHOUT persisting the poison edge — the check now runs
+        # BEFORE the MERGE (matching the JSONL store). Regression for the old check-after-commit bug, where
+        # the edge was committed and then the raise left it in the graph.
+        from memoryschema.neo4j_store import Neo4jMemoryStore
+        store = Neo4jMemoryStore()
+        a, b = '_integration_cycle_a', '_integration_cycle_b'
+        try:
+            store.delete(a)
+            store.delete(b)
+            store.upsert({'name': b, 'schema': 5, 'type': 'semantic', 'description': 'cycle b', 'importance': 1})
+            store.upsert({'name': a, 'schema': 5, 'type': 'semantic', 'description': 'cycle a',
+                          'importance': 1, 'relations': [{'type': 'SUPERSEDES', 'target': b}]})   # a -> b, ok
+            with pytest.raises(ValueError, match="cycle"):
+                store.upsert({'name': b, 'schema': 5, 'type': 'semantic', 'description': 'cycle b',
+                              'importance': 1, 'relations': [{'type': 'SUPERSEDES', 'target': a}]})  # b->a cycles
+            with store._driver.session() as s:
+                back = s.run("MATCH (:Memory {name:$b})-[r:SUPERSEDES]->(:Memory {name:$a}) RETURN count(r) AS c",
+                             a=a, b=b).single()['c']
+                fwd = s.run("MATCH (:Memory {name:$a})-[r:SUPERSEDES]->(:Memory {name:$b}) RETURN count(r) AS c",
+                            a=a, b=b).single()['c']
+            assert back == 0, "the cyclic SUPERSEDES edge must NOT be persisted"
+            assert fwd == 1, "the legit a->b edge must remain"
+        finally:
+            store.delete(a)
+            store.delete(b)
+            store.close()
+
     def test_multispace_roundtrip(self):
         # Per-space embeddings + divergence persist and reconstruct on read.
         from memoryschema.neo4j_store import Neo4jMemoryStore

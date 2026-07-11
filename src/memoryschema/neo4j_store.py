@@ -262,15 +262,12 @@ class Neo4jMemoryStore:
                         f"Invalid relation type {rel_type!r}, "
                         f"must be one of: {', '.join(sorted(_RELATION_TYPES))}"
                     )
-                session.run(f"""
-                    MATCH (s:Memory {{name: $source}})
-                    MERGE (t:Memory {{name: $target}})
-                    MERGE (s)-[r:{rel_type}]->(t)
-                """, source=name, target=target)
-
-                # SUPERSEDES → cycle detection, then mark target
+                # SUPERSEDES → R7 cycle detection BEFORE creating the edge, so a cycle is REJECTED with
+                # the graph left CLEAN (matching the JSONL store's pre-write check) — not persisted and then
+                # reported. Order-independent: the query searches for a PRE-EXISTING path t -[:SUPERSEDES*]-> s,
+                # which by construction never contains the not-yet-created s -> t edge, so checking before vs
+                # after the MERGE returns the identical answer.
                 if rel_type == 'SUPERSEDES':
-                    # Cycle detection (R7)
                     cycle = session.run("""
                         OPTIONAL MATCH path = (t:Memory {name: $target})
                             -[:SUPERSEDES*]->(s:Memory {name: $source})
@@ -280,6 +277,15 @@ class Neo4jMemoryStore:
                         raise ValueError(
                             f"SUPERSEDES cycle detected: {name} → {target} "
                             f"would create a circular chain")
+
+                session.run(f"""
+                    MATCH (s:Memory {{name: $source}})
+                    MERGE (t:Memory {{name: $target}})
+                    MERGE (s)-[r:{rel_type}]->(t)
+                """, source=name, target=target)
+
+                # SUPERSEDES → mark the (now-superseded) target
+                if rel_type == 'SUPERSEDES':
                     session.run("""
                         MATCH (t:Memory {name: $target})
                         WHERE t.status IS NULL OR t.status = 'active'

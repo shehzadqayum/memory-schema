@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+### Fixed (2026-07-12 — Neo4j SUPERSEDES cycle detection persisted the cycle it rejected)
+- **The Neo4j store checked for a SUPERSEDES cycle AFTER committing the edge.** `upsert` ran
+  `MERGE (s)-[:SUPERSEDES]->(t)` (auto-committed), then the R7 cycle query, then raised `ValueError` on a
+  cycle — leaving the cyclic edge persisted in the graph. So a rejected write still corrupted the store, and
+  the two backends diverged (the JSONL store pre-validates against its in-memory snapshot and aborts cleanly).
+  Moved the cycle check ABOVE the `MERGE` (SUPERSEDES only). Order-independent: the query searches for a
+  *pre-existing* path `t -[:SUPERSEDES*]-> s`, which never contains the not-yet-created `s -> t` edge, so the
+  answer is identical — but a rejection now leaves the graph clean. Added the first cycle tests for BOTH
+  backends (hermetic JSONL + an integration test asserting the poison edge is not persisted), closing a
+  zero-coverage gap that let the asymmetry survive.
+
 ### Fixed (2026-07-11 — retrieval-scoring config knobs were silent placebos)
 - **`recency_decay`, `mitigation_dampening`, `recall_depth`, `recall_decay` now actually take effect.** All
   four were config fields (TOML-mappable) but the scorers hardcoded the literals (`0.995` / `0.95`) and the
