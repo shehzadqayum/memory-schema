@@ -13,7 +13,13 @@
   while `plugin sync` wrote the same logical artefacts from the plugin dir — two divergent kernels for one
   path, and a schema ref duplicated across two load tiers. Both now call a shared `deploy_artefacts` over the
   single `claude_plugin/` source; `init --scopes` selects the on-demand rule set. Deleted the three orphaned
-  templates (`memory-working.tpl`, `memory-schema.rules.tpl`, `memory-corpus.tpl`).
+  templates (`memory-working.tpl`, `memory-schema.rules.tpl`, `memory-corpus.tpl`). Re-running `init` is now
+  CONVERGENT for the `.claude/` artefacts (re-synced from the package like `plugin sync`, so a locally-edited
+  deployed rule heals back); the non-artefact files (compose/.env/toml) are still create-only.
+- **Examples rewritten to v5.** `examples/ingest_tweets.py` / `ingest_forum.py` now author entities via
+  `write_index.create_entity_file` (v5, no manual XML/escaping) instead of hand-built `<memory:entity
+  schema="4">`; `consolidate_working.py` uses `format_v5.serialize_v5` (it carries a `prompt` section the plain
+  create path doesn't take). Removed the `xml.sax` escaping imports and the dead `schema: 2`.
 
 ### Fixed (2026-07-11 — adversarial-review follow-ups on Part B/C)
 - **B3 corruption marker was both too broad AND too narrow.** `_V5_SCHEMA5_MARKER` scanned the whole file

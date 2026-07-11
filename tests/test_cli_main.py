@@ -36,7 +36,7 @@ class TestInit:
         result = runner.invoke(cli, ["--project", "test-proj", "--root", str(tmp_path), "init"])
         assert result.exit_code == 0
         assert (tmp_path / "memory" / "MEMORY.md").exists()
-        # schema ref is deployed on-demand (from the .claude-plugin SSOT), not always-loaded
+        # schema ref is deployed on-demand (from the claude_plugin SSOT), not always-loaded
         assert (tmp_path / ".claude" / "rules-ondemand" / "memory-schema.md").exists()
         assert (tmp_path / ".claude" / "rules" / "memory-working.md").exists()   # the always-loaded kernel
 

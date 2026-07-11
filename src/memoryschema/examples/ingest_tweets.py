@@ -3,8 +3,8 @@
 Example: Ingest Twitter archive into the memory system.
 
 Reads YAML frontmatter markdown files from a Twitter archive,
-converts each to a <memory:entity>, embeds in batches via Voyage AI,
-and bulk-writes to the JSONL store.
+creates a v5 memory entity per tweet (via write_index.create_entity_file),
+embeds in batches via Voyage AI, and bulk-writes to the JSONL store.
 
 Usage:
     python ingest_tweets.py --archive-root /path/to/archive --project my-project [--embed]
@@ -17,7 +17,6 @@ import math
 import os
 import sys
 import time
-from xml.sax.saxutils import escape as xml_escape
 
 
 def parse_tweet_file(filepath):
@@ -72,7 +71,7 @@ def parse_tweet_file(filepath):
 
     return {
         'name': name,
-        'schema': 4,
+        'schema': 5,
         'type': 'semantic',
         'provenance': 'ingested',
         'importance': importance,
@@ -125,23 +124,20 @@ def main():
         print("Dry run complete.")
         return
 
-    # Write .md files
+    # Write .md files (v5 — create_entity_file serializes + validates; no manual XML or escaping)
+    from memoryschema.write_index import create_entity_file
     os.makedirs(memory_dir, exist_ok=True)
+    written = 0
     for memory in memories:
         filepath = os.path.join(memory_dir, f"{memory['name']}.md")
-        obs_xml = '\n'.join(f'    <memory:observation>{xml_escape(o)}</memory:observation>'
-                           for o in memory['observations'])
-        content = f"""<memory:entity schema="4" name="{memory['name']}" type="semantic" importance="{memory['importance']}">
-  <memory:description>{xml_escape(memory['description'])}</memory:description>
-  <memory:observations>
-{obs_xml}
-  </memory:observations>
-</memory:entity>
-"""
-        with open(filepath, 'w', encoding='utf-8') as f:
-            f.write(content)
+        if os.path.exists(filepath):
+            continue  # create_entity_file refuses to overwrite an existing entity (skip already-ingested)
+        create_entity_file(filepath, memory['name'], memory['description'], memory['observations'],
+                           importance=memory.get('importance'), mtype=memory.get('type'),
+                           project=memory.get('project'))
+        written += 1
 
-    print(f"Wrote {len(memories)} .md files to {memory_dir}")
+    print(f"Wrote {written} v5 .md files to {memory_dir}")
 
     # Embed + store
     from memoryschema.store import MemoryStore

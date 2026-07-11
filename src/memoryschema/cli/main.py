@@ -172,7 +172,11 @@ def init(config, with_neo4j, scopes, neo4j_password):
     """Initialize a new project with the memory system.
 
     Creates memory/ directory, docker-compose.yml, .env.example,
-    memoryschema.toml, and .claude/rules/ files. Optionally deploys Neo4j.
+    memoryschema.toml, and the .claude/ rules + skill artefacts. Optionally deploys Neo4j.
+
+    Re-running init is safe and CONVERGENT: the .claude/ artefacts are re-synced from the packaged
+    source of truth (like `plugin sync`), so a locally-edited deployed rule is healed back to package
+    state. The non-artefact files (compose/.env/toml) are only created if absent, never overwritten.
 
     For nested agents, run init inside the parent project. The TOML config
     supports hierarchical inheritance via dot-notation project names.

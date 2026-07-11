@@ -49,9 +49,7 @@ python consolidate_working.py \
    ```python
    memory = {
        'name': 'source-123',
-       'schema': 4,   # these legacy scripts emit v4 XML files (still parses); the current
-                      # authored format is schema v5 via write_index.create_entity_file
-                      # (v5 is the default; no env flag) — see docs/schema-specification.md
+       'schema': 5,   # v5 is the current authored format (the default)
        'type': 'semantic',
        'importance': 5,
        'description': 'One-line summary',
@@ -59,6 +57,9 @@ python consolidate_working.py \
        'project': 'my-project',
    }
    ```
+   Write the `.md` with `write_index.create_entity_file(filepath, name, description, observations, ...)`
+   (v5, no manual XML/escaping) — the example scripts here do exactly this; use `format_v5.serialize_v5(dict)`
+   for entities that also carry `reasoning`/`prompt`/`relations` (see `consolidate_working.py`).
 3. Embed in batches:
    ```python
    from memoryschema.embeddings import embed_batch

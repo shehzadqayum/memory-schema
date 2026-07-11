@@ -17,7 +17,6 @@ import os
 import re
 import sys
 from collections import defaultdict
-from xml.sax.saxutils import escape as xml_escape
 
 from memoryschema.tags import parse_memory_file
 
@@ -77,7 +76,7 @@ def merge_cluster(memories, cluster_name):
 
     return {
         'name': cluster_name,
-        'schema': 2,
+        'schema': 5,
         'type': memories[0].get('type', 'semantic'),
         'importance': importance,
         'description': description[:120],
@@ -89,41 +88,18 @@ def merge_cluster(memories, cluster_name):
 
 
 def write_entity(memory, output_dir):
-    """Write a memory entity to a .md file."""
+    """Write a memory entity to a v5 .md file via the schema serializer.
+
+    Uses `format_v5.serialize_v5` (not `write_index.create_entity_file`) because this consolidated entity
+    carries a `prompt` section, which the plain create path does not take — serialize_v5 handles the full
+    dict (observations, reasoning, prompt, relations). No manual XML or escaping (v5 stores prose verbatim).
+    """
+    from memoryschema.format_v5 import serialize_v5
     filepath = os.path.join(output_dir, f"{memory['name']}.md")
-
-    obs_xml = ""
-    if memory.get('observations'):
-        obs_lines = '\n'.join(f'    <memory:observation>{xml_escape(o)}</memory:observation>'
-                              for o in memory['observations'])
-        obs_xml = f"\n  <memory:observations>\n{obs_lines}\n  </memory:observations>"
-
-    prompt_xml = ""
-    if memory.get('prompt'):
-        prompt_xml = f"\n  <memory:prompt>{xml_escape(memory['prompt'])}</memory:prompt>"
-
-    reasoning_xml = ""
-    if memory.get('reasoning'):
-        reasoning_xml = f"\n  <memory:reasoning>{xml_escape(memory['reasoning'])}</memory:reasoning>"
-
-    rels_xml = ""
-    if memory.get('relations'):
-        rel_lines = '\n'.join(
-            f'    <memory:relation target="{r["target"]}" type="{r["type"]}"/>'
-            for r in memory['relations'] if r.get('target') and r.get('type')
-        )
-        if rel_lines:
-            rels_xml = f"\n  <memory:relations>\n{rel_lines}\n  </memory:relations>"
-
-    imp = memory.get('importance', 5)
-    typ = memory.get('type', 'semantic')
-
-    content = f"""<memory:entity schema="4" name="{memory['name']}" type="{typ}" importance="{imp}">
-  <memory:description>{xml_escape(memory['description'])}</memory:description>{obs_xml}{prompt_xml}{reasoning_xml}{rels_xml}
-</memory:entity>
-"""
+    mem = dict(memory)
+    mem['schema'] = 5
     with open(filepath, 'w', encoding='utf-8') as f:
-        f.write(content)
+        f.write(serialize_v5(mem))
 
 
 def main():

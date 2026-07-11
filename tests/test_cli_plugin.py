@@ -20,7 +20,7 @@ class TestArtefactSync:
     """`plugin sync` — mechanical, MD5-verified deploy of the canonical artefacts."""
 
     def _src(self, tmp_path):
-        src = tmp_path / ".claude-plugin"
+        src = tmp_path / "claude_plugin"
         for src_rel, _ in SKILL_FILES + RULE_FILES:
             f = src / src_rel
             f.parent.mkdir(parents=True, exist_ok=True)
@@ -64,7 +64,7 @@ class TestArtefactSync:
 
     def test_src_missing_is_a_package_defect(self, tmp_path):
         runner = CliRunner()
-        src = tmp_path / ".claude-plugin"       # exists but empty — artefacts absent
+        src = tmp_path / "claude_plugin"       # exists but empty — artefacts absent
         src.mkdir()
         target = tmp_path / "dep" / ".claude"
         with patch("memoryschema.cli.plugin_cmd._find_plugin_dir", return_value=src):
@@ -80,8 +80,8 @@ def runner():
 
 @pytest.fixture
 def plugin_dir(tmp_path):
-    """Create a minimal .claude-plugin/ directory with all expected files."""
-    plugin = tmp_path / ".claude-plugin"
+    """Create a minimal claude_plugin/ directory with all expected files."""
+    plugin = tmp_path / "claude_plugin"
     for src_rel, _ in SKILL_FILES:
         f = plugin / src_rel
         f.parent.mkdir(parents=True, exist_ok=True)
