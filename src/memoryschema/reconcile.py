@@ -47,8 +47,10 @@ def _atomic_write_jsonl(path, entries):
             sdir = sidecar_dir(path)
             for e in entries:
                 f.write(json.dumps(externalize(e, sdir), ensure_ascii=False) + '\n')
-            prune_orphans(sdir, [e.get("name") for e in entries])
         os.replace(tmp, path)
+        # Prune only AFTER the new store is committed: pruning inside the write block left a
+        # crash window where the OLD store was still live but its sidecars were already gone.
+        prune_orphans(sdir, [e.get("name") for e in entries])
     finally:
         if os.path.exists(tmp):
             os.remove(tmp)
@@ -244,12 +246,21 @@ def reconcile(config, dry_run=False, prune=True, verify=True, allow_empty=False)
     # --- 1+2: build the exact .md set, reusing the JSONL derived layer where unchanged ---
     from memoryschema.spaces import apply_full_embeddings
     DERIVED = ("embedding", "embeddings", "divergence_profile", "embed_input_hash",
+               "vectors_external",
                "created_at", "access_count", "last_accessed", "associations")
     final = []
     for name, e in md_entities.items():
         out = dict(e)                                           # fresh dict — keep parsed .md pristine
         j = jsonl_by_name.get(name)
-        if j and j.get("embedding") and _embeddings_current(j, e):
+        # Quarantined = UNEMBEDDED (invariant): checked FIRST so a legacy row's vectors are never
+        # reused onto it, and no Voyage is spent — it stays vectorless until released + re-indexed.
+        if (out.get("status") or "active") == "quarantined":
+            if j and j.get("created_at"):
+                out["created_at"] = j["created_at"]
+        # Reusable when the row carries vectors — inline (rehydrated) OR still-externalized
+        # (`vectors_external` marker kept because rehydration was unavailable, e.g. a numpy-less
+        # run: the sidecar .npz is intact and must not be detached by rewriting the row bare).
+        elif j and (j.get("embedding") or j.get("vectors_external")) and _embeddings_current(j, e):
             for k in DERIVED:                                   # reuse derived layer (full multi-space)
                 if k in j and j[k] is not None:
                     out[k] = j[k]
@@ -262,8 +273,10 @@ def reconcile(config, dry_run=False, prune=True, verify=True, allow_empty=False)
             except Exception as ex:
                 result["embed_failed"] += 1                     # Voyage down -> degraded, not a crash
                 result.setdefault("embed_errors", []).append((name, str(ex)[:120]))
-            if j and j.get("created_at"):
-                out["created_at"] = j["created_at"]
+            if j:                                               # carry provenance + access telemetry —
+                for k in ("created_at", "access_count", "last_accessed"):
+                    if j.get(k) is not None:                    # a content change must not wipe usage
+                        out[k] = j[k]
         final.append(out)
 
     # --- 3: rewrite store.jsonl to EXACTLY the .md set (prunes JSONL residuals + applies edits) ---

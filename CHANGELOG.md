@@ -2,6 +2,38 @@
 
 ## [Unreleased]
 
+### Fixed (2026-07-12 — wide package review: vector destruction, quarantine lifecycle, CLI safety)
+An economical whole-package review (4 finders, findings code-verified inline) found 16 real defects:
+- **`embed --all` no longer destroys space vectors.** `reembed()` read store.jsonl RAW (no sidecar
+  rehydration), unlinked each entity's `.npz` (holding ALL seven space vectors), and wrote back only the
+  freshly computed one — on an externalized store (the steady state) every other space vector was
+  permanently destroyed, invisibly to reconcile. It now loads through `MemoryStore` (rehydrated) and saves
+  through the store's own saver.
+- **`embed --all-spaces` is no longer a silent no-op.** It lacked the unlink defense, so `externalize`'s
+  skip-if-unchanged (same content hash) dropped the freshly computed vectors; it now unlinks first, and
+  when the active store is Neo4j it ALSO mirrors to JSONL (else the next reconcile pushed the stale JSONL
+  vectors back over the fresh Neo4j ones).
+- **Quarantine is now file-first and hash-consistent.** (a) Both quarantine writers pop
+  `embed_input_hash` WITH the vectors — leaving the new hash merged it over an existing row's OLD vectors,
+  so post-release reconcile saw "current" forever (permanent stale recall); the `write` path also popped
+  only `embedding`, leaving a quarantined-but-embedded row. (b) The status is persisted to the source .md
+  (`set_lifecycle`) — reconcile previously RESURRECTED quarantined entries as active+embedded+L0-visible
+  (the archive-revert class). (c) `quarantine release` now flips BOTH stores AND the .md. (d) reconcile
+  skips embedding quarantined rows (quarantined = unembedded, checked before the reuse branch).
+- **`import` (tar) now requires `--confirm`** like its twin `restore` (it extracts over the project root);
+  opens with `r:*` so a plain `.tar` works. **`export` tar arcnames now match the live layout**
+  (`memory/store.jsonl`, `.claude/rules/`) so the import round-trip restores files where they are read.
+- **CLI `.env` autoload is allowlisted** (NEO4J_*/VOYAGE_*/MEMORYSCHEMA_*/MEMORY_* — the hook's HIGH-2
+  allowlist, now applied to the CLI too; dotenv dropped: it has no allowlist seam).
+- Gate REJECT/QUARANTINE verdicts are audit-logged on the index_memory path (remember/chain-step/hook);
+  active-chain auth falls back to a Neo4j existence check on a JSONL miss (drift must not bypass
+  read-only); reconcile keeps the `vectors_external` marker on unrehydratable rows (sidecar not detached),
+  carries access telemetry through the re-embed branch, and prunes sidecars only AFTER the store commit.
+  Neo4j: scoped association channel gains the missing `project IS NULL` arm (unscoped = universally
+  visible); `entry_to_node_props` explicit-nulls clearable optionals (property-level drift heals);
+  deploy_cmd docstring made project-agnostic. §14 notes the two accepted asymmetries (seed hub bonus,
+  global k-NN associations). New `tests/test_vector_provenance.py` (10 regressions).
+
 ### Fixed (2026-07-12 — external-review round 2: registry housekeeping)
 Five audited housekeeping catches, each verified against the code: registry header count 53→56 (rows now
 carry their own TOML keys; section counts corrected); `multi_space` risk med→HIGH (flipping it changes every

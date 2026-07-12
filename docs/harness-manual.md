@@ -966,6 +966,10 @@ record.
 - Neo4j query-recall returns `[]` without embeddings (JSONL degrades to keyword);
   JSONL has BM25 (+0.3 cap), Neo4j has substring +0.1; rerank exists on the JSONL
   path only.
+- Neo4j query-recall SEEDS (from the vector index) may miss the hub bonus — the vector-search
+  row doesn't fetch backlink counts; hop-fetched neighbours (which do) get it. Scoring parity
+  is exact on the hop paths. `compute_associations` builds k-NN against the GLOBAL vector
+  index even for scoped projects (scope is enforced at recall time, not association time).
 - SUPERSEDES cycles: BOTH backends pre-validate before the write (the Neo4j store runs the
   cycle query and raises BEFORE the edge `MERGE`, so a rejected cycle edge is never persisted —
   parity with JSONL's pre-write check). Neo4j MERGEs stub nodes for unknown relation targets;

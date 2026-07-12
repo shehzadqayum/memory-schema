@@ -49,6 +49,14 @@ def entry_to_node_props(entry):
         if key in entry and entry[key] is not None:
             props[key] = entry[key]
 
+    # Explicit-null the CLEARABLE optionals when absent: `SET m += props` can only remove a
+    # property via an explicit null, so a field deleted from the source (a lifted supersession,
+    # a retired promoted_to) would otherwise linger on the node FOREVER — property-level drift
+    # that no reconcile could heal (reconcile rebuilds Neo4j THROUGH this function).
+    for key in ('key', 'valid_from', 'superseded_at', 'superseded_by', 'promoted_to',
+                 'body', 'prompt', 'reasoning', 'project'):
+        props.setdefault(key, None)
+
     # Normalize observations to plain strings (legacy stores can still carry
     # {"text","basis"} dicts); a raw ' '.join over dicts would crash migration —
     # the designated on-ramp for exactly those legacy stores.

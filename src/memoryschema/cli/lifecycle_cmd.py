@@ -315,10 +315,13 @@ def export_cmd(config, fmt, output):
                 for f in config.memory_dir.rglob("*.md"):
                     tar.add(f, arcname=f"memory/{f.relative_to(config.memory_dir)}")
             if config.store_path.exists():
-                tar.add(config.store_path, arcname="store.jsonl")
+                # arcnames match the LIVE layout (like backup's), so the import/restore
+                # extract-to-project-root round-trip puts files back where they are read from —
+                # a root-level "store.jsonl" would be silently ignored by everything.
+                tar.add(config.store_path, arcname="memory/store.jsonl")
             if config.rules_dir.exists():
                 for f in config.rules_dir.glob("memory-*"):
-                    tar.add(f, arcname=f"rules/{f.name}")
+                    tar.add(f, arcname=f".claude/rules/{f.name}")
             if config.docker_compose_path.exists():
                 tar.add(config.docker_compose_path, arcname="docker-compose.yml")
         click.echo(f"Exported to {dest}")
@@ -351,8 +354,10 @@ def export_cmd(config, fmt, output):
 @click.argument("source", type=click.Path(exists=True))
 @click.option("--format", "fmt", type=click.Choice(["tar", "jsonl", "md"]),
               help="Import format. Auto-detected if omitted.")
+@click.option("--confirm", is_flag=True,
+              help="Required for --format tar (extracts OVER the project root, like restore).")
 @click.pass_obj
-def import_cmd(config, source, fmt):
+def import_cmd(config, source, fmt, confirm):
     """Import from a portable archive or file.
 
     Example:
@@ -383,7 +388,14 @@ def import_cmd(config, source, fmt):
             sys.exit(1)
 
     if fmt == "tar":
-        with tarfile.open(source, "r:gz") as tar:
+        # Same blast radius as `restore` (extracts over the project root) — same guard.
+        if not confirm:
+            click.echo("This will OVERWRITE existing files under the project root. "
+                       "Use --confirm to proceed.")
+            sys.exit(1)
+        # "r:*" auto-detects compression — a plain .tar is accepted by the suffix
+        # auto-detect above, and "r:gz" would then crash with ReadError.
+        with tarfile.open(source, "r:*") as tar:
             try:
                 tar.extractall(path=config.project_root, filter="data")
             except TypeError:

@@ -106,6 +106,18 @@ def index_memory(filepath, config=None, require_active_chain_auth=True):
                             break
                     except Exception:
                         continue
+        if not exists:
+            # JSONL can drift (a killed hook); an entity present only in Neo4j must not bypass
+            # read-only auth. Checked ONLY on a jsonl miss; any failure (Neo4j down) = fast no-op.
+            try:
+                from memoryschema.neo4j_store import Neo4jMemoryStore
+                _ns = Neo4jMemoryStore()
+                try:
+                    exists = _ns.get(name) is not None
+                finally:
+                    _ns.close()
+            except Exception:
+                pass
         if exists and name != active:
             res.errors.append("BLOCKED: %s is read-only (not the active chain)" % name)
             return res
@@ -150,6 +162,16 @@ def index_memory(filepath, config=None, require_active_chain_auth=True):
         gate = gate_pipeline(memory, store=jsonl_store, config=config)
         res.warnings.extend(str(w) for w in gate.warnings)
         res.verdict = getattr(gate.verdict, "value", str(gate.verdict))
+        # Audit the verdict on THIS path too — remember/chain-step/the hook route through
+        # index_memory, and an unaudited REJECT/QUARANTINE leaves no trace of the veto.
+        if gate.verdict in (GateVerdict.REJECT, GateVerdict.QUARANTINE):
+            try:
+                from memoryschema.audit import log_gate_decision
+                audit_path = os.path.join(os.path.dirname(store_path), "audit.jsonl")
+                log_gate_decision(audit_path, name, getattr(gate.verdict, "value", str(gate.verdict)),
+                                  [str(r) for r in gate.reasons], provenance="index_memory")
+            except Exception:
+                pass
         if gate.verdict == GateVerdict.REJECT:
             res.errors.append("write gate REJECTED: " + "; ".join(str(r) for r in gate.reasons))
             return res
@@ -158,6 +180,19 @@ def index_memory(filepath, config=None, require_active_chain_auth=True):
             memory.pop("embedding", None)
             memory.pop("embeddings", None)
             memory.pop("divergence_profile", None)
+            # The hash travels WITH the vectors it describes: leaving the NEW hash while popping
+            # the NEW vectors would merge it over an existing row's OLD vectors — after release,
+            # reconcile would see "current" forever and never re-embed (permanent stale recall).
+            memory.pop("embed_input_hash", None)
+            # FILE-FIRST: persist the status to the source .md, or reconcile (which rebuilds the
+            # stores FROM the .md set, where status defaults to active) silently RESURRECTS the
+            # quarantined entity — the same class as the archive-revert bug. v4 files can't carry
+            # it (set_lifecycle is v5-only) — warn loudly instead of failing the index.
+            try:
+                set_lifecycle(filepath, status="quarantined")
+            except Exception as e:
+                res.warnings.append("could not persist quarantine to the .md (%s) — "
+                                    "reconcile may resurrect it" % e)
             res.embedded = False
             res.warnings.append("QUARANTINED: " + "; ".join(str(r) for r in gate.reasons))
     except ImportError:

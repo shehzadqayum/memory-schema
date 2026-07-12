@@ -748,7 +748,8 @@ class Neo4jMemoryStore:
                      OR n.project STARTS WITH $scope_prefix
                      OR $scope_project STARTS WITH (n.project + '.'))"""
             assoc_scope = """
-                AND (an.project = $scope_project
+                AND (an.project IS NULL
+                     OR an.project = $scope_project
                      OR an.project STARTS WITH $scope_prefix
                      OR $scope_project STARTS WITH (an.project + '.'))"""
             params['scope_project'] = project

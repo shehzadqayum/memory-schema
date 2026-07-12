@@ -75,8 +75,8 @@ def register(project, repo_url, prefix, scopes, consumer_commit, note):
     current HEAD, the subtree pointer, the schema version, and the date — so `deploy status` is always true.
 
     Example:
-        memoryschema deploy register --project helios \\
-            --repo-url https://github.com/me/helios.git --prefix packages/memory-schema
+        memoryschema deploy register --project my-project \\
+            --repo-url https://github.com/me/my-project.git --prefix packages/memory-schema
     """
     root = _module_root()
     if not root:

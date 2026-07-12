@@ -9,10 +9,8 @@ Usage:
     reembed(prefix='forum-', config=config, batch_size=20)
 """
 
-import json
 import os
 import sys
-import tempfile
 import time
 
 
@@ -44,8 +42,13 @@ def reembed(prefix, config=None, batch_size=20, max_chars=8000, dry_run=False,
 
     store_path = str(config.store_path)
 
-    with open(store_path, 'r', encoding='utf-8') as f:
-        entries = [json.loads(line) for line in f if line.strip()]
+    # Load through MemoryStore so sidecar vectors are REHYDRATED. A raw json.loads read of an
+    # externalized store yields entries with NO inline vectors; the rewrite below would then
+    # persist only the freshly computed vector and the sidecar rewrite would DESTROY every
+    # other space vector for the whole corpus (found by the 2026-07-12 wide review).
+    from memoryschema.store import MemoryStore
+    _store = MemoryStore(store_path, config=config)
+    entries = _store._load()
 
     target_entries = [e for e in entries if e.get('name', '').startswith(prefix)]
 
@@ -125,26 +128,13 @@ def reembed(prefix, config=None, batch_size=20, max_chars=8000, dry_run=False,
                 except OSError:
                     pass
 
-    # Write store back atomically, externalizing vectors to the sidecar (matching
-    # store._save) so store.jsonl is not re-bloated with inline vector JSON.
-    dirpath = os.path.dirname(store_path)
-    fd, tmp_path = tempfile.mkstemp(suffix='.tmp', dir=dirpath)
-    try:
-        with os.fdopen(fd, 'w', encoding='utf-8') as f:
-            for entry in entries:
-                f.write(json.dumps(vector_sidecar.externalize(entry, sdir),
-                                   ensure_ascii=False) + '\n')
-        os.replace(tmp_path, store_path)
-    except BaseException:
-        if os.path.exists(tmp_path):
-            os.unlink(tmp_path)
-        raise
+    # Write back through the store's own saver (atomic tmp+replace, externalizes to the
+    # sidecar) — the entries are fully rehydrated, so every space vector survives the rewrite.
+    _store._save(entries)
 
     # Recompute associations
     if not skip_assoc and embedded > 0:
-        from memoryschema.store import MemoryStore
-        store = MemoryStore(store_path)
-        stats['associations'] = store.compute_associations(k=10)
+        stats['associations'] = _store.compute_associations(k=10)
 
     return stats
 
@@ -171,6 +161,7 @@ def reembed_all_spaces(prefix='', config=None, store=None, dry_run=False):
         store = get_store(config=config)
 
     from memoryschema.spaces import apply_full_embeddings
+    from memoryschema import vector_sidecar
 
     entries = store.list_all(include_inactive=True)
     matched = [e for e in entries if e.get('name', '').startswith(prefix)]
@@ -179,11 +170,36 @@ def reembed_all_spaces(prefix='', config=None, store=None, dry_run=False):
         stats['dry_run'] = True
         return stats
 
+    # Sidecar + mirror plumbing: content is unchanged on a backfill, so externalize's
+    # skip-if-unchanged (same embed_input_hash) would DROP the freshly computed vectors —
+    # unlink each entity's .npz first to force the rewrite (same defense as reembed()).
+    # And when the active store is Neo4j, ALSO mirror to the JSONL store (index_memory's
+    # dual-write pattern): otherwise the next reconcile pushes the stale JSONL vectors
+    # back over the fresh Neo4j ones (reconcile rebuilds Neo4j FROM the JSONL).
+    jsonl_path = str(config.store_path)
+    sdir = vector_sidecar.sidecar_dir(jsonl_path)
+    jsonl_mirror = None
+    if type(store).__name__ != 'MemoryStore':
+        from memoryschema.store import MemoryStore
+        jsonl_mirror = MemoryStore(jsonl_path, config=config)
+
     for entry in matched:
         if not apply_full_embeddings(entry, config=config):    # shared derived-layer write
             stats['skipped_empty'] += 1
             continue
+        name = entry.get('name') or ''
+        stale = vector_sidecar._npz_path(sdir, name)
+        if name and os.path.exists(stale):
+            try:
+                os.unlink(stale)
+            except OSError:
+                pass
         store.upsert(entry)
+        if jsonl_mirror is not None:
+            try:
+                jsonl_mirror.upsert(entry)
+            except Exception as ex:
+                print(f'WARN jsonl mirror failed for {name}: {ex}', file=sys.stderr)
         stats['embedded'] += 1
 
     return stats

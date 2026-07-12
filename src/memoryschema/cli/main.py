@@ -94,11 +94,19 @@ def cli(ctx, project, root):
     _maybe_preflight(ctx.obj)
 
 
+# The keys the CLI may take from a project .env — the SAME allowlist as the PostToolUse hook's
+# HIGH-2 security fix. Never the whole file: a project .env can hold unrelated secrets (broker
+# API keys, tokens) that must not leak into this process's environment (inherited by every child
+# process the CLI spawns — docker, git, cypher-shell).
+_ENV_ALLOWED_PREFIXES = ("NEO4J_", "VOYAGE_", "MEMORYSCHEMA_", "MEMORY_")
+
+
 def _load_project_env(root):
-    """Auto-load the project .env so NEO4J_*/VOYAGE_API_KEY are present for EVERY CLI invocation —
-    mirroring the PostToolUse hook. Without this, a shell that didn't manually `source .env` silently
-    degrades to JSONL (auth failure), undermining the "deps up at all times" default. Never overrides
-    an already-set var (an explicit export wins); searches `root` then its parents."""
+    """Auto-load the ALLOWLISTED keys from the project .env so NEO4J_*/VOYAGE_API_KEY are present
+    for EVERY CLI invocation — mirroring the PostToolUse hook (same allowlist). Without this, a
+    shell that didn't manually `source .env` silently degrades to JSONL (auth failure). Never
+    overrides an already-set var (an explicit export wins); searches `root` then its parents.
+    Deliberately NOT python-dotenv: dotenv loads the whole file (no allowlist seam)."""
     import os
     from pathlib import Path
     try:
@@ -106,19 +114,13 @@ def _load_project_env(root):
         envf = next((d / ".env" for d in [start, *start.parents] if (d / ".env").is_file()), None)
         if envf is None:
             return
-        try:
-            from dotenv import load_dotenv
-            load_dotenv(envf, override=False)
-            return
-        except Exception:
-            pass  # python-dotenv absent — fall back to a minimal parser
         for line in envf.read_text(encoding="utf-8").splitlines():
             line = line.strip()
             if not line or line.startswith("#") or "=" not in line:
                 continue
             k, _, v = line.partition("=")
             k = k.strip()
-            if k and k not in os.environ:
+            if k and k.startswith(_ENV_ALLOWED_PREFIXES) and k not in os.environ:
                 os.environ[k] = v.strip().strip('"').strip("'")
     except Exception:
         pass  # env autoload must never break the CLI

@@ -362,7 +362,19 @@ def write(config, file_path):
         for r in gate_result.reasons:
             click.echo(f"QUARANTINED: {r}", err=True)
         memory['status'] = 'quarantined'
-        memory.pop('embedding', None)  # quarantined = unembedded
+        # quarantined = unembedded: pop ALL derived vector keys AND the hash that describes them
+        # (a lone 'embedding' pop left embeddings/divergence/hash to upsert — a quarantined-but-
+        # embedded row, and a stale-vector poison after release via the merged hash).
+        memory.pop('embedding', None)
+        memory.pop('embeddings', None)
+        memory.pop('divergence_profile', None)
+        memory.pop('embed_input_hash', None)
+        # file-first: persist the status to the source .md or reconcile resurrects it
+        try:
+            from memoryschema.write_index import set_lifecycle
+            set_lifecycle(file_path, status='quarantined')
+        except Exception as e:
+            click.echo(f"warn: could not persist quarantine to the .md ({e})", err=True)
         store.upsert(memory)
         click.echo(f"Quarantined: {memory['name']} (review with: memoryschema quarantine review {memory['name']})")
         return
@@ -625,11 +637,27 @@ def quarantine_release(config, name):
     """Release a quarantined memory (set status back to active)."""
     store = _get_store(config)
     result = store.release_quarantine(name)
-    if result:
-        click.echo(f"Released: {name}")
-    else:
+    if not result:
         click.echo(f"Error: Entity '{name}' not found or not quarantined.", err=True)
         sys.exit(1)
+    # Release in BOTH stores (get_store may be Neo4j — a JSONL row left quarantined is silent
+    # status divergence no drift check sees) AND in the source .md (file-first: reconcile
+    # rebuilds status FROM the .md, which now persists 'quarantined' at gate time).
+    if type(store).__name__ != 'MemoryStore':
+        try:
+            from memoryschema.store import MemoryStore
+            MemoryStore(str(config.store_path), config=config).release_quarantine(name)
+        except Exception:
+            pass
+    md_path = config.memory_dir / f"{name}.md"
+    if md_path.exists():
+        try:
+            from memoryschema.write_index import set_lifecycle
+            set_lifecycle(str(md_path), status='active')
+        except Exception as e:
+            click.echo(f"warn: could not persist release to the .md ({e}) — "
+                       f"reconcile may re-quarantine", err=True)
+    click.echo(f"Released: {name}")
 
 
 @quarantine.command("reject")
