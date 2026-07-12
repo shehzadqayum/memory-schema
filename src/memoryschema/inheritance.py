@@ -42,6 +42,7 @@ _TOML_FIELD_MAP = {
     'gate.l0_echo_threshold': 'l0_echo_threshold',
     'gate.numeric_probe_mode': 'numeric_probe_mode',
     'gate.numeric_probe_enabled': 'numeric_probe_enabled',
+    'gate.numeric_probe_sim_threshold': 'numeric_probe_sim_threshold',
 }
 
 TOML_FILENAME = 'memoryschema.toml'

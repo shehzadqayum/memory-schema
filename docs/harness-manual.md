@@ -461,7 +461,9 @@ opt-out `MEMORYSCHEMA_RECALL_LOG=0`):
 ```
 
 `hits` = top 10 **served** results only (a consistently-lower-ranked memory is invisible to this
-log — and to everything computed from it, e.g. the dream report's `never_surfaced`). `cfg` =
+log — and to everything computed from it, e.g. the dream report's `never_surfaced`); a
+`channel: "probe"` row (§7.3) is ALWAYS logged even past the cap — its citation is the
+decensoring signal. `cfg` =
 the active retrieval config, so attribution can be segmented by config regime. `degraded` =
 backend was not Neo4j. Deliberately separate from scoring —
 recall never bumps `access_count`. `memoryschema recall-stats [--strong 0.5]` reports
@@ -707,8 +709,9 @@ PostToolUse hook does the same from the written file's project root. Secrets bel
 | `verification_staleness_days` | 7 | recall staleness annotation |
 | `mitigation_dampening` | 0.95 | TOML `retrieval.mitigation_dampening` — score ×= it for a mitigated entry |
 | `semantic_weights` / `structured_weights` | (0.2, 0.3, 0.5) / (0.3, 0.5, 0.2) | TOML-tunable |
-| `numeric_probe_enabled` / `mode` / `sim_threshold` | true / `log` / 0.80 | gate stage 5 |
-| `l0_echo_threshold` | 0.6 | gate stage 6 |
+| `numeric_probe_enabled` / `mode` / `sim_threshold` | true / `log` / 0.80 | gate stage 5 — TOML `gate.numeric_probe_enabled` / `gate.numeric_probe_mode` / `gate.numeric_probe_sim_threshold` |
+| `l0_echo_threshold` | 0.6 | gate stage 6 — TOML `gate.l0_echo_threshold` |
+| `probe_slot` | **false** | TOML `retrieval.probe_slot` — the §7.3 decensoring probe (appends one dormant entity per CLI recall) |
 | `generator_id` | None | env `MEMORY_GENERATOR` (session-scoped) |
 
 Canonical constant sets are defined in `entity_schema.py` (the single authority) and re-exported by
@@ -762,12 +765,12 @@ config resolution → throttled banner-only preflight (§9.1). `--json` on query
 | command | behavior |
 |---------|----------|
 | `status [--json]` | backend, node count, store path, URI |
-| `recall QUERY [-n 10] [-p PROJECT] [--include-inactive] [--as-of ISO] [--json]` | §6.4 + telemetry; `--as-of` = point-in-time (§4.6) |
+| `recall QUERY [-n 10] [-p PROJECT] [--include-inactive] [--as-of ISO] [--json]` | §6.4 + telemetry; `--as-of` = point-in-time (§4.6); with `retrieval.probe_slot` appends one `[probe]` row (§7.3, skipped under `--as-of`) |
 | `recall-stats [--strong 0.5] [--json]` | telemetry stats (§7.1) |
 | `attribution [--json]` | recall × citation join (§7.2) |
 | `dream [--json]` | consolidation candidate report (§8.1), read-only |
 | `get NAME [--json]` / `list [--type] [--project] [-n 20] [--include-inactive]` / `search TEXT [...]` | single entity / filtered list / keyword search |
-| `eval [--mode retrieval\|salience\|ablation\|backends] [--store PATH] [--json]` | retrieval-quality metrics (recall@k, MRR, nDCG) |
+| `eval [--mode retrieval\|salience\|ablation\|backends\|replay\|goldgen\|decayfit] [--store PATH] [--set K=V]... [--vs K=V]... [--k N] [--json]` | retrieval-quality metrics (recall@k, MRR, nDCG) + the §7.3 calibration workflow: `--set` per-run config overrides (grid cells), `replay` paired A/B (`--vs` = config B), `goldgen` gold candidates, `decayfit` decay-form fit |
 
 **Lifecycle & review**
 

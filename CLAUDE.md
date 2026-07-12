@@ -50,6 +50,22 @@ safe unless you replace the package files.
 - **v5 is the authored default.** `create_entity_file` emits v5; v4 XML authoring is legacy, reachable only via
   `MEMORYSCHEMA_V4=1` / `MEMORYSCHEMA_V5=0`. v4 files still parse (read + migration).
 
+## Calibration doctrine (epistemic policy is measured, not guessed)
+
+The scoring/gate thresholds are **epistemic policy encoded as hyperparameters** — miscalibration risks
+silent knowledge suppression. The full surface is catalogued in `docs/parameter-registry.md`; the tuning
+workflow is harness-manual **§7.3**. Non-negotiable principles:
+- **Attribution is a guardrail, never a loss function** — citations are censored implicit feedback (only
+  served memories can be cited), so optimizing θ against them institutionalizes suppression. Tuning weight
+  goes on **paired within-query replay** (`eval --mode replay`) against **operator-curated gold**
+  (`eval --mode goldgen` mines candidates; a human verifies every label).
+- **The telemetry→config loop is operator-closed**: analyses propose TOML diffs; the operator applies ONE at
+  a time in git against a **pre-committed keep-threshold** (the multi-space-ablation protocol). Never
+  auto-apply. Record each tuning run as a memory entity.
+- **Telemetry never feeds scoring** (recall never bumps `access_count`; the probe row scores 0.0), and the
+  probe (`retrieval.probe_slot`, opt-in) only ever APPENDS — exploration must not displace real results.
+- Calibration code is **read-only over the store** — schema/representation untouched; this is pure harness.
+
 ## Security posture
 
 - The hook `src/memoryschema/hooks/hook-post-write.sh` carries **THREE local patches** (package source — no CLI

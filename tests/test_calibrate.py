@@ -105,6 +105,18 @@ def test_pick_probe_prefers_dormant_and_excludes_served(cfg):
     assert p["name"] == "dormant" and p["channel"] == "probe"
 
 
+def test_probe_row_is_logged_even_past_the_top10_cap(cfg):
+    # at --limit >= 10 the appended probe is the 11th row; the log must still carry it
+    # (the probe's citation is the decensoring signal — an unlogged probe can't attribute)
+    rows = [{"name": f"m{i}", "score": 0.5, "channel": "seed"} for i in range(10)]
+    rows.append({"name": "the-probe", "score": 0.0, "channel": "probe"})
+    recall_log.log_recall(cfg, "q", rows, backend="MemoryStore",
+                          now="2026-07-01T10:00:00+00:00")
+    ev = recall_log.read_events(cfg)[0]
+    assert len(ev["hits"]) == 11
+    assert ev["hits"][-1] == {"name": "the-probe", "score": 0.0, "channel": "probe"}
+
+
 # ── decay fit ─────────────────────────────────────────────────────────────────────────────
 def test_fit_decay_insufficient_data_is_honest(cfg):
     r = fit_decay(cfg)

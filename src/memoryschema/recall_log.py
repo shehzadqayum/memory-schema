@@ -35,10 +35,15 @@ def log_recall(config, query, results, backend, degraded=False, now=None):
         if now is None:
             from datetime import datetime, timezone
             now = datetime.now(timezone.utc).isoformat()
-        hits = [{"name": r.get("name"),
+        rows = [{"name": r.get("name"),
                  "score": round(float(r.get("score") or 0), 4),
                  "channel": r.get("channel")}
-                for r in (results or [])][:10]
+                for r in (results or [])]
+        hits = rows[:10]
+        # A probe row must ALWAYS be logged (its citation is the decensoring signal, and the
+        # attribution join reads this log) — at --limit >= 10 the appended probe would
+        # otherwise be sliced off by the top-10 cap and the probe would be invisible.
+        hits.extend(r for r in rows[10:] if r.get("channel") == "probe")
         rec = {"ts": now, "query": query, "n": len(results or []),
                "backend": backend, "degraded": bool(degraded), "hits": hits}
         # Snapshot the active retrieval config per event — without it a config change is invisible

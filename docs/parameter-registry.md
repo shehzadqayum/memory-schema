@@ -2,15 +2,16 @@
 
 > Every tunable epistemic parameter in the package: the thresholds, weights, decays, caps, windows,
 
-**53 parameters** — 23 retrieval-ranking, 9 write-integrity, 8 lifecycle, 8 budget, 5 telemetry-window. (Since this audit, `gate.l0_echo_threshold`, `gate.numeric_probe_mode`, `gate.numeric_probe_enabled`, and `retrieval.mitigation_dampening` gained TOML keys; `retrieval.probe_slot` (default false) added — the §7.3 decensoring probe.)
+**53 parameters** — 23 retrieval-ranking, 9 write-integrity, 8 lifecycle, 8 budget, 5 telemetry-window. (Since this audit, `gate.l0_echo_threshold`, `gate.numeric_probe_mode`, `gate.numeric_probe_enabled`, `gate.numeric_probe_sim_threshold`, and `retrieval.mitigation_dampening` gained TOML keys; `retrieval.probe_slot` (default false) added — the §7.3 decensoring probe.)
 > and budgets that decide what gets WRITTEN (gate), RECALLED (scoring/ranking), or RETIRED
 > (lifecycle/consolidation). These are **policy, not implementation detail** — miscalibration risks
 > knowledge suppression (a memory that never surfaces, is never written, or is wrongly retired).
 > Generated from the 2026-07-12 gate-tuning audit; regenerate when a parameter is added or moved.
 >
 > **Legibility rule:** a HIGH-suppression-risk parameter should be config-exposed (TOML) or carry a
-> written justification for staying hardcoded. Tuning any parameter follows the calibration protocol
-> (pre-committed thresholds, paired replay — see the gate-tuning evaluation in the memory store).
+> written justification for staying hardcoded. Tuning any parameter follows the calibration workflow
+> (harness-manual §7.3: goldgen → grid cells → paired replay → probe → decayfit; pre-committed
+> thresholds; the operator applies TOML changes one at a time — the loop never closes automatically).
 >
 > ⚠ `recency_decay` (0.995/hr score decay) and `recall_decay` (0.8 per-hop BFS decay) are DIFFERENT
 > parameters; note that LOWERING `recency_decay` decays FASTER (tightens), not looser.
