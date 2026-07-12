@@ -96,7 +96,10 @@ def _parse_frontmatter(lines):
         if not line.strip() or line.strip().startswith("#"):
             continue
         if in_relations:
-            m = _REL_RE.match(line.strip())
+            # Tolerate a YAML inline comment on a relation line (`- SUPERSEDES old # retired`): the `#` can
+            # never appear in a relation target (target charset excludes it), so stripping ` #…` never eats
+            # real data — and without it the line fails _REL_RE and the edge (incl. SUPERSEDES) is dropped.
+            m = _REL_RE.match(re.sub(r"\s+#.*$", "", line.strip()))
             if m:
                 relations.append({"type": m.group(1), "target": m.group(2)})
                 continue
@@ -147,8 +150,14 @@ def parse_v5_content(content, filepath=None):
     order = []                  # section keys in first-seen order (duplicate headings merge)
     current = "_lead"
     buf = {current: []}
+    in_fence = False            # a `##` inside a ``` / ~~~ code fence is content, NOT a section boundary
     for line in body_lines:
-        m = re.match(r"^##\s+(.+?)\s*$", line)
+        stripped = line.lstrip()
+        if stripped.startswith("```") or stripped.startswith("~~~"):
+            in_fence = not in_fence
+            buf[current].append(line)
+            continue
+        m = None if in_fence else re.match(r"^##\s+(.+?)\s*$", line)
         if m:
             orig = m.group(1).strip()
             current = orig.lower()

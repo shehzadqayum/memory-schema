@@ -299,20 +299,25 @@ def append_chain_step(filepath, step_text, desc=None, reasoning=None, uses=None)
 
 
 def _assert_v5_no_shrink(before, after, filepath):
-    """Guard a v5 rewrite against SILENT structural loss. `after` (the re-parse of the serialized
-    content) must be well-formed AND retain at least as many relations and the same set of unknown
-    (`extra_sections`) titles as `before` (the mutated dict). A shrink means the parser/serializer
-    round-trip dropped structured data — the caller must refuse to persist (file left unchanged).
-    Defense-in-depth beyond the pre-existing well-formedness (`is None`) check."""
+    """Guard a v5 rewrite against SILENT structural loss OR corruption. `after` (the re-parse of the serialized
+    content) must be well-formed, retain at least as many relations as `before`, AND carry the IDENTICAL set of
+    unknown (`extra_sections`) — title AND content. These writers (chain-step append, lifecycle edit) never
+    intend to touch unknown sections, so ANY difference means the round-trip dropped, merged, or
+    PHANTOM-CREATED one — e.g. a column-0 `## ` line inside a multi-line --desc/--reasoning re-parses into a new
+    heading, truncating the prose section and spawning a phantom section. A title-superset check would MASK
+    that (a phantom only ADDS a title); requiring equality catches it. Any difference raises and leaves the
+    file unchanged. Defense-in-depth beyond the well-formedness (`is None`) check."""
     if after is None:
         raise ValueError("v5 serialize round-trip failed — file left unchanged: %s" % filepath)
     if len(after.get("relations") or []) < len(before.get("relations") or []):
         raise ValueError("v5 rewrite would DROP relations — file left unchanged: %s" % filepath)
-    before_titles = {t for t, _ in (before.get("extra_sections") or [])}
-    after_titles = {t for t, _ in (after.get("extra_sections") or [])}
-    if not before_titles <= after_titles:
-        raise ValueError("v5 rewrite would DROP unknown sections %s — file left unchanged: %s"
-                         % (sorted(before_titles - after_titles), filepath))
+    before_extra = {t: text for t, text in (before.get("extra_sections") or [])}
+    after_extra = {t: text for t, text in (after.get("extra_sections") or [])}
+    if before_extra != after_extra:
+        changed = sorted(set(before_extra) ^ set(after_extra)) or \
+            sorted(t for t in before_extra if before_extra.get(t) != after_extra.get(t))
+        raise ValueError("v5 rewrite would ALTER unknown sections %s (a `## ` line in --desc/--reasoning?) "
+                         "— file left unchanged: %s" % (changed, filepath))
 
 
 def _append_chain_step_v5(filepath, content, original, step_text,

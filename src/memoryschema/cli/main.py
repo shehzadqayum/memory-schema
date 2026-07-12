@@ -155,16 +155,25 @@ def _maybe_preflight(config):
         else:
             fail = "; ".join(f"{c['name']}: {c['detail']}" for c in r["failures"])
             click.echo(f"⚠ memory DEGRADED — {fail}  (run `memoryschema preflight`)", err=True)
-        # Cheap, Neo4j-free .md-vs-JSONL drift banner (same ≤1/60s cadence as the preflight above). The
-        # file-first write path is per-file atomic, so a killed hook / interrupted CLI leaves NO partial
-        # store — only MISSING derived updates (silent until sync/reconcile). This surfaces that drift loudly
-        # within one un-throttled CLI call. Banner-only; reconcile heals.
+        # Cheap, Neo4j-free .md-vs-JSONL drift banner. Independently throttled by its OWN ≤1/60s marker: a
+        # DEGRADED backend suppresses the .preflight_ok marker above and so runs this whole body on every CLI
+        # call — without a separate throttle local_drift would then re-parse the entire corpus each time (the
+        # exact state where the operator runs many diagnostic commands). The file-first write path is per-file
+        # atomic, so a killed hook leaves NO partial store — only MISSING derived updates (silent until
+        # sync/reconcile); this surfaces that within one un-throttled call. Banner-only; reconcile heals.
         try:
-            from memoryschema.reconcile import local_drift
-            d = local_drift(config)
-            if d["malformed"] or d["missing_from_jsonl"] or d["jsonl_orphans"]:
-                click.echo(f"⚠ memory store drift ({d['md_count']} .md vs {d['jsonl_count']} jsonl) — "
-                           f"run `memoryschema reconcile`", err=True)
+            drift_marker = Path(config.project_root) / ".memoryschema" / ".drift_ok"
+            if not (drift_marker.exists() and (time.time() - drift_marker.stat().st_mtime) < 60):
+                from memoryschema.reconcile import local_drift
+                d = local_drift(config)
+                if d["malformed"] or d["missing_from_jsonl"] or d["jsonl_orphans"]:
+                    click.echo(f"⚠ memory store drift ({d['md_count']} .md vs {d['jsonl_count']} jsonl) — "
+                               f"run `memoryschema reconcile`", err=True)
+                try:                                   # throttle the CHECK itself (not just the banner) so the
+                    drift_marker.parent.mkdir(parents=True, exist_ok=True)   # corpus parse stays ≤1/60s even
+                    drift_marker.write_text("ok")                           # when preflight is degraded
+                except Exception:
+                    pass
         except Exception:
             pass  # a drift check must never break the CLI
     except Exception:

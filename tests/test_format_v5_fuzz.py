@@ -8,6 +8,8 @@ no-silent-shrink writer guard.
 
 import os
 
+import pytest
+
 from memoryschema.format_v5 import parse_v5_content, serialize_v5
 from memoryschema.validator import validate
 from memoryschema.write_index import append_chain_step, create_entity_file
@@ -32,6 +34,22 @@ Desc.
     mem = parse_v5_content(f, filepath="e.md")
     # the SUPERSEDES edge after the stray line MUST survive (pre-fix it was silently dropped)
     assert ("SUPERSEDES", "b-mem") in _rels(mem)
+    assert ("USES", "a-mem") in _rels(mem)
+
+
+def test_inline_comment_on_relation_line_does_not_drop_the_edge():
+    # a YAML inline comment on a relation line must not silently drop the edge (esp. SUPERSEDES)
+    f = """---
+schema: 5
+relations:
+  - SUPERSEDES old-fact   # retired 2026-07
+  - USES a-mem
+---
+
+Desc.
+"""
+    mem = parse_v5_content(f, filepath="e.md")
+    assert ("SUPERSEDES", "old-fact") in _rels(mem)
     assert ("USES", "a-mem") in _rels(mem)
 
 
@@ -111,6 +129,54 @@ Line two.
     re_mem = parse_v5_content(out, filepath="e.md")
     assert re_mem.get("extra_sections") == mem.get("extra_sections")
     assert _rels(re_mem) == _rels(mem)
+
+
+def test_fenced_heading_inside_unknown_section_does_not_fragment():
+    # a `## Heading` inside a ``` code fence is CONTENT, not a section boundary — memory notes embed examples
+    f = """---
+schema: 5
+---
+
+Desc.
+
+## Snippet
+Example:
+```md
+## Inner Example
+```
+done
+"""
+    mem = parse_v5_content(f, filepath="e.md")
+    assert [t for t, _ in (mem.get("extra_sections") or [])] == ["Snippet"], "must stay ONE section"
+    body = dict(mem["extra_sections"])["Snippet"]
+    assert "## Inner Example" in body and "done" in body
+    out = serialize_v5(mem)
+    assert out.count("## Inner Example") == 1
+    assert parse_v5_content(out, filepath="e.md").get("extra_sections") == mem.get("extra_sections")
+
+
+def test_append_desc_with_heading_line_is_refused_not_corrupted(tmp_path):
+    # a multi-line --desc with a column-0 `## ` line would truncate ## Summary + spawn a phantom section;
+    # the no-shrink guard must REFUSE (fail loud), not silently corrupt (title-superset would have masked it)
+    p = tmp_path / "chain-y.md"
+    p.write_text("---\nschema: 5\ntype: procedural\n---\n\nA chain.\n\n## Log\n- Step 1: first\n",
+                 encoding="utf-8")
+    original = p.read_text(encoding="utf-8")
+    with pytest.raises(ValueError):
+        append_chain_step(str(p), "second", desc="keep this\n## Note\ndropped tail")
+    assert p.read_text(encoding="utf-8") == original      # file left unchanged
+
+
+def test_append_reasoning_heading_matching_existing_section_is_refused(tmp_path):
+    # injected `## Note` duplicating an existing unknown section: title set is unchanged, but content merges —
+    # the content-aware equality check must still catch it (a title-only check would pass)
+    p = tmp_path / "chain-z.md"
+    p.write_text("---\nschema: 5\n---\n\nA chain.\n\n## Note\nfoo\n\n## Log\n- Step 1: first\n",
+                 encoding="utf-8")
+    original = p.read_text(encoding="utf-8")
+    with pytest.raises(ValueError):
+        append_chain_step(str(p), "second", reasoning="bar\n## Note\nbaz")
+    assert p.read_text(encoding="utf-8") == original
 
 
 def test_duplicate_sections_merge_without_dropping_content():

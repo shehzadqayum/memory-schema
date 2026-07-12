@@ -131,6 +131,26 @@ def test_maybe_preflight_silent_when_in_sync(tmp_path, monkeypatch, capsys):
     assert "store drift" not in capsys.readouterr().err
 
 
+def test_drift_check_is_independently_throttled_when_degraded(tmp_path, monkeypatch):
+    """A degraded backend never writes .preflight_ok, so _maybe_preflight runs on every call; the drift check
+    must be throttled by its OWN marker so it does not re-parse the whole corpus each invocation."""
+    import memoryschema.reconcile as rc
+    from memoryschema.cli.main import _maybe_preflight
+    calls = {"n": 0}
+    def counting_local_drift(cfg):
+        calls["n"] += 1
+        return {"md_count": 0, "jsonl_count": 0, "missing_from_jsonl": [], "jsonl_orphans": [], "malformed": []}
+    monkeypatch.setattr(rc, "local_drift", counting_local_drift)
+    # degraded: ok=False -> the .preflight_ok health marker is never written, so the body runs every call
+    monkeypatch.setattr(pf, "ensure_backend", lambda cfg, **kw: {
+        "ok": False, "degraded": False, "failures": [{"name": "neo4j", "detail": "down"}]})
+    monkeypatch.delenv("MEMORYSCHEMA_SKIP_PREFLIGHT", raising=False)
+    cfg = MemoryConfig(project_root=str(tmp_path))
+    _maybe_preflight(cfg)      # runs the drift check, writes .drift_ok
+    _maybe_preflight(cfg)      # .drift_ok fresh -> drift check throttled out
+    assert calls["n"] == 1
+
+
 def test_start_container_recovers_stopped_via_docker_start(tmp_path, monkeypatch):
     """A merely-stopped named container is recovered by `docker start` alone — no compose, no file executed."""
     cfg = MemoryConfig(project_root=str(tmp_path))

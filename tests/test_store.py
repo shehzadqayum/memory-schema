@@ -15,6 +15,16 @@ def store(tmp_path):
     return MemoryStore(path)
 
 
+def test_merge_updates_summary(store):
+    # `summary` must merge (it is a prose peer of body/prompt/chain AND an embedding input hashed into
+    # embed_input_hash) — dropping it on merge desyncs the row's text from its vectors. Regression for the
+    # merge-whitelist gap found alongside embed_input_hash.
+    store.upsert({"name": "e", "schema": 5, "description": "d", "summary": "SUMMARY_V1"})
+    store.upsert({"name": "e", "schema": 5, "description": "d", "summary": "SUMMARY_V2"})
+    e = {x["name"]: x for x in store.list_all(include_inactive=True)}["e"]
+    assert e["summary"] == "SUMMARY_V2"
+
+
 @pytest.fixture
 def populated_store(store):
     """Store with 3 entries."""

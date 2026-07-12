@@ -312,8 +312,12 @@ class MemoryStore:
         # computed together with `embedding`/`embeddings` by embed_all_spaces. Without it a merge that carries
         # NEW vectors keeps the OLD stored hash, so `externalize()` sees a match and SKIPS the .npz rewrite —
         # the new vectors are dropped and recall scores new text against the old embedding until reconcile.
+        # `summary` MUST merge for the SAME reason: it is a prose peer of body/prompt/chain (set by
+        # `chain step --desc`) AND a direct input to the embedding composition + the embed_input_hash it is
+        # hashed into — dropping it on merge leaves the row's summary stale while its vectors/hash reflect the
+        # new text (recall + `index --embed` then run against a summary the row no longer stores).
         for key in ('type', 'status', 'description', 'importance',
-                     'body', 'prompt', 'chain', 'confidence',
+                     'summary', 'body', 'prompt', 'chain', 'confidence',
                      'key', 'valid_from', 'superseded_at', 'superseded_by',
                      'promoted_to',
                      'embedding', 'embeddings', 'divergence_profile', 'embed_input_hash'):

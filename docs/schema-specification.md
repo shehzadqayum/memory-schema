@@ -96,6 +96,13 @@ the lead** (newlines flattened; later lead paragraphs discarded).
 | `## Summary` | prose — the evolving chain summary (replaced by `--desc`) |
 | `## Observations` | bullets: `- ` opens an item; following non-bullet non-empty lines join with a space |
 | `## Log` | bullets — ordered `Step N: …` entries (chains) |
+
+> ⚠️ **`## Observations` / `## Log` are bullet-only.** Leading prose **before the first bullet** is not
+> captured (there is no item to attach it to) — these sections are code-written as bullets (`remember`,
+> `chain step`), so this bites only a hand-edit that puts a paragraph under one of them. It is a documented
+> limitation, not a caught error; put narrative prose under `## Reasoning` / `## Summary` / a custom `##`
+> section (all preserved) instead.
+
 | `## Reasoning` | prose — appended-to with `\n\n---\n` separators |
 | `## Prompt` / `## Chain` | prose — triggering input / chain context |
 | `## Notes` | prose → the `body` field |

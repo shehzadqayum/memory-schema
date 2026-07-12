@@ -249,12 +249,14 @@ recomputed). Content: everything the parser emits (schema-specification.md), obs
 **Upsert.** SUPERSEDES cycles are pre-validated (BFS from the target; a cycle raises
 before anything mutates). Insert copies the full dict (all keys persist). Merge:
 
-- replace-if-present whitelist: `type, status, description, importance, body, prompt,
-  chain, confidence, key, valid_from, superseded_at, superseded_by, promoted_to,
+- replace-if-present whitelist: `type, status, description, importance, summary, body,
+  prompt, chain, confidence, key, valid_from, superseded_at, superseded_by, promoted_to,
   embedding, embeddings, divergence_profile, embed_input_hash` (the hash merges WITH the
-  vectors it describes, so the sidecar's skip-if-unchanged stays truthful on a merge);
-- immutable after creation: `name, schema, filepath, project` (also not merged:
-  `summary`, `log`, `related`);
+  vectors it describes, so the sidecar's skip-if-unchanged stays truthful on a merge;
+  `summary` merges too — it is a prose peer of body/prompt/chain AND an embedding input
+  hashed into `embed_input_hash`, so dropping it would desync the row from its vectors);
+- immutable after creation: `name, schema, filepath, project` (`log` is not merged
+  directly — it flows in via `observations`, which append-merge; `related` is not a field);
 - `reasoning` REPLACES (the `.md` file is the accumulator; appending here doubled chain
   reasoning when the hook re-upserted full text);
 - observations append with exact-text dedupe; relations append deduped by (target, type);
@@ -291,12 +293,12 @@ before f-string interpolation into Cypher — that allowlist is the injection bo
 Neo4j does NOT store `chain`, `confidence`, `summary`, `log`, `related`, or
 `embed_input_hash`.
 
-**Observable asymmetries vs JSONL** (accepted, documented): SUPERSEDES cycle check runs
-after the edge MERGE (auto-committed edge survives the error; JSONL pre-validates);
-relations to unknown names MERGE stub target nodes (JSONL keeps the dangling relation,
-skips side effects); no audit logging anywhere in the Neo4j store;
-`compute_associations` deletes ALL association edges globally before recomputing, even
-project-scoped.
+**Observable asymmetries vs JSONL** (accepted, documented): relations to unknown names
+MERGE stub target nodes (JSONL keeps the dangling relation, skips side effects); no audit
+logging anywhere in the Neo4j store; `compute_associations` deletes ALL association edges
+globally before recomputing, even project-scoped. (The SUPERSEDES cycle check is **no longer**
+asymmetric — both backends now pre-validate BEFORE the write; the Neo4j store runs the cycle
+query and raises before the edge `MERGE`, so a rejected cycle edge is never persisted.)
 
 **Associations**: `ASSOCIATED_WITH` edges with `score`, top k=10 via the vector index;
 `compute_associations_single(name)` (per-write) deletes and recomputes only that node's
@@ -777,7 +779,8 @@ consoles).
 
 - Package `memory-schema` 0.1.0 (version dual-maintained in `pyproject.toml` AND
   `_version.py` — keep in sync). src-layout; Python ≥ 3.11 (stdlib `tomllib`); MIT.
-  Package data ships `templates/*` and `hooks/*`. Console script:
+  Package data ships `templates/*`, `hooks/*`, and `claude_plugin/**/*` (the deployable
+  `.claude/` rules/skills SSOT — §12.1). Console script:
   `memoryschema = memoryschema.cli.main:cli`.
 - Required dependency: `click>=8.0` only. Extras: `[neo4j]` neo4j≥5.0, `[embeddings]`
   voyageai≥0.3 (lazy-imported; carries the marker `python_version < '3.15'` since voyageai
@@ -884,11 +887,12 @@ record.
 - Neo4j query-recall returns `[]` without embeddings (JSONL degrades to keyword);
   JSONL has BM25 (+0.3 cap), Neo4j has substring +0.1; rerank exists on the JSONL
   path only.
-- SUPERSEDES cycles: JSONL pre-validates; Neo4j detects after the auto-committed edge
-  MERGE. Neo4j MERGEs stub nodes for unknown relation targets; JSONL skips side
-  effects. The Neo4j store performs no audit logging.
-- JSONL merge doesn't update `embed_input_hash` (stale until reconcile); Neo4j stores
-  no `chain/confidence/summary/log/related/embed_input_hash` at all.
+- SUPERSEDES cycles: BOTH backends pre-validate before the write (the Neo4j store runs the
+  cycle query and raises BEFORE the edge `MERGE`, so a rejected cycle edge is never persisted —
+  parity with JSONL's pre-write check). Neo4j MERGEs stub nodes for unknown relation targets;
+  JSONL skips side effects. The Neo4j store performs no audit logging.
+- JSONL merge updates `embed_input_hash` + `summary` alongside the vectors (the merge-whitelist
+  fix, §5.1); Neo4j stores no `chain/confidence/summary/log/related/embed_input_hash` at all.
 - `hook install --timeout` changes only the echoed message (registered timeout is the
   constant 10 s). `backup --neo4j-only` falls through to a full backup. `validate`
   `--json` mode exits 0 even with errors. `doctor` always exits 0; its docstring still

@@ -2,6 +2,33 @@
 
 ## [Unreleased]
 
+### Fixed (2026-07-12 — adversarial-review follow-ups on the four fixes above)
+A multi-agent adversarial review (7 dimensions, 2-skeptic verification) of the four fixes surfaced these:
+- **`summary` was also missing from the JSONL merge whitelist** — the same class as `embed_input_hash`, and
+  worse: `summary` feeds the embedding composition AND is hashed into `embed_input_hash`. A merge (e.g.
+  `chain step --desc`) kept the new vectors+hash but dropped the new summary, leaving the row's text desynced
+  from its own vectors (and `index --embed` then re-embedding the stale summary). Added `summary` to the
+  whitelist; manual §5.1/§14 corrected.
+- **The drift check re-parsed the whole corpus on every CLI call when the backend was degraded.** The
+  `.preflight_ok` throttle is written only when fully healthy, so a degraded backend ran `_maybe_preflight`
+  (and the drift block) every call. Gave the drift check its OWN `.drift_ok` ≤1/60s marker so the corpus parse
+  stays throttled regardless of backend health.
+- **`_assert_v5_no_shrink` now requires byte-identical unknown sections** (was a title-superset check). A
+  column-0 `## ` line inside a multi-line `--desc`/`--reasoning` re-parsed into a phantom heading, truncating
+  the prose section — and the superset check MASKED it (a phantom only adds a title). Equality catches drop,
+  phantom-add, and duplicate-title content-merge; the writers never touch unknown sections, so it never
+  false-positives.
+- **An inline `# comment` on a relation line no longer drops the edge.** `_REL_RE` anchored on `\s*$`, so
+  `- SUPERSEDES old  # retired` failed to match and was silently skipped. The relation matcher now strips a
+  trailing ` #…` (the `#` can't appear in a target, so no data is eaten).
+- **A `## Heading` inside a ``` code fence is now treated as content, not a section boundary.** The body-split
+  loop tracks fence state, so a memory note embedding a fenced markdown/code example with `##` lines no longer
+  fragments into phantom sections on roundtrip.
+- Docs: harness-manual §5.2 + §14 corrected (the SUPERSEDES cycle asymmetry was retired by the earlier
+  cycle fix — both backends pre-validate now); §14 stale "JSONL merge doesn't update embed_input_hash" note
+  removed; §12 package-data list now includes `claude_plugin/**/*`; schema-specification §2 documents the
+  `## Observations`/`## Log` bullet-only limitation. Fuzz + store + preflight regression tests added.
+
 ### Added (2026-07-12 — silent store drift after a killed hook is now loud)
 - **The default-mode CLI gate now warns on `.md`-vs-JSONL store drift.** The PostToolUse hook is bounded at
   10 s and can be killed mid-index; because every store write is per-file atomic (JSONL whole-file
