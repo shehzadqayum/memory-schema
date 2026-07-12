@@ -298,6 +298,23 @@ def append_chain_step(filepath, step_text, desc=None, reasoning=None, uses=None)
     return step_no
 
 
+def _assert_v5_no_shrink(before, after, filepath):
+    """Guard a v5 rewrite against SILENT structural loss. `after` (the re-parse of the serialized
+    content) must be well-formed AND retain at least as many relations and the same set of unknown
+    (`extra_sections`) titles as `before` (the mutated dict). A shrink means the parser/serializer
+    round-trip dropped structured data — the caller must refuse to persist (file left unchanged).
+    Defense-in-depth beyond the pre-existing well-formedness (`is None`) check."""
+    if after is None:
+        raise ValueError("v5 serialize round-trip failed — file left unchanged: %s" % filepath)
+    if len(after.get("relations") or []) < len(before.get("relations") or []):
+        raise ValueError("v5 rewrite would DROP relations — file left unchanged: %s" % filepath)
+    before_titles = {t for t, _ in (before.get("extra_sections") or [])}
+    after_titles = {t for t, _ in (after.get("extra_sections") or [])}
+    if not before_titles <= after_titles:
+        raise ValueError("v5 rewrite would DROP unknown sections %s — file left unchanged: %s"
+                         % (sorted(before_titles - after_titles), filepath))
+
+
 def _append_chain_step_v5(filepath, content, original, step_text,
                           desc=None, reasoning=None, uses=None):
     """v5 chain append: parse -> mutate -> serialize (the serializer IS the
@@ -331,8 +348,7 @@ def _append_chain_step_v5(filepath, content, original, step_text,
 
     new_content = serialize_v5(mem)
     from memoryschema.format_v5 import parse_v5_content as _reparse
-    if _reparse(new_content, filepath=filepath) is None:
-        raise ValueError("v5 serialize round-trip failed — file left unchanged")
+    _assert_v5_no_shrink(mem, _reparse(new_content, filepath=filepath), filepath)
     with open(filepath, "w", encoding="utf-8", newline="") as f:
         f.write(new_content)
     return step_no
@@ -368,8 +384,7 @@ def set_lifecycle(filepath, status=None, superseded_at=None, superseded_by=None,
     if promoted_to is not None:
         mem["promoted_to"] = promoted_to
     new_content = serialize_v5(mem)
-    if parse_v5_content(new_content, filepath=filepath) is None:
-        raise ValueError("lifecycle serialize round-trip failed — file unchanged")
+    _assert_v5_no_shrink(mem, parse_v5_content(new_content, filepath=filepath), filepath)
     with open(filepath, "w", encoding="utf-8", newline="") as f:
         f.write(new_content)
     return mem

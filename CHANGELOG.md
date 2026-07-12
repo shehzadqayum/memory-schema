@@ -2,6 +2,25 @@
 
 ## [Unreleased]
 
+### Fixed (2026-07-12 — v5 parser silently truncated relations and unknown sections)
+- **A stray line inside `relations:` no longer severs the block.** The parser exited relations mode on the
+  first non-matching line; an indented stray bullet or comment then made every SUBSEQUENT `- TYPE target`
+  fall through the scalar guard and vanish — and the next programmatic rewrite erased them permanently. The
+  mode is now Postel-liberal: an indented / bulleted / blank / comment line is SKIPPED (mode retained); it
+  exits only on a genuine top-level `key:` scalar (column 0).
+- **Lowercase relation types parse instead of vanishing.** The relation-line regex widened from `[A-Z_]+` to
+  `[A-Za-z_]+` (a documented superset of the canonical UPPERCASE set), so a `- uses x` now PARSES and the
+  validator flags it loudly as **R2** — parse-liberally / validate-strictly, not a silent drop.
+- **Unknown `## Heading` sections are preserved verbatim on roundtrip.** They were parsed but the serializer
+  re-emitted only the six known sections, so an invented section was destroyed on the next append/lifecycle
+  rewrite. The parser now collects them (first-seen order, original title case) into `extra_sections` and the
+  serializer re-emits them after the known sections. They still carry no machine semantics.
+- **Writers refuse a silently-shrinking rewrite.** `append_chain_step` (v5) and `set_lifecycle` now assert,
+  after serialize, that the re-parse retains at least as many relations and the same unknown-section titles —
+  a shrink raises and leaves the file unchanged (defense-in-depth beyond the well-formedness check).
+- Docs: schema-specification §2 rewritten (relations mode + unknown-section preservation); new
+  `tests/test_format_v5_fuzz.py` malformed-input battery. Additive — no `SCHEMA_VERSION` bump.
+
 ### Fixed (2026-07-12 — a JSONL merge dropped new vectors; packaging clash with strict resolvers)
 - **`embed_input_hash` now merges with the vectors (retrieval was scoring new text against old embeddings).**
   The JSONL merge whitelist carried `embedding`/`embeddings`/`divergence_profile` but NOT `embed_input_hash`,

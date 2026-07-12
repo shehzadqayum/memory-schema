@@ -59,10 +59,15 @@ import re
 
 FRONTMATTER_OPEN = "---"
 _SECTIONS = ("summary", "observations", "log", "reasoning", "prompt", "chain")
-# Target charset must be at least as permissive as any entity name that can exist
-# (names are not hard-validated to kebab at creation), or a legal relation to e.g.
-# `my_fact` is silently dropped on parse — including SUPERSEDES edges.
-_REL_RE = re.compile(r"^-\s+([A-Z_]+)\s+([A-Za-z0-9][A-Za-z0-9._-]*)\s*$")
+# The body sections the harness understands (`## Notes` maps to `body`). Any OTHER `## Heading`
+# is an unknown section: parsed and preserved verbatim on roundtrip (extra_sections), never discarded.
+_KNOWN_BODY_SECTIONS = frozenset(_SECTIONS) | {"notes"}
+# Parse-liberally / validate-strictly (Postel): the TYPE token is a deliberate SUPERSET of the canonical
+# UPPERCASE relation set — `[A-Za-z_]+` also captures a lowercase `- uses x`, so it PARSES (and the validator
+# then flags it loudly as R2) instead of being silently dropped. The TARGET must be at least as permissive as
+# any entity name that can exist (names are not hard-validated to kebab at creation), or a legal relation to
+# e.g. `my_fact` is silently dropped on parse — including SUPERSEDES edges.
+_REL_RE = re.compile(r"^-\s+([A-Za-z_]+)\s+([A-Za-z0-9][A-Za-z0-9._-]*)\s*$")
 
 
 def _scalar(val):
@@ -95,7 +100,14 @@ def _parse_frontmatter(lines):
             if m:
                 relations.append({"type": m.group(1), "target": m.group(2)})
                 continue
-            in_relations = False  # fall through to key parsing
+            # Postel-liberal: only a genuine top-level `key: value` scalar (column 0) ends the block.
+            # A stray indented / bulleted / bare line inside relations: is SKIPPED, the mode RETAINED —
+            # a nested comment or bullet no longer severs the block and silently drops every SUBSEQUENT
+            # `- TYPE target`. (Blank + `#`-comment lines are already skipped at the top of the loop.)
+            if ":" in line and not line.startswith((" ", "\t", "-")):
+                in_relations = False  # a real top-level scalar ends the block; fall through
+            else:
+                continue
         if line.strip() == "relations:":
             in_relations = True
             continue
@@ -128,15 +140,22 @@ def parse_v5_content(content, filepath=None):
         return None
     body_lines = lines[close + 1:]
 
-    # Split the body into the lead paragraph + ## sections.
+    # Split the body into the lead paragraph + ## sections. Track each heading's ORIGINAL title
+    # (case preserved) and first-seen order so UNKNOWN sections roundtrip verbatim (see extra_sections).
     sections = {}
+    titles = {}                 # lowercased key -> original heading text
+    order = []                  # section keys in first-seen order (duplicate headings merge)
     current = "_lead"
     buf = {current: []}
     for line in body_lines:
         m = re.match(r"^##\s+(.+?)\s*$", line)
         if m:
-            current = m.group(1).strip().lower()
-            buf.setdefault(current, [])
+            orig = m.group(1).strip()
+            current = orig.lower()
+            if current not in buf:
+                buf[current] = []
+                order.append(current)
+                titles[current] = orig
             continue
         buf[current].append(line)
     for key, blines in buf.items():
@@ -165,6 +184,11 @@ def parse_v5_content(content, filepath=None):
 
     obs = bullets("observations")
     log = bullets("log")
+    # Unknown `## Heading` sections carry no machine semantics but MUST survive a programmatic
+    # rewrite (chain-step append, lifecycle edit) — collect them in first-seen order, original title
+    # preserved, for verbatim re-emission by serialize_v5. (Files with none gain no key: parity kept.)
+    extra_sections = [(titles[k], sections[k]) for k in order
+                      if k not in _KNOWN_BODY_SECTIONS and sections.get(k)]
 
     memory = {
         "schema": int(meta.get("schema", 5) or 5),
@@ -180,6 +204,7 @@ def parse_v5_content(content, filepath=None):
         "type": meta.get("type") or "semantic",
         "status": meta.get("status") or "active",
         "body": sections.get("notes") or None,   # trailing human notes (v4 body-after-entity parity)
+        "extra_sections": extra_sections or None,  # unknown ## sections, preserved verbatim on roundtrip
     }
     if meta.get("importance"):
         try:
@@ -239,4 +264,8 @@ def serialize_v5(memory):
     section("Prompt", memory.get("prompt"))
     section("Chain", memory.get("chain"))
     section("Notes", memory.get("body"))
+    # Unknown sections preserved verbatim (title case retained), after the known ones — kills the
+    # silent-destruction class where an invented `## Heading` vanished on the next rewrite.
+    for item in memory.get("extra_sections") or []:
+        section(item[0], item[1])            # (title, text) — tuple in-memory, [title, text] via JSONL
     return NL.join(out).rstrip() + NL

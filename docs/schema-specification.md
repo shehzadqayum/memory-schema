@@ -56,8 +56,14 @@ File shape: `---` fence · YAML-subset frontmatter · `---` fence · markdown bo
 
 **Frontmatter grammar** (zero-dependency YAML subset, parsed line-by-line):
 - Blank lines and `#`-comment lines skipped.
-- `relations:` enters relations mode: each following line matching the relation grammar (see Reference tables)
-  appends `{"type", "target"}`; the first non-matching line exits the mode and is parsed as a scalar.
+- `relations:` enters relations mode: each following line matching the relation grammar appends
+  `{"type", "target"}`. The relation-line grammar is **Postel-liberal** — the type token is `[A-Za-z_]+`, a
+  deliberate SUPERSET of the canonical UPPERCASE relation set (see Reference tables), so a lowercase
+  `- uses x` PARSES (and is then flagged loudly as **R2** by the validator) rather than being silently
+  dropped. A non-matching line is SKIPPED with the mode RETAINED when it is indented, a bullet (`-`), blank,
+  or a `#`-comment; the mode exits only on a genuine **top-level `key:` scalar** (column 0), which is then
+  parsed as a scalar. (Rationale: a stray nested bullet or comment inside `relations:` must not sever the
+  block and silently drop every subsequent `- TYPE target`.)
 - Scalar lines: `key: value` (not starting with space or `-`); value stripped of surrounding `"` then `'`.
   Unknown keys are ignored.
 - The closing fence is the first line whose strip equals `---`. **Unterminated fence → the whole parse returns
@@ -94,9 +100,13 @@ the lead** (newlines flattened; later lead paragraphs discarded).
 | `## Prompt` / `## Chain` | prose — triggering input / chain context |
 | `## Notes` | prose → the `body` field |
 
-Unknown `##` sections parse but are **discarded on roundtrip** — do not invent sections. **Nothing in the body
-is escaped** — raw `< > &` and even a literal `</memory:entity>` roundtrip verbatim (this is why v5 cannot
-suffer the v4 content-corruption class). Roundtrip identity is pinned by `tests/test_format_v5.py`.
+Unknown `##` sections are **preserved verbatim on roundtrip** — the parser collects them (in first-seen order,
+original title case retained) into `extra_sections`, and the serializer re-emits them after the known sections.
+They still carry **no machine semantics** (they are not indexed, embedded, or validated as content), but a
+programmatic rewrite (chain-step append, lifecycle edit) no longer destroys them. **Nothing in the body is
+escaped** — raw `< > &` and even a literal `</memory:entity>` roundtrip verbatim (this is why v5 cannot suffer
+the v4 content-corruption class). Roundtrip identity is pinned by `tests/test_format_v5.py`, and the
+malformed-input preservation guarantees by `tests/test_format_v5_fuzz.py`.
 
 ## 3. Validation model & the corruption invariant
 
