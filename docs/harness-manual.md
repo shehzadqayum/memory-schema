@@ -387,7 +387,8 @@ score = recency × w_r + importance/10 × w_i + relevance × w_v      (clamped t
 - **Importance** `(importance or 5)/10`.
 - **Relevance**: per-space `max(0, cos(query, space_vec))` over `entry.embeddings`
   (single `embedding` treated as the default space), combined by the
-  **variance-weighted combiner**: `Σ(sim × weight)/Σ(weight)` with default-space weight
+  **variance-weighted combiner** (only when `retrieval.multi_space` is on — **default OFF**,
+  two ablations at 47/72 entities measured no lift; off = default-space cosine): `Σ(sim × weight)/Σ(weight)` with default-space weight
   fixed at 1.0 and each field space weighted by its divergence (skipped when ≤ 0); no
   profile → equal-weight mean; single space → pass-through. No base weights, no query
   classification — the data determines the weights.

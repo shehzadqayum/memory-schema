@@ -730,32 +730,35 @@ class MemoryStore:
         return min(score * 0.1, 0.3)
 
     @staticmethod
-    def _multi_space_relevance(entry, query_embedding):
-        """Compute combined relevance across all available embedding spaces.
+    def _multi_space_relevance(entry, query_embedding, multi_space=True):
+        """Compute combined relevance across embedding spaces.
 
-        Variance-weighted: uses per-entry divergence profile to weight spaces.
-        Distinctive fields get amplified, redundant fields suppressed.
-        Falls back to single embedding for legacy entries without embeddings dict.
+        Variance-weighted over ALL spaces when `multi_space` (uses the per-entry divergence
+        profile to weight distinctive fields up, redundant ones down). When `multi_space` is
+        False (the config default — two ablations measured no lift), or for a legacy entry with
+        no `embeddings` dict, only the DEFAULT space is used → the combiner passes it through =
+        plain single-space cosine.
         """
         from memoryschema.spaces import combine_similarities as _combine_sims
 
         per_space_sims = {}
         embeddings = entry.get('embeddings', {})
 
-        if embeddings:
+        if multi_space and embeddings:
             for space_name, space_vec in embeddings.items():
                 if space_vec:
                     per_space_sims[space_name] = max(
                         0.0, _cosine_similarity(query_embedding, space_vec))
-        elif entry.get('embedding'):
-            per_space_sims['default'] = max(
-                0.0, _cosine_similarity(query_embedding, entry['embedding']))
+        else:
+            default_vec = entry.get('embedding') or embeddings.get('default')
+            if default_vec:
+                per_space_sims['default'] = max(
+                    0.0, _cosine_similarity(query_embedding, default_vec))
 
         if not per_space_sims:
             return 0.0
 
-        # Use precomputed divergence profile if available
-        divergence = entry.get('divergence_profile')
+        divergence = entry.get('divergence_profile') if multi_space else None
         return _combine_sims(per_space_sims, divergence_profile=divergence)
 
     def _score_entry(self, entry, query_embedding=None, mode='semantic',
@@ -802,7 +805,8 @@ class MemoryStore:
         if precomputed_relevance is not None:
             relevance = precomputed_relevance
         elif query_embedding:
-            relevance = self._multi_space_relevance(entry, query_embedding)
+            multi = self.config.multi_space if self.config else False
+            relevance = self._multi_space_relevance(entry, query_embedding, multi)
         else:
             relevance = 0.0
 
@@ -854,13 +858,17 @@ class MemoryStore:
                 query_vec = np.array(query_embedding, dtype=np.float32)
                 query_norm = np.linalg.norm(query_vec)
 
-                # Collect per-entry space embeddings (multi-space or legacy)
+                # Collect per-entry space embeddings (multi-space, or default-only when the
+                # off-switch is set / for legacy entries).
+                multi = self.config.multi_space if self.config else False
                 entry_space_embs = []  # list of (entry, {space: vec})
                 non_embedded = []
                 for e in entries:
-                    space_embs = e.get('embeddings', {})
-                    if not space_embs and e.get('embedding'):
-                        space_embs = {'default': e['embedding']}
+                    space_embs = dict(e.get('embeddings', {})) if multi else {}
+                    if not space_embs:
+                        dv = e.get('embedding') or (e.get('embeddings') or {}).get('default')
+                        if dv:
+                            space_embs = {'default': dv}
                     if space_embs:
                         entry_space_embs.append((e, space_embs))
                     else:
@@ -899,7 +907,7 @@ class MemoryStore:
                         for space_name, idx_sim_map in space_sims.items():
                             if idx in idx_sim_map:
                                 per_space[space_name] = idx_sim_map[idx]
-                        divergence = entry.get('divergence_profile')
+                        divergence = entry.get('divergence_profile') if multi else None
                         combined = _combine_sims(per_space, divergence_profile=divergence) if per_space else 0.0
                         score = self._score_entry(
                             entry, precomputed_relevance=combined)
@@ -1102,14 +1110,15 @@ def _cosine_similarity(a, b):
     return dot / (norm_a * norm_b)
 
 
-def multi_space_relevance(entry, query_embedding):
+def multi_space_relevance(entry, query_embedding, multi_space=True):
     """Module-level variance-weighted multi-space relevance for an entry.
 
     Thin wrapper over MemoryStore._multi_space_relevance so both the JSONL store
-    and the Neo4j store (which has no such method) score multi-space identically.
-    Falls back to the single 'embedding' vector for legacy entries.
+    and the Neo4j store (which has no such method) score identically. `multi_space`
+    False → default-space cosine only (the config off-switch). Falls back to the
+    single 'embedding' vector for legacy entries.
     """
-    return MemoryStore._multi_space_relevance(entry, query_embedding)
+    return MemoryStore._multi_space_relevance(entry, query_embedding, multi_space)
 
 
 def get_store(jsonl_path=None, config=None, require_neo4j=None):

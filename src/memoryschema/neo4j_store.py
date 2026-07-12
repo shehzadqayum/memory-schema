@@ -843,7 +843,8 @@ class Neo4jMemoryStore:
             # Variance-weighted multi-space relevance (shared with the JSONL store).
             # Falls back to the single 'embedding' vector for legacy/default-only entries.
             from memoryschema.store import multi_space_relevance
-            relevance = multi_space_relevance(entry, query_embedding)
+            multi = self.config.multi_space if self.config else False
+            relevance = multi_space_relevance(entry, query_embedding, multi)
         elif entry.get('_vector_score') is not None:
             relevance = entry['_vector_score']
 

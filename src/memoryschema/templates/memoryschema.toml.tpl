@@ -27,6 +27,7 @@ name = "{project_name}"
 # association_k = 10            # k-NN neighbour count (the association recall channel)
 # seed_count = 3                # scored seeds the cascade starts from (the hardest reachability gate)
 # embed_max_chars = 8000        # cap on the composed embed input; change → run `embed --all` (not auto)
+# multi_space = false           # variance-weighted multi-space relevance — OFF: ablations measured no lift
 # probe_slot = false            # decensoring probe: append one dormant entity per CLI recall
 # l0_token_budget = 2000
 # max_inherit_depth = 3

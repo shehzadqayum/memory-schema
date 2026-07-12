@@ -33,6 +33,7 @@ _TOML_FIELD_MAP = {
     'retrieval.recall_decay': 'recall_decay',
     'retrieval.seed_count': 'seed_count',
     'retrieval.embed_max_chars': 'embed_max_chars',
+    'retrieval.multi_space': 'multi_space',
     'retrieval.l0_token_budget': 'l0_token_budget',
     'retrieval.max_inherit_depth': 'max_inherit_depth',
     'retrieval.semantic_weights': 'semantic_weights',

@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Changed (2026-07-12 — residuals Phase B1: multi-space relevance is now opt-in, default OFF)
+- **`retrieval.multi_space` (default false).** A second pre-registered ablation (this time at 72 active
+  entities, `eval --mode ablation`) again measured NO lift for variance-weighted multi-space relevance — MRR
+  flat, recall@5 −0.042, recall@10 −0.042, ndcg@10 −0.011 vs single-space — confirming the 47-entity result.
+  Per the standing keep-rule (≥ +0.02 MRR), multi-space is now gated behind the flag and OFF by default in
+  both stores' scoring (scalar, numpy-batch, and the Neo4j path all honour it); default = plain default-space
+  cosine. The per-space embeddings + divergence profile are still COMPUTED and STORED, so the flag (and the
+  `eval --mode ablation` re-tests at 250/500 entities, which are independent of the flag) need no re-embed.
+  Supersedes the aspirational "dormant" claim — `multi_space_relevance` previously ran unconditionally.
+
 ### Added (2026-07-12 — residuals Phase A: attribution guardrail number, gate legibility, param promotions)
 - **Aggregate attribution guardrail + drift alarm** (`attribution.compute_aggregate` /
   `attribution_drift`; `memoryschema attribution [--windows 24,72,168] [--alarm-drop 0.15]`): the EVENT-level

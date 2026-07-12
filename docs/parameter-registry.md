@@ -2,7 +2,7 @@
 
 > Every tunable epistemic parameter in the package: the thresholds, weights, decays, caps, windows,
 
-**53 parameters** — 23 retrieval-ranking, 9 write-integrity, 8 lifecycle, 8 budget, 5 telemetry-window. (Since this audit, `gate.l0_echo_threshold`, `gate.numeric_probe_mode`, `gate.numeric_probe_enabled`, `gate.numeric_probe_sim_threshold`, and `retrieval.mitigation_dampening` gained TOML keys; `retrieval.probe_slot` (default false) added — the §7.3 decensoring probe; and `gate.strict`, `retrieval.seed_count` (3), `retrieval.embed_max_chars` (8000) promoted to TOML keys.)
+**53 parameters** — 23 retrieval-ranking, 9 write-integrity, 8 lifecycle, 8 budget, 5 telemetry-window. (Since this audit, `gate.l0_echo_threshold`, `gate.numeric_probe_mode`, `gate.numeric_probe_enabled`, `gate.numeric_probe_sim_threshold`, and `retrieval.mitigation_dampening` gained TOML keys; `retrieval.probe_slot` (default false) added — the §7.3 decensoring probe; and `gate.strict`, `retrieval.seed_count` (3), `retrieval.embed_max_chars` (8000) promoted to TOML keys; `retrieval.multi_space` (default false — ablation-driven off-switch) added.)
 > and budgets that decide what gets WRITTEN (gate), RECALLED (scoring/ranking), or RETIRED
 > (lifecycle/consolidation). These are **policy, not implementation detail** — miscalibration risks
 > knowledge suppression (a memory that never surfaces, is never written, or is wrongly retired).

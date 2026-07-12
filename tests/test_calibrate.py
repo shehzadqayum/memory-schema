@@ -171,3 +171,18 @@ def test_embed_max_chars_default_matches_module_constant():
     from memoryschema.config import MemoryConfig
     from memoryschema.embedding_input import DEFAULT_MAX_CHARS
     assert MemoryConfig(project_root=".").embed_max_chars == DEFAULT_MAX_CHARS
+
+
+# ── B1: multi_space off-switch ──────────────────────────────────────────────────────────────
+def test_multi_space_off_by_default_uses_default_space_only(cfg):
+    # an entry whose per-space vectors would score differently than its default vector:
+    # off (default) must use ONLY the default space; on must combine.
+    from dataclasses import replace
+    ent = {"embedding": [1.0, 0.0], "embeddings": {"default": [1.0, 0.0], "name": [0.0, 1.0]},
+           "divergence_profile": {"name": 1.0}}
+    q = [0.0, 1.0]                                    # orthogonal to default, aligned with 'name'
+    off = MemoryStore._multi_space_relevance(ent, q, multi_space=False)
+    on = MemoryStore._multi_space_relevance(ent, q, multi_space=True)
+    assert off == 0.0                                # default space only → cos([1,0],[0,1]) = 0
+    assert on > off                                  # multi picks up the aligned 'name' space
+    assert cfg.multi_space is False                  # package default is OFF (measured no-lift)

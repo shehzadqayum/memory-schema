@@ -100,6 +100,10 @@ class MemoryConfig:
     recall_decay: float = 0.8
     seed_count: int = 3  # scored seeds the cascade starts from — the hardest reachability gate
     embed_max_chars: int = 8000  # cap on the composed embed input (MUST match embedding_input.DEFAULT_MAX_CHARS)
+    # Variance-weighted multi-space relevance in scoring. Default OFF: two pre-registered ablations
+    # (47 then 72 entities) measured NO lift (2026-07: MRR flat, recall@5 −0.04); the per-space embeddings
+    # are still computed + stored, so re-enabling (or the ablation) needs no re-embed. Re-test at 250/500.
+    multi_space: bool = False
     max_inherit_depth: int = 3  # max hierarchy levels for scope matching
     verification_staleness_days: int = 7  # staleness threshold for verified_at display
     mitigation_dampening: float = 0.95  # score multiplier for entries with inbound MITIGATES

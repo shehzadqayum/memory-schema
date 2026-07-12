@@ -275,7 +275,11 @@ _VEC_AB = [0.7071, 0.7071, 0.0]  # ~45 degrees between A and B
 
 @pytest.fixture
 def store(tmp_path):
-    return MemoryStore(str(tmp_path / 'test.jsonl'))
+    # This module tests the MULTI-SPACE scoring path, which is now opt-in (retrieval.multi_space,
+    # default off after the 47/72-entity ablations). Enable it here so these tests exercise it.
+    from memoryschema.config import MemoryConfig
+    cfg = MemoryConfig(project_root=str(tmp_path), multi_space=True)
+    return MemoryStore(str(tmp_path / 'test.jsonl'), config=cfg)
 
 
 class TestMultiSpaceRelevance:
