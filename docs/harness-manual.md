@@ -251,19 +251,16 @@ before anything mutates). Insert copies the full dict (all keys persist). Merge:
 
 - replace-if-present whitelist: `type, status, description, importance, body, prompt,
   chain, confidence, key, valid_from, superseded_at, superseded_by, promoted_to,
-  embedding, embeddings, divergence_profile`;
+  embedding, embeddings, divergence_profile, embed_input_hash` (the hash merges WITH the
+  vectors it describes, so the sidecar's skip-if-unchanged stays truthful on a merge);
 - immutable after creation: `name, schema, filepath, project` (also not merged:
-  `summary`, `log`, `related`, `embed_input_hash` — see the reconcile note below);
+  `summary`, `log`, `related`);
 - `reasoning` REPLACES (the `.md` file is the accumulator; appending here doubled chain
   reasoning when the hook re-upserted full text);
 - observations append with exact-text dedupe; relations append deduped by (target, type);
 - side effects over the merged relation list (targets present in the store only):
   `SUPERSEDES` → target status `superseded` (if active) + audit + force record;
   `CONTRADICTS` → symmetric edge added to the target; `MITIGATES` → audit only.
-
-Known consequence: a merge carrying new vectors does not update `embed_input_hash`
-(not whitelisted), so the sidecar skip-if-unchanged can hold a stale vector until
-`reconcile` (whose derived-field copy includes the hash) heals it.
 
 **v4/v5 status interaction.** The v4 parser emits `status` only when declared, so
 re-indexing a v4 file never overrides store lifecycle. The v5 parser ALWAYS emits status
@@ -769,8 +766,10 @@ consoles).
   Package data ships `templates/*` and `hooks/*`. Console script:
   `memoryschema = memoryschema.cli.main:cli`.
 - Required dependency: `click>=8.0` only. Extras: `[neo4j]` neo4j≥5.0, `[embeddings]`
-  voyageai≥0.3 (lazy-imported), `[numpy]` numpy≥1.24 (pure-Python fallbacks
-  everywhere), `[all]`, `[dev]` pytest + cov/mock/timeout.
+  voyageai≥0.3 (lazy-imported; carries the marker `python_version < '3.15'` since voyageai
+  caps its own Requires-Python there — so a strict resolver can still solve our unbounded
+  `requires-python`), `[numpy]` numpy≥1.24 (pure-Python fallbacks everywhere), `[all]`,
+  `[dev]` pytest + cov/mock/timeout.
 - **Vendoring:** a host project can vendor this package (e.g. at `packages/memory-schema`, installed editable
   into the project venv) instead of consuming it from PyPI — the vendored copy is then the canonical source,
   and any local modifications are ordinary committed code (there is no upstream to re-sync from). The

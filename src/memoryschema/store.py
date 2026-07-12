@@ -308,11 +308,15 @@ class MemoryStore:
         # MUST merge too — they arrive via set_lifecycle + re-index on EXISTING
         # entities, so a whitelist miss silently drops them until the next
         # reconcile rebuild (found live: promoted_to vanished on first use).
+        # `embed_input_hash` MUST merge alongside the vectors: it is the sidecar's skip-if-unchanged key,
+        # computed together with `embedding`/`embeddings` by embed_all_spaces. Without it a merge that carries
+        # NEW vectors keeps the OLD stored hash, so `externalize()` sees a match and SKIPS the .npz rewrite —
+        # the new vectors are dropped and recall scores new text against the old embedding until reconcile.
         for key in ('type', 'status', 'description', 'importance',
                      'body', 'prompt', 'chain', 'confidence',
                      'key', 'valid_from', 'superseded_at', 'superseded_by',
                      'promoted_to',
-                     'embedding', 'embeddings', 'divergence_profile'):
+                     'embedding', 'embeddings', 'divergence_profile', 'embed_input_hash'):
             if key in memory_dict and memory_dict[key] is not None:
                 existing[key] = memory_dict[key]
 

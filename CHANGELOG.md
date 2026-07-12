@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+### Fixed (2026-07-12 — a JSONL merge dropped new vectors; packaging clash with strict resolvers)
+- **`embed_input_hash` now merges with the vectors (retrieval was scoring new text against old embeddings).**
+  The JSONL merge whitelist carried `embedding`/`embeddings`/`divergence_profile` but NOT `embed_input_hash`,
+  the sidecar's skip-if-unchanged key. So a merge carrying NEW vectors kept the OLD stored hash, `externalize()`
+  saw a match and SKIPPED the `.npz` rewrite — the new vectors were dropped, and recall scored the updated
+  content against the stale embedding until the next `reconcile`. Added the hash to the whitelist (it is
+  computed together with the vectors by `embed_all_spaces`); new end-to-end test asserts the sidecar is
+  actually rewritten on a merge. Removed the corresponding "known consequence" note from the manual.
+- **`[embeddings]`/`[all]` now resolve under strict resolvers (Poetry 2.x / uv).** `voyageai` caps its own
+  Requires-Python at `<3.15`; our `requires-python` is unbounded `>=3.11`, so a whole-range solver could not
+  find a `voyageai` valid for 3.15+. Added the marker `python_version < '3.15'` to the voyageai requirement in
+  both extras — on a future 3.15 the extra installs everything else and embeddings degrade loudly (lazy
+  import). No upper bound on `requires-python` (the base install is click-only).
+
 ### Fixed (2026-07-12 — Neo4j SUPERSEDES cycle detection persisted the cycle it rejected)
 - **The Neo4j store checked for a SUPERSEDES cycle AFTER committing the edge.** `upsert` ran
   `MERGE (s)-[:SUPERSEDES]->(t)` (auto-committed), then the R7 cycle query, then raised `ValueError` on a
