@@ -25,6 +25,8 @@ name = "{project_name}"
 # structured_weights = [0.3, 0.5, 0.2]
 # mitigation_dampening = 0.95   # score ×= this for entries with inbound MITIGATES
 # association_k = 10            # k-NN neighbour count (the association recall channel)
+# seed_count = 3                # scored seeds the cascade starts from (the hardest reachability gate)
+# embed_max_chars = 8000        # cap on the composed embed input; change → run `embed --all` (not auto)
 # probe_slot = false            # decensoring probe: append one dormant entity per CLI recall
 # l0_token_budget = 2000
 # max_inherit_depth = 3
@@ -34,3 +36,4 @@ name = "{project_name}"
 # numeric_probe_enabled = true
 # numeric_probe_mode = "log"    # 'log' (warn) or 'quarantine'
 # numeric_probe_sim_threshold = 0.80
+# strict = false               # gate stage 2 (near-dup probe) — dormant in production; enable after measuring

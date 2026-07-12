@@ -147,7 +147,10 @@ def embed_all_spaces(entry, config=None, embed_fn=None, max_chars=None):
     """
     from memoryschema.embedding_input import DEFAULT_MAX_CHARS
     if max_chars is None:
-        max_chars = DEFAULT_MAX_CHARS
+        # Honour retrieval.embed_max_chars when set; default matches DEFAULT_MAX_CHARS byte-for-byte
+        # (so the default composition is unchanged). NOTE: embed_input_hash is over compose_full_text,
+        # which is UNTRUNCATED — changing this does NOT auto-trigger reconcile re-embed; run `embed --all`.
+        max_chars = getattr(config, 'embed_max_chars', None) or DEFAULT_MAX_CHARS
 
     default_text = compose_embedding_text(entry, space='default', max_chars=max_chars)
     if not default_text:

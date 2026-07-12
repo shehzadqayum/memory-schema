@@ -98,6 +98,8 @@ class MemoryConfig:
     association_k: int = 10
     recall_depth: int = 2
     recall_decay: float = 0.8
+    seed_count: int = 3  # scored seeds the cascade starts from — the hardest reachability gate
+    embed_max_chars: int = 8000  # cap on the composed embed input (MUST match embedding_input.DEFAULT_MAX_CHARS)
     max_inherit_depth: int = 3  # max hierarchy levels for scope matching
     verification_staleness_days: int = 7  # staleness threshold for verified_at display
     mitigation_dampening: float = 0.95  # score multiplier for entries with inbound MITIGATES
@@ -114,6 +116,9 @@ class MemoryConfig:
     numeric_probe_mode: str = 'log'  # 'log' (default burn-in) or 'quarantine'
     numeric_probe_sim_threshold: float = 0.80
     l0_echo_threshold: float = 0.6
+    # Gate stage 2 (near-duplicate consistency probe) is strict-mode-only; production callers pass
+    # strict=False, so it is DORMANT by default. Opt in per deployment AFTER measuring false-quarantines.
+    gate_strict: bool = False
 
     def __post_init__(self):
         self.project_root = Path(self.project_root).resolve()

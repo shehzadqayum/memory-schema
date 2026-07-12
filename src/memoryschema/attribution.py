@@ -61,6 +61,17 @@ def read_citations(config):
     return events
 
 
+def _dt(s):
+    """ISO timestamp → NAIVE datetime (or None). Normalizing to naive means a single tz-aware
+    entry (an older writer, a manual repair, an external appender) can't raise TypeError on
+    subtraction and crash the attribution join / dream report."""
+    try:
+        d = datetime.fromisoformat(s)
+    except (ValueError, TypeError):
+        return None
+    return d.replace(tzinfo=None) if d.tzinfo is not None else d
+
+
 def compute_attribution(config):
     """Per-memory attribution from the recall log x citation log.
 
@@ -84,16 +95,6 @@ def compute_attribution(config):
         n = ev.get("target")
         if n and ev.get("ts"):
             citations.setdefault(n, []).append(ev["ts"])
-
-    def _dt(s):
-        try:
-            d = datetime.fromisoformat(s)
-        except (ValueError, TypeError):
-            return None
-        # Normalize to naive so a single tz-aware entry (an older writer, a manual
-        # repair, or an external appender) can't raise TypeError on subtraction and
-        # crash the whole attribution join / dream report.
-        return d.replace(tzinfo=None) if d.tzinfo is not None else d
 
     out = {}
     for name in set(recalls) | set(citations):
@@ -121,3 +122,87 @@ def compute_attribution(config):
             key=lambda n: (-(out[n]["attribution_rate"] or 0), -out[n]["citations"]))[:10],
     }
     return {"memories": out, "summary": summary}
+
+
+def _events_and_cites(config):
+    """(events, cites): events = [(t0_naive, [hit names], regime)]; cites = {name: sorted naive dts}.
+    `regime` = the stable-JSON of the recall event's retrieval-config snapshot ('pre-cfg' if absent)."""
+    from memoryschema.recall_log import read_events
+    cites = {}
+    for ev in read_citations(config):
+        n, ts = ev.get("target"), _dt(ev.get("ts"))
+        if n and ts:
+            cites.setdefault(n, []).append(ts)
+    for n in cites:
+        cites[n].sort()
+    events = []
+    for ev in read_events(config):
+        t0 = _dt(ev.get("ts"))
+        if t0 is None:
+            continue
+        names = [h.get("name") for h in ev.get("hits", []) if h.get("name")]
+        cfg = ev.get("cfg")
+        regime = json.dumps(cfg, sort_keys=True) if cfg else "pre-cfg"
+        events.append((t0, names, regime))
+    return events, cites
+
+
+def _event_attributed(t0, names, cites, w_hours):
+    """True if any of the event's hits earns a citation within w_hours AFTER the event."""
+    limit = w_hours * 3600
+    return any(any(0 <= (c - t0).total_seconds() <= limit for c in cites.get(n, []))
+               for n in names)
+
+
+def compute_aggregate(config, windows=(24, 72, 168)):
+    """EVENT-level aggregate attribution — the single guardrail NUMBER the calibration workflow
+    watches (harness-manual §7.3), NOT a loss function (attribution is censored implicit feedback).
+
+    For each window W an event is 'attributed' if ANY of its served hits earns a citation within W
+    hours; rate = attributed events / total events. Segmented by the recall-log retrieval-config
+    snapshot ('cfg') so a config change's effect is legible; pre-snapshot events fall in 'pre-cfg'.
+    Reporting at MULTIPLE windows makes any conclusion robust to the 24h join-window choice."""
+    events, cites = _events_and_cites(config)
+    regimes = sorted({r for _, _, r in events})
+    overall, by_regime = {}, {r: {} for r in regimes}
+    for w in windows:
+        key = str(w)
+        attr = sum(1 for t0, names, _ in events if _event_attributed(t0, names, cites, w))
+        overall[key] = {"events": len(events), "attributed": attr,
+                        "rate": round(attr / len(events), 3) if events else None}
+        for r in regimes:
+            evs = [(t0, names) for t0, names, rr in events if rr == r]
+            a = sum(1 for t0, names in evs if _event_attributed(t0, names, cites, w))
+            by_regime[r][key] = {"events": len(evs), "attributed": a,
+                                 "rate": round(a / len(evs), 3) if evs else None}
+    return {"windows": list(windows), "events": len(events),
+            "overall": overall, "by_regime": by_regime}
+
+
+def attribution_drift(config, window_hours=24, period_days=14, now=None):
+    """Trailing-period vs prior-period event-level attribution rate — the DRIFT-ALARM input.
+
+    Compares [now-P, now] against [now-2P, now-P) (P = period_days) at window W. Returns
+    {recent, prior, rel_drop} where rel_drop = (prior-recent)/prior; None fields when a period has
+    no events. A large drop means the current policy is surfacing less-cited memories than it was —
+    a signal to INVESTIGATE (never to auto-tune; citation is Goodhart-vulnerable and nonstationary)."""
+    events, cites = _events_and_cites(config)
+    ref = _dt(now) if isinstance(now, str) else (
+        now.replace(tzinfo=None) if isinstance(now, datetime) and now.tzinfo else now)
+    if ref is None:
+        ref = datetime.now(timezone.utc).replace(tzinfo=None)
+    p = period_days * 86400
+
+    def _rate(lo, hi):
+        evs = [(t0, names) for t0, names, _ in events if lo <= (ref - t0).total_seconds() < hi]
+        if not evs:
+            return None, 0
+        a = sum(1 for t0, names in evs if _event_attributed(t0, names, cites, window_hours))
+        return round(a / len(evs), 3), len(evs)
+
+    recent, n_recent = _rate(0, p)
+    prior, n_prior = _rate(p, 2 * p)
+    rel_drop = round((prior - recent) / prior, 3) if (prior and recent is not None and prior > 0) else None
+    return {"window_hours": window_hours, "period_days": period_days,
+            "recent": recent, "recent_events": n_recent,
+            "prior": prior, "prior_events": n_prior, "rel_drop": rel_drop}

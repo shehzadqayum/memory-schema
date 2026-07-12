@@ -31,6 +31,8 @@ _TOML_FIELD_MAP = {
     'retrieval.association_k': 'association_k',
     'retrieval.recall_depth': 'recall_depth',
     'retrieval.recall_decay': 'recall_decay',
+    'retrieval.seed_count': 'seed_count',
+    'retrieval.embed_max_chars': 'embed_max_chars',
     'retrieval.l0_token_budget': 'l0_token_budget',
     'retrieval.max_inherit_depth': 'max_inherit_depth',
     'retrieval.semantic_weights': 'semantic_weights',
@@ -43,6 +45,7 @@ _TOML_FIELD_MAP = {
     'gate.numeric_probe_mode': 'numeric_probe_mode',
     'gate.numeric_probe_enabled': 'numeric_probe_enabled',
     'gate.numeric_probe_sim_threshold': 'numeric_probe_sim_threshold',
+    'gate.strict': 'gate_strict',
 }
 
 TOML_FILENAME = 'memoryschema.toml'

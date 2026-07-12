@@ -495,7 +495,8 @@ class Neo4jMemoryStore:
             if entry:
                 seeds = [entry]
         elif query and query_embedding:
-            seeds = self._vector_search(query_embedding, top_k=3, project=project)
+            n_seed = self.config.seed_count if self.config else 3
+            seeds = self._vector_search(query_embedding, top_k=n_seed, project=project)
         else:
             return []
 

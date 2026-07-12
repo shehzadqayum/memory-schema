@@ -138,6 +138,7 @@ class TestGateNumericProbe:
         config.numeric_probe_mode = 'log'
         config.numeric_probe_sim_threshold = 0.80
         config.l0_echo_threshold = 0.6
+        config.gate_strict = False   # stage 2 dormant (MagicMock would otherwise auto-truthy this)
 
         memory = {'name': 'new', 'description': 'Test',
                   'observations': ['433 tests passing'],
@@ -154,6 +155,7 @@ class TestGateNumericProbe:
         config.numeric_probe_mode = 'quarantine'
         config.numeric_probe_sim_threshold = 0.80
         config.l0_echo_threshold = 0.6
+        config.gate_strict = False   # stage 2 dormant (MagicMock would otherwise auto-truthy this)
 
         memory = {'name': 'new', 'description': 'Test',
                   'observations': ['433 tests passing'],
@@ -170,6 +172,7 @@ class TestGateNumericProbe:
         config.numeric_probe_mode = 'quarantine'
         config.numeric_probe_sim_threshold = 0.80
         config.l0_echo_threshold = 0.6
+        config.gate_strict = False   # stage 2 dormant (MagicMock would otherwise auto-truthy this)
 
         memory = {'name': 'new', 'description': 'Test',
                   'observations': ['433 tests passing'],
@@ -186,6 +189,7 @@ class TestGateNumericProbe:
         config.numeric_probe_mode = 'quarantine'
         config.numeric_probe_sim_threshold = 0.80
         config.l0_echo_threshold = 0.6
+        config.gate_strict = False   # stage 2 dormant (MagicMock would otherwise auto-truthy this)
 
         memory = {'name': 'new', 'description': 'Test',
                   'observations': ['433 tests passing'],
@@ -201,6 +205,7 @@ class TestGateNumericProbe:
         config.numeric_probe_enabled = True
         config.numeric_probe_mode = 'quarantine'
         config.l0_echo_threshold = 0.6
+        config.gate_strict = False   # stage 2 dormant (MagicMock would otherwise auto-truthy this)
 
         memory = {'name': 'new', 'description': 'Test',
                   'observations': ['433 tests passing']}

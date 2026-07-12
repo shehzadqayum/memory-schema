@@ -2,6 +2,25 @@
 
 ## [Unreleased]
 
+### Added (2026-07-12 — residuals Phase A: attribution guardrail number, gate legibility, param promotions)
+- **Aggregate attribution guardrail + drift alarm** (`attribution.compute_aggregate` /
+  `attribution_drift`; `memoryschema attribution [--windows 24,72,168] [--alarm-drop 0.15]`): the EVENT-level
+  attribution rate per window, **segmented by config regime** via the recall-log `cfg` snapshot (finally
+  consuming it), plus a trailing-14d-vs-prior-14d drift alarm (stderr `⚠` + a `attribution_drift` line in the
+  dream report). Reporting multiple windows makes conclusions robust to the 24h join boundary. It is a
+  **guardrail, not a loss function** — attribution is censored implicit feedback; watched, never argmax'd
+  (§7.2/§7.3).
+- **`gate.strict`** (TOML; config `gate_strict`, default false): enables the dormant write-gate stage-2
+  near-duplicate probe without a caller passing `strict=True`. Manual §4.5 now states plainly that stage 2 is
+  strict-only and DORMANT in production — opt in after measuring false-quarantines.
+- **Two high-suppression-risk params promoted to TOML**: `retrieval.seed_count` (default 3 — the hardest
+  reachability gate, threaded through both stores' seed selection) and `retrieval.embed_max_chars` (default
+  8000, threaded through `embed_all_spaces`). NOTE: `embed_input_hash` is over the UNTRUNCATED
+  `compose_full_text`, so changing `embed_max_chars` does NOT auto-trigger a reconcile re-embed — apply it
+  with an explicit `embed --all`. An anti-drift test pins the default to `DEFAULT_MAX_CHARS`.
+- Manual §9.4 records the deliberately-not-built async-embedding roadmap note. Registry + TOML template +
+  §6.3/§6.4/§6.5 synced; 9 new tests.
+
 ### Fixed (2026-07-12 — deployment-surface alignment: the calibration doctrine reaches deployed agents)
 The claude_plugin SSOT, templates, and root docs had missed the calibration work: the deployed scoring note
 (rules-ondemand) now names the `[gate]` levers + `probe_slot` and carries the §7.3 doctrine (attribution =

@@ -977,7 +977,8 @@ class MemoryStore:
         elif query:
             scored = self._score_all_entries(scorable_entries, query, query_embedding)
             scored.sort(key=lambda x: x[1], reverse=True)
-            seeds = [e for e, _ in scored[:3]]
+            n_seed = self.config.seed_count if self.config else 3
+            seeds = [e for e, _ in scored[:n_seed]]
         else:
             return []
 

@@ -201,6 +201,19 @@ def build_report(config, active_chain=None, today=None):
                         "CLAUDE.md / skill), then mark promoted_to via "
                         "set_lifecycle so it drops from this list"})
 
+    # 8. Attribution drift (guardrail, §7.3): code DISCOVERS the trailing-vs-prior event-level
+    #    rate fall; the dream-pass judge weighs it — never an auto-tune trigger.
+    try:
+        from memoryschema.attribution import attribution_drift
+        d = attribution_drift(config, now=today)   # today may be None → real now
+        if d.get("rel_drop") is not None and d["rel_drop"] > 0.15:
+            report["attribution_drift"] = (
+                "event-level attribution fell %d%% (%dd: %s → %s) — INVESTIGATE the retrieval "
+                "config / corpus before tuning (do not auto-tune)" % (
+                    round(100 * d["rel_drop"]), d["period_days"], d["prior"], d["recent"]))
+    except Exception:
+        pass
+
     report["counts"] = {k: len(v) for k, v in report.items()
                         if isinstance(v, list)}
     return report

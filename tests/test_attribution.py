@@ -205,3 +205,70 @@ class TestNeverSurfacedGrace:
         r = build_report(_cfg(project), today="2026-07-05")
         names = [c["name"] for c in r["never_surfaced"]]
         assert "old-mem" in names and "fresh-mem" not in names
+
+
+def _write_citation_log(project, events):
+    d = project / ".memoryschema"
+    d.mkdir(exist_ok=True)
+    with open(d / "citation_log.jsonl", "w", encoding="utf-8") as f:
+        for e in events:
+            f.write(json.dumps(e) + "\n")
+
+
+class TestAggregateAndDrift:
+    def test_aggregate_event_level_rate_per_window(self, project):
+        from memoryschema.attribution import compute_aggregate
+        # ev1: hit cited +2h (attributed at all windows); ev2: hit cited +48h (only 72h/168h);
+        # ev3: hit never cited (never attributed).
+        _write_recall_log(project, [
+            {"ts": "2026-07-01T10:00:00", "hits": [{"name": "a"}]},
+            {"ts": "2026-07-02T10:00:00", "hits": [{"name": "b"}]},
+            {"ts": "2026-07-03T10:00:00", "hits": [{"name": "c"}]},
+        ])
+        _write_citation_log(project, [
+            {"ts": "2026-07-01T12:00:00", "target": "a"},
+            {"ts": "2026-07-04T10:00:00", "target": "b"},   # +48h after ev2
+        ])
+        agg = compute_aggregate(_cfg(project), windows=(24, 72, 168))
+        assert agg["events"] == 3
+        assert agg["overall"]["24"]["attributed"] == 1      # only a
+        assert agg["overall"]["72"]["attributed"] == 2      # a + b
+        assert agg["overall"]["24"]["rate"] == round(1 / 3, 3)
+
+    def test_aggregate_segments_by_config_regime(self, project):
+        from memoryschema.attribution import compute_aggregate
+        cfgA = {"recency_decay": 0.995, "recall_depth": 2}
+        cfgB = {"recency_decay": 0.99, "recall_depth": 2}
+        _write_recall_log(project, [
+            {"ts": "2026-07-01T10:00:00", "hits": [{"name": "a"}], "cfg": cfgA},
+            {"ts": "2026-07-02T10:00:00", "hits": [{"name": "b"}], "cfg": cfgB},
+            {"ts": "2026-07-03T10:00:00", "hits": [{"name": "c"}]},   # no cfg -> pre-cfg
+        ])
+        _write_citation_log(project, [{"ts": "2026-07-01T12:00:00", "target": "a"}])
+        agg = compute_aggregate(_cfg(project), windows=(24,))
+        assert set(agg["by_regime"]) == {
+            json.dumps(cfgA, sort_keys=True), json.dumps(cfgB, sort_keys=True), "pre-cfg"}
+        assert agg["by_regime"][json.dumps(cfgA, sort_keys=True)]["24"]["rate"] == 1.0
+        assert agg["by_regime"]["pre-cfg"]["24"]["rate"] == 0.0
+
+    def test_drift_alarm_fires_on_a_fall(self, project):
+        from memoryschema.attribution import attribution_drift
+        # prior 14d: 2 events both attributed (rate 1.0); recent 14d: 2 events none attributed (0.0)
+        _write_recall_log(project, [
+            {"ts": "2026-06-05T10:00:00", "hits": [{"name": "p1"}]},
+            {"ts": "2026-06-06T10:00:00", "hits": [{"name": "p2"}]},
+            {"ts": "2026-06-25T10:00:00", "hits": [{"name": "r1"}]},
+            {"ts": "2026-06-26T10:00:00", "hits": [{"name": "r2"}]},
+        ])
+        _write_citation_log(project, [
+            {"ts": "2026-06-05T11:00:00", "target": "p1"},
+            {"ts": "2026-06-06T11:00:00", "target": "p2"},
+        ])
+        d = attribution_drift(_cfg(project), window_hours=24, period_days=14, now="2026-07-02T10:00:00")
+        assert d["prior"] == 1.0 and d["recent"] == 0.0 and d["rel_drop"] == 1.0
+
+    def test_drift_none_when_a_period_is_empty(self, project):
+        from memoryschema.attribution import attribution_drift
+        _write_recall_log(project, [{"ts": "2026-07-01T10:00:00", "hits": [{"name": "a"}]}])
+        d = attribution_drift(_cfg(project), now="2026-07-02T10:00:00")
+        assert d["prior"] is None and d["rel_drop"] is None

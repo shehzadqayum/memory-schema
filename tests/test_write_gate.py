@@ -82,3 +82,23 @@ class TestAuditLogging:
             record = json.loads(f.readline())
         assert record['verdict'] == 'reject'
         assert 'Missing name' in record['reasons'][0]
+
+
+class TestGateStrictConfig:
+    """gate.strict (config) enables stage 2 without the caller passing strict=True (A2)."""
+    def _dup(self, store):
+        # an existing entry + a differently-described near-duplicate embedding (cosine 1.0)
+        store.upsert({'name': 'orig', 'schema': 5, 'description': 'alpha topic',
+                      'embedding': [1.0, 0.0, 0.0, 0.0]})
+        return {'name': 'dup', 'description': 'totally different words here',
+                'embedding': [1.0, 0.0, 0.0, 0.0]}
+
+    def test_dormant_by_default(self, store):
+        r = gate_pipeline(self._dup(store), store=store)          # no config, strict defaults False
+        assert r.verdict == GateVerdict.ACCEPT                     # stage 2 dormant
+
+    def test_config_gate_strict_enables_stage2(self, store):
+        from memoryschema.config import MemoryConfig
+        cfg = MemoryConfig(project_root='.', gate_strict=True)
+        r = gate_pipeline(self._dup(store), store=store, config=cfg)
+        assert r.verdict == GateVerdict.QUARANTINE                 # config flipped stage 2 on

@@ -132,3 +132,42 @@ def test_fit_decay_reports_fits_with_enough_intervals(cfg):
     r = fit_decay(cfg, min_intervals=50)
     assert r["n_intervals"] == 59 and r["median_interval_h"] == 5.0
     assert "exponential" in r and "power_law" in r and r["verdict"]
+
+
+# ── A3: promoted params (seed_count, embed_max_chars) ───────────────────────────────────────
+def test_seed_count_config_widens_the_seed_set(cfg):
+    from dataclasses import replace
+    from memoryschema.store import MemoryStore
+    # 5 distinct entities; a name-less keyword recall seeds from the top-N scored
+    cfg2 = replace(cfg, seed_count=5)
+    store = MemoryStore(str(cfg2.store_path), config=cfg2)
+    for i in range(5):
+        store.upsert({"name": f"topic-{i}", "schema": 5, "description": f"shared topic term item {i}",
+                      "observations": [f"shared topic term item {i}"]})
+    res = store.recall(query="shared topic term", limit=20)
+    seeds = [r["name"] for r in res if r.get("channel") == "seed"]
+    assert len(seeds) == 5                                   # config.seed_count honoured (default would be 3)
+
+
+def test_embed_max_chars_from_config_but_hash_is_invariant(cfg):
+    from dataclasses import replace
+    from memoryschema import spaces
+    from memoryschema.embedding_input import embed_input_hash
+    entry = {"name": "e", "description": "d" * 50, "observations": ["o" * 5000]}
+    lens = []
+    def capture(text):                                       # embed_fn: record the composed input length
+        lens.append(len(text))
+        return [0.1, 0.2, 0.3, 0.4]
+    spaces.embed_all_spaces(entry, config=replace(cfg, embed_max_chars=200), embed_fn=capture)
+    assert lens and max(lens) <= 200                         # config cap applied to the composed input
+    # the provenance hash is over the UNTRUNCATED compose_full_text — invariant to the cap
+    h_default = embed_input_hash(entry)
+    spaces.embed_all_spaces(entry, config=replace(cfg, embed_max_chars=8000), embed_fn=capture)
+    assert embed_input_hash(entry) == h_default
+
+
+def test_embed_max_chars_default_matches_module_constant():
+    # the two must stay in lockstep — a divergence would embed a different length than the docs claim
+    from memoryschema.config import MemoryConfig
+    from memoryschema.embedding_input import DEFAULT_MAX_CHARS
+    assert MemoryConfig(project_root=".").embed_max_chars == DEFAULT_MAX_CHARS

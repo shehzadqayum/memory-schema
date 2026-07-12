@@ -180,7 +180,7 @@ QUARANTINE` + reasons + warnings. Never silently drops.
 | validation | missing description | warning |
 | quality nudge | description > 120 chars (non-`chain-` names) | warning |
 | quality nudge | importance equals the store mode when the mode covers > 40% of ≥ 10 entries | warning ("vary it") |
-| consistency probe | **strict mode only** (not run on the standard path): cosine > 0.95 to a differently-described entry | QUARANTINE |
+| consistency probe (stage 2) | **strict mode only — DORMANT in production** (every production caller passes `strict=False`): cosine > 0.95 to a differently-described entry. Opt in per deployment via `gate.strict = true` AFTER measuring false-quarantines; the `strict=` arg still forces it on. | QUARANTINE |
 | numeric probe (stage 5) | needs store + embedding; claims `(value, unit, qualifier)` extracted from description+observations; a ≥ 0.80-cosine neighbour with same unit+qualifier but different value | mode `log` (default): warning; mode `quarantine`: QUARANTINE. Escape valves: hits against declared `CONTRADICTS`/`SUPERSEDES` targets are dropped |
 | L0 echo (stage 6) | Jaccard word-overlap ≥ 0.6 between the candidate's description and an existing L0 entry, and no relations beyond the echoed entry | QUARANTINE ("restates X without new content") |
 
@@ -412,7 +412,7 @@ TOML-tunable via `retrieval.*`):
    unscoped entities universally visible, depth separation ≤ `max_inherit_depth`.
 2. **Returnable** = active only (unless `--include-inactive`); non-active entries stay
    traversable in BFS ("traversable-not-returned" — superseded entries bridge walks).
-3. **Seeds**: explicit `name`, else top-3 scored entries (JSONL: full blend + BM25;
+3. **Seeds**: explicit `name`, else the top-`retrieval.seed_count` (default 3) scored entries (JSONL: full blend + BM25;
    Neo4j: native vector-index search with escalating scoped over-fetch ×3/×9/×100 and a
    +0.1 substring bonus). **Neo4j query-recall returns `[]` without embeddings** (no
    keyword seeding at the store level); JSONL degrades to keyword/recency blend.
@@ -442,7 +442,10 @@ the deployment's `retrieval.*`); `eval --set KEY=VALUE` overrides config per run
   `--all-spaces` runs the full multi-space + divergence backfill through the active
   backend. `--coverage` reports embedded % and multi-space %.
 - `reconcile` re-embeds precisely the entries whose `embed_input_hash` no longer matches
-  the current file content (§9.3).
+  the current file content (§9.3). The composed embed input is capped at
+  `retrieval.embed_max_chars` (default 8000); because `embed_input_hash` is over the UNTRUNCATED
+  `compose_full_text`, changing the cap does NOT auto-trigger a reconcile re-embed — apply it with
+  an explicit `embed --all`.
 
 ---
 
@@ -472,14 +475,25 @@ surfaced, and the never-surfaced set (the dream report's dead-weight feed).
 
 ### 7.2 Attribution (recall × citation join)
 
-`memoryschema attribution [--json]` joins the recall log against the citation log
-(§4.8): per memory — recalls, citations, `attributed_recalls` (recalls followed by a
-citation within `CITE_WINDOW_HOURS = 24`), `attribution_rate`, last recalled/cited.
-Summary lists: `recalled_never_cited` (≥ 3 recalls, 0 citations — retrieval noise or
-ambient value, reviewed by the dream pass) and `top_attributed` (top 10). The design
-point: retrieval telemetry proves memories are FOUND; a citation at the moment
-`--uses`/`--informs` executes proves one CHANGED the work. Citations are forward-precise
-(logged as they happen); pre-log backlink-era relations are not counted in the rate.
+`memoryschema attribution [--json] [--windows 24,72,168] [--alarm-drop 0.15]` joins the
+recall log against the citation log (§4.8): per memory — recalls, citations,
+`attributed_recalls` (recalls followed by a citation within `CITE_WINDOW_HOURS = 24`),
+`attribution_rate`, last recalled/cited. Summary lists: `recalled_never_cited` (≥ 3 recalls,
+0 citations — retrieval noise or ambient value, reviewed by the dream pass) and
+`top_attributed` (top 10). The design point: retrieval telemetry proves memories are FOUND;
+a citation at the moment `--uses`/`--informs` executes proves one CHANGED the work. Citations
+are forward-precise (logged as they happen); pre-log backlink-era relations are not counted.
+
+**Aggregate guardrail** (`aggregate` block; `compute_aggregate`): the EVENT-level rate —
+per `--windows` hour W, the fraction of recall EVENTS where any served hit earned a citation
+within W. Reported at multiple windows so a conclusion doesn't hinge on the 24h boundary, and
+**segmented by config regime** via the recall-log `cfg` snapshot (§7.1) so a config change's
+effect is legible (`pre-cfg` = events logged before the snapshot existed). **Drift alarm**
+(`drift`; `attribution_drift`): the trailing-14d event-level rate vs the prior 14d; a relative
+fall > `--alarm-drop` prints `⚠ attribution drift … — investigate before tuning` to stderr and
+seeds a `attribution_drift` line in the dream report. This is a **guardrail, not a loss
+function** — attribution is censored implicit feedback (only served memories can be cited) and
+Goodhart-vulnerable; the number is watched, never argmax'd (§7.3).
 
 ### 7.3 Calibration workflow (tuning epistemic policy safely)
 
@@ -493,6 +507,9 @@ telemetry→config loop is NEVER closed automatically:
    (usage labels carry position/selection bias — they are candidates, never auto-labels).
 2. **Grid cells**: `eval --set retrieval.recency_decay=0.99` runs any eval mode under a
    config override (loud failure on unknown keys); sweep = loop cells in a shell.
+2½. **Watch the guardrail**: `memoryschema attribution` — the aggregate event-level rate (per
+   window, per config regime) and the drift alarm. A sustained drop is the signal to INVESTIGATE
+   (below); it is never itself the objective to optimize.
 3. **Paired A/B**: `eval --mode replay --vs retrieval.recall_decay=0.7 [--set …A] [--k 5]`
    re-runs the SAME queries (logged + gold) under A vs B against the current JSONL store:
    label-free top-k diffs for logged queries; McNemar + rank sign test (exact binomial)
@@ -664,6 +681,11 @@ default-mode gate (`_maybe_preflight`, §9.1) also runs a cheap Neo4j-free `.md`
 (`reconcile.local_drift`) and prints `⚠ memory store drift (N .md vs M jsonl) — run \`memoryschema reconcile\``
 on any mismatch — so an interrupted index becomes loud within one un-throttled CLI call.
 
+> **Roadmap (deliberately not built):** embedding is synchronous in the hook (it holds the ~1.5 s Voyage
+> call inline). An async/queued embedding worker would shorten the hook but adds a daemon + a durable queue +
+> failure recovery; the file-first design makes it unnecessary — a killed hook just leaves the derived layer
+> behind and `reconcile` (or the next write) catches up. Revisit only if hook latency becomes a real problem.
+
 ### 9.5 Neo4j container lifecycle
 
 `memoryschema neo4j deploy` (pull → up → healthcheck poll 60 s → schema → verify) ·
@@ -711,6 +733,7 @@ PostToolUse hook does the same from the written file's project root. Secrets bel
 | `semantic_weights` / `structured_weights` | (0.2, 0.3, 0.5) / (0.3, 0.5, 0.2) | TOML-tunable |
 | `numeric_probe_enabled` / `mode` / `sim_threshold` | true / `log` / 0.80 | gate stage 5 — TOML `gate.numeric_probe_enabled` / `gate.numeric_probe_mode` / `gate.numeric_probe_sim_threshold` |
 | `l0_echo_threshold` | 0.6 | gate stage 6 — TOML `gate.l0_echo_threshold` |
+| `gate_strict` | **false** | TOML `gate.strict` — enables gate stage 2 (near-dup probe), dormant in production |
 | `probe_slot` | **false** | TOML `retrieval.probe_slot` — the §7.3 decensoring probe (appends one dormant entity per CLI recall) |
 | `generator_id` | None | env `MEMORY_GENERATOR` (session-scoped) |
 

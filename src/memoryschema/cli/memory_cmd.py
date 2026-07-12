@@ -901,17 +901,40 @@ def dream_cmd(config, as_json):
 
 @click.command("attribution")
 @click.option("--json", "as_json", is_flag=True, help="Machine-readable output.")
+@click.option("--windows", default="24,72,168",
+              help="Comma-separated hours for the aggregate attribution rate (default 24,72,168 = 1d/3d/7d). "
+                   "Report multiple so a conclusion doesn't hinge on the 24h join window.")
+@click.option("--alarm-drop", "alarm_drop", default=0.15, show_default=True,
+              help="Drift alarm: relative fall in the trailing-14d event-level rate vs the prior 14d that "
+                   "triggers a ⚠ (a guardrail to INVESTIGATE before tuning — never an auto-tune trigger).")
 @click.pass_obj
-def attribution_cmd(config, as_json):
+def attribution_cmd(config, as_json, windows, alarm_drop):
     """Attribution report: which recalled memories actually influence work.
 
     Joins the recall log against the citation log (chain step --uses /
     remember --uses|--informs log at the moment they happen). A recalled-
     then-cited memory has PROVEN utility; recalled-never-cited is retrieval
     noise or ambient value. Feeds the dream pass + importance decisions.
+
+    The aggregate block + drift alarm are the calibration GUARDRAIL (§7.3):
+    a health number to watch, never a loss function to optimize (attribution
+    is censored implicit feedback + Goodhart-vulnerable).
     """
-    from memoryschema.attribution import compute_attribution
+    from memoryschema.attribution import compute_attribution, compute_aggregate, attribution_drift
+    try:
+        wins = tuple(int(w) for w in str(windows).split(",") if w.strip())
+    except ValueError:
+        wins = (24, 72, 168)
     rep = compute_attribution(config)
+    agg = compute_aggregate(config, windows=wins or (24, 72, 168))
+    drift = attribution_drift(config, window_hours=(wins[0] if wins else 24))
+    rep["aggregate"] = agg
+    rep["drift"] = drift
+    # Drift alarm to stderr so it surfaces in both human and --json runs (never raises).
+    if drift.get("rel_drop") is not None and drift["rel_drop"] > alarm_drop:
+        click.echo("⚠ attribution drift: %dd rate %s → %s (rel drop %d%%) — investigate before tuning "
+                   "(§7.3; do NOT auto-tune)" % (drift["period_days"], drift["prior"], drift["recent"],
+                   round(100 * drift["rel_drop"])), err=True)
     if as_json:
         import json as _json
         click.echo(_json.dumps(rep, indent=1))
@@ -936,3 +959,20 @@ def attribution_cmd(config, as_json):
         click.echo("Recalled >=3x, never cited (noise or ambient - dream-pass review):")
         for n in summ["recalled_never_cited"][:8]:
             click.echo("  %s (%d recalls)" % (n, mems[n]["recalls"]))
+    # Aggregate guardrail (event-level rate per window) + the config regimes it segments by.
+    click.echo("")
+    click.echo("Aggregate event-level rate (guardrail, §7.3 — watch, do not optimize):")
+    for w in agg["windows"]:
+        o = agg["overall"][str(w)]
+        rate = "%d%%" % round(100 * o["rate"]) if o["rate"] is not None else "-"
+        click.echo("  within %4dh: %s over %d events" % (w, rate, o["events"]))
+    if len(agg["by_regime"]) > 1:
+        click.echo("  by config regime (%dh window):" % agg["windows"][0])
+        for regime, per in sorted(agg["by_regime"].items()):
+            o = per[str(agg["windows"][0])]
+            rate = "%d%%" % round(100 * o["rate"]) if o["rate"] is not None else "-"
+            label = "pre-cfg" if regime == "pre-cfg" else regime[:52]
+            click.echo("    %s  %s (%d ev)" % (rate.rjust(4), label, o["events"]))
+    if drift.get("rel_drop") is not None:
+        click.echo("  drift: %dd %s → %s (rel %+d%%)" % (drift["period_days"], drift["prior"],
+                   drift["recent"], round(-100 * drift["rel_drop"])))

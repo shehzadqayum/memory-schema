@@ -73,8 +73,13 @@ def gate_pipeline(memory, store=None, strict=False, config=None):
     Evaluates a parsed memory dict through six stages.
     Returns GateResult with verdict, reasons, and warnings.
     Never silently drops — every entry gets a verdict.
+
+    Stage 2 (the near-duplicate consistency probe) runs only in strict mode. Production callers
+    pass `strict=False`, so it is DORMANT by default; a deployment opts in via `gate.strict`
+    (config) after measuring — the arg still wins when explicitly True.
     """
     warnings = []
+    strict = strict or bool(getattr(config, 'gate_strict', False))
 
     # Stage 1: Validation
     name = memory.get('name')
