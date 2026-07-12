@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### Added (2026-07-12 — silent store drift after a killed hook is now loud)
+- **The default-mode CLI gate now warns on `.md`-vs-JSONL store drift.** The PostToolUse hook is bounded at
+  10 s and can be killed mid-index; because every store write is per-file atomic (JSONL whole-file
+  tempfile+`os.replace`; `.npz` tmp→`os.replace` with cleanup), a kill leaves NO partial store — only
+  *missing* derived updates that were silent until the next `sync`/`reconcile`. `_maybe_preflight` now runs a
+  cheap Neo4j-free `.md`-vs-JSONL check (`reconcile.local_drift`, reusing the canonical `_parse_md`
+  enumeration) on the same ≤1/60 s throttle and prints `⚠ memory store drift (N .md vs M jsonl) — run
+  \`memoryschema reconcile\`` on any mismatch. Banner-only; never raises. Manual §9.1/§9.4 document it.
+
 ### Fixed (2026-07-12 — v5 parser silently truncated relations and unknown sections)
 - **A stray line inside `relations:` no longer severs the block.** The parser exited relations mode on the
   first non-matching line; an indented stray bullet or comment then made every SUBSEQUENT `- TYPE target`

@@ -9,7 +9,7 @@ import json
 
 import memoryschema.spaces as spaces
 from memoryschema.config import MemoryConfig
-from memoryschema.reconcile import diff, reconcile
+from memoryschema.reconcile import diff, local_drift, reconcile
 
 _ENTITY = (
     '<memory:entity schema="4" name="{name}" type="semantic" importance="5">\n'
@@ -50,6 +50,38 @@ def test_diff_detects_drift(tmp_path, monkeypatch):
     assert d["missing_from_jsonl"] == ["beta"]
     assert d["jsonl_orphans"] == ["ghost"]
     assert d["in_sync"] is False
+
+
+def test_local_drift_detects_md_jsonl_drift_neo4j_free(tmp_path, monkeypatch):
+    # local_drift is the cheap Neo4j-free subset the preflight banner uses. The bogus Neo4j URI in _setup
+    # would hang/error if it were queried — that local_drift returns promptly proves it never touches Neo4j.
+    cfg = _setup(tmp_path, monkeypatch)                               # md={alpha,beta}, jsonl={alpha,ghost}
+    d = local_drift(cfg)
+    assert d["missing_from_jsonl"] == ["beta"]
+    assert d["jsonl_orphans"] == ["ghost"]
+    assert d["md_count"] == 2 and d["jsonl_count"] == 2
+    assert d["malformed"] == []
+    assert "neo4j_count" not in d                                     # deliberately NOT part of the cheap check
+
+
+def test_local_drift_clean_after_reconcile(tmp_path, monkeypatch):
+    cfg = _setup(tmp_path, monkeypatch)
+    reconcile(cfg)                                                    # heal JSONL to the .md set
+    d = local_drift(cfg)
+    assert d["missing_from_jsonl"] == [] and d["jsonl_orphans"] == [] and d["malformed"] == []
+    assert d["md_count"] == d["jsonl_count"] == 2
+
+
+def test_local_drift_flags_malformed_v5(tmp_path):
+    # a present-but-unparseable v5 entity is drift the banner must surface (corruption, not a deletion)
+    mem = tmp_path / "memory"
+    mem.mkdir(parents=True, exist_ok=True)
+    (mem / "broken.md").write_text("---\nschema: 5\n", encoding="utf-8")   # unterminated fence
+    (mem / "store.jsonl").write_text("", encoding="utf-8")
+    cfg = MemoryConfig(project_root=str(tmp_path),
+                       neo4j_uri="bolt://127.0.0.1:59999", neo4j_password="x")
+    d = local_drift(cfg)
+    assert "broken.md" in d["malformed"]
 
 
 def test_reconcile_heals_to_md_no_residuals(tmp_path, monkeypatch):

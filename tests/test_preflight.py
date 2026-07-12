@@ -101,6 +101,36 @@ def test_start_container_refuses_untrusted_compose(tmp_path, monkeypatch):
     assert not any("compose" in a for a in calls), "must NOT run `compose up` on an untrusted file"
 
 
+# ── the implicit gate's cheap .md-vs-JSONL drift banner (kill-safety: silent drift → loud) ─────────
+def _drift_project(tmp_path, jsonl_body):
+    mem = tmp_path / "memory"
+    mem.mkdir(parents=True, exist_ok=True)
+    (mem / "alpha.md").write_text("---\nschema: 5\n---\n\nAlpha entity.\n", encoding="utf-8")
+    (mem / "store.jsonl").write_text(jsonl_body, encoding="utf-8")
+    return MemoryConfig(project_root=str(tmp_path))
+
+
+def test_maybe_preflight_emits_store_drift_banner(tmp_path, monkeypatch, capsys):
+    """A healthy backend + a drifted store (one .md entity, empty JSONL) → the cheap drift banner MUST fire."""
+    from memoryschema.cli.main import _maybe_preflight
+    monkeypatch.setattr(pf, "ensure_backend", lambda cfg, **kw: {"ok": True, "degraded": False})
+    monkeypatch.delenv("MEMORYSCHEMA_SKIP_PREFLIGHT", raising=False)
+    _maybe_preflight(_drift_project(tmp_path, ""))                    # JSONL empty → alpha missing
+    err = capsys.readouterr().err
+    assert "store drift" in err and "reconcile" in err
+
+
+def test_maybe_preflight_silent_when_in_sync(tmp_path, monkeypatch, capsys):
+    """No drift → no banner (the gate must not cry wolf on a clean store)."""
+    import json
+    from memoryschema.cli.main import _maybe_preflight
+    monkeypatch.setattr(pf, "ensure_backend", lambda cfg, **kw: {"ok": True, "degraded": False})
+    monkeypatch.delenv("MEMORYSCHEMA_SKIP_PREFLIGHT", raising=False)
+    cfg = _drift_project(tmp_path, json.dumps({"name": "alpha", "schema": 5}) + "\n")
+    _maybe_preflight(cfg)
+    assert "store drift" not in capsys.readouterr().err
+
+
 def test_start_container_recovers_stopped_via_docker_start(tmp_path, monkeypatch):
     """A merely-stopped named container is recovered by `docker start` alone — no compose, no file executed."""
     cfg = MemoryConfig(project_root=str(tmp_path))

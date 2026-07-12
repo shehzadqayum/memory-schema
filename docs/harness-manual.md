@@ -541,7 +541,11 @@ keyword/BM25) unless `MEMORYSCHEMA_REQUIRE_VOYAGE`.
 - **Implicit gate**: every CLI invocation runs a banner-only preflight (never
   exits/raises), throttled by the `.memoryschema/.preflight_ok` marker (< 60 s old →
   skip; the marker is written only when fully healthy, so degraded states keep
-  re-warning). Escape hatch: `MEMORYSCHEMA_SKIP_PREFLIGHT`.
+  re-warning). On the same cadence it also runs a cheap Neo4j-free `.md`-vs-JSONL count
+  check (`reconcile.local_drift`) and prints `⚠ memory store drift … — run \`memoryschema
+  reconcile\`` on any mismatch — so an interrupted/killed index (§9.4) becomes loud within
+  one un-throttled call, not silent until the next `sync`. Escape hatch:
+  `MEMORYSCHEMA_SKIP_PREFLIGHT`.
 
 ### 9.2 sync — read-only drift report
 
@@ -604,6 +608,16 @@ sentinel was NOT touched this response, emits
 `{"systemMessage": "MEMORY CHAIN REMINDER: ..."}` (Stop hooks support only top-level
 `systemMessage`; the PostToolUse hook uses `hookSpecificOutput` — these are the two hook
 output formats). Sentinel present → consumed silently.
+
+**Kill-safety (the 10 s timeout).** The hook is bounded at 10 s and can be killed mid-pipeline. Every store
+write it performs is **per-file atomic** — the JSONL is a whole-file tempfile + `os.replace` (§5.1) and the
+`.npz` sidecar is `tmp` → `os.replace` with exception cleanup (§5.3) — so a kill leaves **no partial JSONL and
+no orphaned `.npz`**, only *missing* derived updates (the `.md` is written, the stores not yet caught up). That
+is the file-first contract: the `.md` set is truth and `reconcile` heals the derived layers. The residual risk
+is that the drift stays **silent** until someone runs `sync`/`reconcile`; to close that, the throttled
+default-mode gate (`_maybe_preflight`, §9.1) also runs a cheap Neo4j-free `.md`-vs-JSONL count check
+(`reconcile.local_drift`) and prints `⚠ memory store drift (N .md vs M jsonl) — run \`memoryschema reconcile\``
+on any mismatch — so an interrupted index becomes loud within one un-throttled CLI call.
 
 ### 9.5 Neo4j container lifecycle
 

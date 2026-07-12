@@ -155,6 +155,18 @@ def _maybe_preflight(config):
         else:
             fail = "; ".join(f"{c['name']}: {c['detail']}" for c in r["failures"])
             click.echo(f"⚠ memory DEGRADED — {fail}  (run `memoryschema preflight`)", err=True)
+        # Cheap, Neo4j-free .md-vs-JSONL drift banner (same ≤1/60s cadence as the preflight above). The
+        # file-first write path is per-file atomic, so a killed hook / interrupted CLI leaves NO partial
+        # store — only MISSING derived updates (silent until sync/reconcile). This surfaces that drift loudly
+        # within one un-throttled CLI call. Banner-only; reconcile heals.
+        try:
+            from memoryschema.reconcile import local_drift
+            d = local_drift(config)
+            if d["malformed"] or d["missing_from_jsonl"] or d["jsonl_orphans"]:
+                click.echo(f"⚠ memory store drift ({d['md_count']} .md vs {d['jsonl_count']} jsonl) — "
+                           f"run `memoryschema reconcile`", err=True)
+        except Exception:
+            pass  # a drift check must never break the CLI
     except Exception:
         pass  # the dependency gate must never break the CLI
 

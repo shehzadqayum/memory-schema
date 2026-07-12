@@ -134,6 +134,24 @@ def _neo4j_names(config):
         return None, set(), str(e)
 
 
+def local_drift(config):
+    """CHEAP, Neo4j-free .md-vs-JSONL drift check for the CLI hot path (the throttled preflight banner).
+
+    Reuses `_parse_md` (the canonical, parser-delegating entity enumeration — never a hand-rolled glob) and the
+    JSONL name set; does NOT touch Neo4j, so there is no network round-trip and it works when the container is
+    down. The full three-layer report is `diff()`; this is the fast local subset that turns SILENT store drift
+    (a hook killed mid-index, an interrupted CLI write) into a loud one-line nudge within one CLI call."""
+    md_map, malformed = _parse_md(config.memory_dir)
+    md = set(md_map)
+    jsonl = {e["name"] for e in MemoryStore(str(config.store_path)).list_all(include_inactive=True)}
+    return {
+        "md_count": len(md), "jsonl_count": len(jsonl),
+        "missing_from_jsonl": sorted(md - jsonl),
+        "jsonl_orphans": sorted(jsonl - md),
+        "malformed": [os.path.basename(f) for f in malformed],
+    }
+
+
 def diff(config):
     """Read-only drift report across .md / JSONL / Neo4j (the real `sync`)."""
     md_map, malformed = _parse_md(config.memory_dir)
