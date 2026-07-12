@@ -43,8 +43,8 @@ Single parse entry point: `tags.parse_memory_content(content, filepath=None)`
 (`parse_memory_file` reads UTF-8 and delegates; returns `None` on OS errors).
 
 - If `format_v5.is_v5_content(content)` — the stripped content starts with a `---` fence — the file parses as
-  v5 and **never** falls through to XML. (Known edge: `str.lstrip()` does not strip a U+FEFF BOM, so a
-  BOM-prefixed v5 file fails dispatch; `parse_v5_content` strips BOM if called directly.)
+  v5 and **never** falls through to XML. `is_v5_content` strips a leading U+FEFF BOM (matching
+  `parse_v5_content` and the reconcile corruption guard), so a BOM-prefixed v5 file dispatches correctly.
 - Otherwise the v4 XML path runs (§4).
 - Write-side selection: `write_index.create_entity_file` emits **v5 by default**; v4 XML authoring is retained
   only for legacy/migration and must be explicitly re-selected (`MEMORYSCHEMA_V4=1` or `MEMORYSCHEMA_V5=0`).

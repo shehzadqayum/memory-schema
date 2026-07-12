@@ -79,10 +79,13 @@ def _scalar(val):
 
 
 def is_v5_content(content):
-    """A v5 file starts with a '---' frontmatter fence."""
-    return content.lstrip().startswith(FRONTMATTER_OPEN + "\n") or \
-        content.lstrip().startswith(FRONTMATTER_OPEN + "\r\n") or \
-        content.lstrip() == FRONTMATTER_OPEN
+    """A v5 file starts with a '---' frontmatter fence. BOM-tolerant so a UTF-8-BOM'd v5 file
+    dispatches correctly — parse_v5_content and the reconcile corruption guard both strip the BOM,
+    so this must too, or a valid BOM'd entity fails dispatch and is misreported as corruption."""
+    stripped = content.lstrip("﻿").lstrip()
+    return stripped.startswith(FRONTMATTER_OPEN + "\n") or \
+        stripped.startswith(FRONTMATTER_OPEN + "\r\n") or \
+        stripped == FRONTMATTER_OPEN
 
 
 def _parse_frontmatter(lines):

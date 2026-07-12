@@ -2,6 +2,27 @@
 
 ## [Unreleased]
 
+### Fixed (2026-07-12 — external-review triage: BOM dispatch, log-all-served, registry accuracy)
+Two external docs-only LLM reviews (DeepSeek + Grok), each point checked against the code:
+- **BOM dispatch fix.** `format_v5.is_v5_content` used plain `lstrip()` which does NOT strip a U+FEFF BOM,
+  while `parse_v5_content` and the reconcile corruption guard both do — so a valid BOM-prefixed v5 entity
+  failed dispatch and was misreported as corruption (guard caught it, so no prune, but it could never parse).
+  `is_v5_content` is now BOM-tolerant; fuzz test asserts a BOM'd file parses via the dispatch path.
+- **Recall log records ALL served hits** (dropped the fixed top-10 cap). The log is a record of what was
+  SERVED (bounded by `--limit`), so an entity absent from it was never served — not merely rank-capped. This
+  closes the served-vs-logged blind spot the dream report's `never_surfaced` read (a consistently rank-11+
+  entity is no longer misflagged as dead weight). Dream report + skill notes updated; the probe-guarantee
+  special-case is now a no-op (all rows logged). Rejected logging the full unserved candidate set (log bloat;
+  offline replay already covers it).
+- **Parameter-registry rows corrected**: the table still said "no TOML key/HARDCODED" for
+  `l0_echo_threshold`, `numeric_probe_*`, `mitigation_dampening`, `recall_seed_count`,
+  `embedding_input_max_chars` (only the header note had been updated when the keys landed); rows now show the
+  real TOML keys, and `probe_slot` / `multi_space` / `gate_strict` gained rows.
+- Doc clarifications: traversable-not-returned covers ALL non-active statuses; `confidence` stays whitelisted
+  for v4-legacy preservation (v5 never emits it); `max_inherit_depth` example; decayfit is a zero-dep
+  closed-form R² fit (not scipy/MLE); §9.4 sidecar-lag sentence (a kill between JSONL+`.npz` leaves a
+  vectorless row, healed by re-embed; `sync` is the three-layer audit). Spec §1 BOM note reflects the fix.
+
 ### Changed (2026-07-12 — residuals Phase B1: multi-space relevance is now opt-in, default OFF)
 - **`retrieval.multi_space` (default false).** A second pre-registered ablation (this time at 72 active
   entities, `eval --mode ablation`) again measured NO lift for variance-weighted multi-space relevance — MRR

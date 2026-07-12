@@ -20,7 +20,9 @@
 
 | param | where | default | config key | risk | effect |
 |---|---|---|---|---|---|
-| `recall_seed_count` | store.py:980 | 3 (scored[:3]; neo4j_store.py:498 to | HARDCODED | HIGH | Only the top-3 scored/vector-matched entries seed the activation cascade; everything else must be graph-reachable from them within recall_depth hops. |
+| `recall_seed_count` | store.py:980 | 3 (scored[:seed_count]; neo4j top_k) | TOML `retrieval.seed_count` | HIGH | Only the top-3 scored/vector-matched entries seed the activation cascade; everything else must be graph-reachable from them within recall_depth hops. |
+| `probe_slot` | cli/memory_cmd.py (recall) | false | TOML `retrieval.probe_slot` | HIGH | Appends one dormant active entity per CLI recall (channel=probe, score 0.0) — the §7.3 decensoring probe; changes what is surfaced/logged. |
+| `multi_space` | config.py; store scoring | false | TOML `retrieval.multi_space` | med | Variance-weighted multi-space relevance; OFF by default (2 ablations, no lift). Off = default-space cosine. |
 | `semantic_weights` | config.py:106 | (0.2, 0.3, 0.5) | retrieval.semantic_weights | HIGH | (recency, importance, relevance) blend for semantic-mode scoring — the default mode for recall — resolved via store._resolve_weights (store.py:43) for |
 | `as_of_overfetch` | cli/memory_cmd.py:79 | max(limit*4, 20) | HARDCODED | med | Point-in-time (--as-of) recall over-fetches before the temporal validity filter, then truncates back to limit. |
 | `association_k` | config.py:98 | 10 | retrieval.association_k | med | k-NN neighbour count for ASSOCIATED_WITH edges (compute_associations, both stores; also CLI --k default index_cmd.py:138) — the association channel of |
@@ -39,7 +41,7 @@
 | `combiner_default_space_weight` | spaces.py:89 | 1.0 | HARDCODED | low | In variance-weighted multi-space relevance the 'default' blend space always contributes with weight 1.0; field spaces contribute by their divergence f |
 | `hub_bonus` | store.py:824 | 0.05 * log(1+backlinks) | HARDCODED (also neo4j_store.py:862) | low | Log-scale additive bonus for entries with inbound relations (hub memories), capped implicitly by the min(score,1.0) clamp. |
 | `importance_default` | store.py:797 | 5 (normalized /10) | HARDCODED (also neo4j_store.py:835; display default memory | low | Entries without an importance get 0.5 on the importance axis of every score and rank mid-pack in the L0 index. |
-| `mitigation_dampening` | config.py:103 | 0.95 | CONFIG FIELD mitigation_dampening, no TOML key (HARDCODED  | low | Score multiplier applied to entries with inbound MITIGATES backlinks (store.py:836, neo4j_store.py:872). |
+| `mitigation_dampening` | config.py:103 | 0.95 | TOML `retrieval.mitigation_dampening` | low | Score multiplier applied to entries with inbound MITIGATES backlinks (store.py:836, neo4j_store.py:872). |
 | `neo4j_seed_keyword_bonus` | neo4j_store.py:520 | +0.1 (cap 1.0) | HARDCODED | low | Flat bonus when the query substring appears in a seed's searchable text (Neo4j backend only — a scoring-parity divergence from the JSONL BM25 boost). |
 | `procedural_access_reinforcement` | store.py:793 | exponent = 1/(1 + 0.3*min(access_cou | HARDCODED (factor 0.3, cap 10; also neo4j_store.py:831) | low | Frequently accessed procedural entries decay slower (exponent 1.0 at 0 accesses down to 0.25 at 10+). |
 | `rerank_limit_default` | embeddings.py:90 | 5 | HARDCODED (function default; recall passes its own limit) | low | Default top_k for the Voyage rerank-2 call when no limit is passed. |
@@ -52,14 +54,15 @@
 
 | param | where | default | config key | risk | effect |
 |---|---|---|---|---|---|
-| `l0_echo_threshold` | config.py:113 | 0.6 (read at write_gate.py:143, comp | CONFIG FIELD l0_echo_threshold, no TOML key (HARDCODED def | HIGH | Jaccard content-word overlap vs any MEMORY.md entry description above which a new active entry with no external relations is QUARANTINED as an L0 echo |
-| `numeric_probe_mode` | config.py:111 | 'log' (read at write_gate.py:142, br | CONFIG FIELD numeric_probe_mode, no TOML key (HARDCODED de | HIGH | 'log' = numeric contradictions become warnings (burn-in); 'quarantine' = they quarantine the write. |
+| `l0_echo_threshold` | config.py:113 | 0.6 (read at write_gate.py:143, comp | TOML `gate.l0_echo_threshold` | HIGH | Jaccard content-word overlap vs any MEMORY.md entry description above which a new active entry with no external relations is QUARANTINED as an L0 echo |
+| `gate_strict` | config.py; write_gate.py:78 | false | TOML `gate.strict` | med | Enables gate stage 2 (near-dup consistency probe); dormant in production, opt in after measuring false-quarantines. |
+| `numeric_probe_mode` | config.py:111 | 'log' (read at write_gate.py:142, br | TOML `gate.numeric_probe_mode` | HIGH | 'log' = numeric contradictions become warnings (burn-in); 'quarantine' = they quarantine the write. |
 | `consistency_near_dup_threshold` | write_gate.py:340 | 0.95 (strict mode only) | HARDCODED | med | Gate stage 2: in strict mode, an embedded candidate >0.95 cosine to an existing entry with a DIFFERENT description is QUARANTINED as a near-duplicate. |
 | `hook_timeout` | cli/hook_cmd.py:41 | 10 seconds | HARDCODED (CLI --timeout default, written into settings.js | med | PostToolUse hook timeout — the window in which a hand-edited memory file must parse+embed+gate+dual-write. |
-| `numeric_probe_sim_threshold` | config.py:112 | 0.80 (read at write_gate.py:153) | CONFIG FIELD numeric_probe_sim_threshold, no TOML key (HAR | med | Cosine similarity above which an existing active entry counts as a 'neighbour' whose numeric claims are compared against the candidate's. |
+| `numeric_probe_sim_threshold` | config.py:112 | 0.80 (read at write_gate.py:153) | TOML `gate.numeric_probe_sim_threshold` | med | Cosine similarity above which an existing active entry counts as a 'neighbour' whose numeric claims are compared against the candidate's. |
 | `desc_length_nudge` | write_gate.py:93 | 120 chars | HARDCODED | low | Warn-only nudge when a non-chain description exceeds 120 chars (chains exempt). |
 | `importance_mode_nudge` | write_gate.py:105 | store>=10 entries AND mode fraction  | HARDCODED (thresholds at write_gate.py:100 and :105) | low | Warn-only nudge when the declared importance equals the store's modal value and that mode covers >40% of entries (anti-7-inflation). |
-| `numeric_probe_enabled` | config.py:110 | True | CONFIG FIELD numeric_probe_enabled, no TOML key (HARDCODED | low | Master switch for gate stage 5 (numeric contradiction detection against >=0.80-cosine neighbours). |
+| `numeric_probe_enabled` | config.py:110 | True | TOML `gate.numeric_probe_enabled` | low | Master switch for gate stage 5 (numeric contradiction detection against >=0.80-cosine neighbours). |
 | `reconcile_shrink_guard` | reconcile.py:35 | 0.5 (_SHRINK_GUARD_FRACTION) | HARDCODED | low | Reconcile refuses to rebuild the stores when the parsed .md set has collapsed below 50% of the existing JSONL (wipe protection). |
 
 **High-risk rationale:**
@@ -87,7 +90,7 @@
 
 | param | where | default | config key | risk | effect |
 |---|---|---|---|---|---|
-| `embedding_input_max_chars` | embedding_input.py:22 | 8000 (DEFAULT_MAX_CHARS) | HARDCODED | HIGH | Truncation budget per embedding space; default space = name+description+summary+NEWEST observations (recency-biased tail), reasoning takes its tail. |
+| `embedding_input_max_chars` | embedding_input.py:22 | 8000 (DEFAULT_MAX_CHARS) | TOML `retrieval.embed_max_chars` | HIGH | Truncation budget per embedding space; default space = name+description+summary+NEWEST observations (recency-biased tail), reasoning takes its tail. |
 | `l0_token_budget` | config.py:94 | 2000 (also l0_budget.py:17 DEFAULT_T | retrieval.l0_token_budget | HIGH | Token cap for MEMORY.md (the always-in-context L0 index); rebuild_index drops the lowest-importance ACTIVE entries when over budget (l0_budget.py:268) |
 | `recall_cli_limit` | cli/memory_cmd.py:54 | 10 | HARDCODED (CLI --limit default; kernel habit uses --limit  | med | Default number of recall results returned to the LLM. |
 | `embed_batch_size` | cli/index_cmd.py:58 | 20 | HARDCODED (CLI --batch-size default) | low | Texts per Voyage API call during bulk index --embed. |

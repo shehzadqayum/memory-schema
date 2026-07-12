@@ -254,7 +254,9 @@ before anything mutates). Insert copies the full dict (all keys persist). Merge:
   embedding, embeddings, divergence_profile, embed_input_hash` (the hash merges WITH the
   vectors it describes, so the sidecar's skip-if-unchanged stays truthful on a merge;
   `summary` merges too — it is a prose peer of body/prompt/chain AND an embedding input
-  hashed into `embed_input_hash`, so dropping it would desync the row from its vectors);
+  hashed into `embed_input_hash`, so dropping it would desync the row from its vectors;
+  `confidence` is v4-only and never emitted by a v5 writer — it stays in the whitelist purely so a
+  merge PRESERVES it on a legacy v4 entry, not because v5 sets it);
 - immutable after creation: `name, schema, filepath, project` (`log` is not merged
   directly — it flows in via `observations`, which append-merge; `related` is not a field);
 - `reasoning` REPLACES (the `.md` file is the accumulator; appending here doubled chain
@@ -410,9 +412,11 @@ max_inherit_depth=3)` (the CLI `recall` passes `config.recall_depth`/`recall_dec
 TOML-tunable via `retrieval.*`):
 
 1. **Scope**: `project_matches_scope` — bidirectional (ancestors AND descendants),
-   unscoped entities universally visible, depth separation ≤ `max_inherit_depth`.
-2. **Returnable** = active only (unless `--include-inactive`); non-active entries stay
-   traversable in BFS ("traversable-not-returned" — superseded entries bridge walks).
+   unscoped entities universally visible, depth separation ≤ `max_inherit_depth` (measured from the
+   query's project node — e.g. a query at `a.b.c` sees an entity at `a` (depth 2) but not one at `x.y.z.w`).
+2. **Returnable** = active only (unless `--include-inactive`); **all non-active statuses**
+   (superseded, archived, quarantined) stay traversable in BFS ("traversable-not-returned" — a superseded
+   entry can still bridge a walk to an active neighbour), but only active entries are returned.
 3. **Seeds**: explicit `name`, else the top-`retrieval.seed_count` (default 3) scored entries (JSONL: full blend + BM25;
    Neo4j: native vector-index search with escalating scoped over-fetch ×3/×9/×100 and a
    +0.1 substring bonus). **Neo4j query-recall returns `[]` without embeddings** (no
@@ -464,15 +468,15 @@ opt-out `MEMORYSCHEMA_RECALL_LOG=0`):
          "semantic_weights": [0.2, 0.3, 0.5]}}
 ```
 
-`hits` = top 10 **served** results only (a consistently-lower-ranked memory is invisible to this
-log — and to everything computed from it, e.g. the dream report's `never_surfaced`); a
-`channel: "probe"` row (§7.3) is ALWAYS logged even past the cap — its citation is the
-decensoring signal. `cfg` =
-the active retrieval config, so attribution can be segmented by config regime. `degraded` =
+`hits` = **all served** results (bounded by the recall `--limit`, no fixed top-N cap). The log is a
+record of what was SERVED, so an entity absent from it was never served — NOT merely rank-capped;
+this is exactly the distinction the dream report's `never_surfaced` needs (a consistently rank-11+
+entity is no longer misread as dead weight). A `channel: "probe"` row (§7.3) is logged like any other.
+`cfg` = the active retrieval config, so attribution can be segmented by config regime. `degraded` =
 backend was not Neo4j. Deliberately separate from scoring —
 recall never bumps `access_count`. `memoryschema recall-stats [--strong 0.5]` reports
 events, strong-hit rate (top score ≥ threshold), degraded count, recalls/day, top
-surfaced, and the never-surfaced set (the dream report's dead-weight feed).
+surfaced, and the never-served set (the dream report's dead-weight feed).
 
 ### 7.2 Attribution (recall × citation join)
 
@@ -524,7 +528,9 @@ telemetry→config loop is NEVER closed automatically:
    knowledge suppression; probes are visible in the recall log for segmentation.
 5. **Decay form**: `eval --mode decayfit` fits the inter-recall interval distribution
    (exponential vs power-law CCDF) from the recall log — the environment-derived decay
-   (Anderson & Schooler); honest "insufficient data" below 50 intervals.
+   (Anderson & Schooler); honest "insufficient data" below 50 intervals. Method is a
+   zero-dependency closed-form fit: each model is linearized (log-CCDF vs t; log-CCDF vs
+   log-t) and compared by R² — no scipy, no MLE, matching the package's stdlib-only posture.
 6. **Apply**: config changes are TOML diffs the operator applies ONE at a time, in git,
    against a pre-committed keep-threshold (the multi-space-ablation protocol: commit the
    threshold BEFORE seeing results). Record each tuning run as a memory entity.
@@ -549,7 +555,7 @@ candidate sections over ACTIVE entities:
 | `chains` | `chain-*` name, not the active chain | distill durable lessons into standalone entities, then archive (archive-never-destroy) |
 | `oversized` | the active chain with > 40 observations | conclude + release + start a successor |
 | `stale_keyed` | has `key` + `valid_from`, ≥ 14 days unrefreshed | re-remember with the same key, or leave if stable |
-| `never_surfaced` | zero recall-log appearances; **excluding entities created < 7 days ago** (grace — fresh distillates haven't had a chance) | archive if resolved/expired; reference facts stay |
+| `never_surfaced` | never SERVED in the recall log (which now records all served hits, not a top-N); **excluding entities created < 7 days ago** (grace — fresh distillates haven't had a chance) | archive if resolved/expired; reference facts stay |
 | `duplicates` | pairwise default-space cosine ≥ 0.80 | merge (`--supersedes` both) or link if distinct |
 | `attribution_review` | recalled ≥ 3×, never cited (§7.2) | retrieval noise (archive/refine) vs ambient value (leave, note it) |
 | `promotion_candidates` | procedural type OR ≥ 3 citations, no `promoted_to` yet | promote to a standing surface (§8.3) |
@@ -680,7 +686,10 @@ is the file-first contract: the `.md` set is truth and `reconcile` heals the der
 is that the drift stays **silent** until someone runs `sync`/`reconcile`; to close that, the throttled
 default-mode gate (`_maybe_preflight`, §9.1) also runs a cheap Neo4j-free `.md`-vs-JSONL count check
 (`reconcile.local_drift`) and prints `⚠ memory store drift (N .md vs M jsonl) — run \`memoryschema reconcile\``
-on any mismatch — so an interrupted index becomes loud within one un-throttled CLI call.
+on any mismatch — so an interrupted index becomes loud within one un-throttled CLI call. A kill BETWEEN the
+JSONL write and the sidecar write leaves a JSONL entry with no `.npz` (a vectorless row) — harmless (recall
+degrades to keyword for it) and healed by re-embed; the count banner is `.md`-vs-JSONL only, so `sync`
+(three-layer, including the sidecar via reconcile's hash check) remains the comprehensive audit.
 
 > **Roadmap (deliberately not built):** embedding is synchronous in the hook (it holds the ~1.5 s Voyage
 > call inline). An async/queued embedding worker would shorten the hook but adds a daemon + a durable queue +

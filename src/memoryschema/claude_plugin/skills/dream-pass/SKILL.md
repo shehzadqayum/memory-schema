@@ -52,8 +52,8 @@ or git — every action below is reversible and reviewable.
 
 5. **Archive never-surfaced dead weight.** Only entities that are RESOLVED or
    EXPIRED (completed plans, fixed bugs). Reference facts stay even if unread.
-   ⚠ The recall log records only the top-10 served hits — a consistently-rank-11+
-   entity LOOKS never-surfaced here without being dead; weigh that before archiving.
+   ⚠ "Never surfaced" = never SERVED in the recall log (which records all served hits) —
+   still not automatic dead weight: a reference fact, or one recall was simply run rarely.
    (With `retrieval.probe_slot` on, a probed entity leaves this list — it WAS served;
    if it earned no citation it appears in the attribution review instead.)
 

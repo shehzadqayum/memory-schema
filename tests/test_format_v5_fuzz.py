@@ -197,6 +197,15 @@ Desc.
     assert "first" in mem["observations"] and "second" in mem["observations"]
 
 
+def test_bom_prefixed_v5_dispatches_and_parses():
+    from memoryschema.format_v5 import is_v5_content
+    from memoryschema.tags import parse_memory_content
+    f = "﻿---\nschema: 5\n---\n\nA BOM-prefixed entity.\n"
+    assert is_v5_content(f), "dispatch must be BOM-tolerant (parse + guard already are)"
+    mem = parse_memory_content(f, filepath="e.md")   # the DISPATCH path, not parse_v5_content directly
+    assert mem is not None and mem["name"] == "e"
+
+
 def test_stray_mid_body_fence_is_body_content_not_corruption():
     f = """---
 schema: 5

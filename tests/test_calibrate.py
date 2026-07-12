@@ -105,9 +105,9 @@ def test_pick_probe_prefers_dormant_and_excludes_served(cfg):
     assert p["name"] == "dormant" and p["channel"] == "probe"
 
 
-def test_probe_row_is_logged_even_past_the_top10_cap(cfg):
-    # at --limit >= 10 the appended probe is the 11th row; the log must still carry it
-    # (the probe's citation is the decensoring signal — an unlogged probe can't attribute)
+def test_all_served_hits_are_logged(cfg):
+    # the log records ALL served hits (no fixed top-N cap) so `never_surfaced` can distinguish
+    # never-served from rank-capped; the appended probe (11th row) is logged like any other.
     rows = [{"name": f"m{i}", "score": 0.5, "channel": "seed"} for i in range(10)]
     rows.append({"name": "the-probe", "score": 0.0, "channel": "probe"})
     recall_log.log_recall(cfg, "q", rows, backend="MemoryStore",
