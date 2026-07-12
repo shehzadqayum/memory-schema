@@ -55,7 +55,7 @@ def _run_ablation_eval(config, as_json):
     from memoryschema.eval.fixtures import load_gold_set
     from memoryschema.eval.ablation import run_ablation
 
-    entries = [e for e in MemoryStore(str(config.store_path)).list_all()
+    entries = [e for e in MemoryStore(str(config.store_path), config=config).list_all()
                if e.get("embedding") and (e.get("status") or "active") == "active"]
     try:
         from memoryschema.embeddings import embed_text
@@ -117,7 +117,7 @@ def _run_backend_eval(config, as_json):
         ns.close()
     except Exception as e:
         results["neo4j"] = {"error": str(e)[:140]}
-    results["jsonl"] = bench(MemoryStore(str(config.store_path)))
+    results["jsonl"] = bench(MemoryStore(str(config.store_path), config=config))
 
     if as_json:
         click.echo(json.dumps(results, indent=2))
@@ -143,7 +143,7 @@ def _run_retrieval_eval(config, store_path, as_json):
     if store_path:
         # Real-data evaluation against actual store
         from memoryschema.eval.fixtures import build_real_data_query_set
-        store = MemoryStore(store_path)
+        store = MemoryStore(store_path, config=config)   # eval must honour the deployment config
         query_set = build_real_data_query_set()
         source = f"real store ({store_path})"
     else:
@@ -152,7 +152,7 @@ def _run_retrieval_eval(config, store_path, as_json):
         import os
         tmpdir = tempfile.mkdtemp()
         fixture_path = os.path.join(tmpdir, 'eval.jsonl')
-        store = MemoryStore(fixture_path)
+        store = MemoryStore(fixture_path, config=config)   # fixtures too — measure the config YOU run
         for entry in build_fixture_entries():
             store.upsert(entry)
         query_set = build_query_set()

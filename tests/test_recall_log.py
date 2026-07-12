@@ -35,6 +35,15 @@ def test_log_recall_appends_event(cfg):
     assert ev[0]["hits"][0] == {"name": "alpha", "score": 0.71, "channel": "seed"}
 
 
+def test_log_recall_snapshots_retrieval_config(cfg):
+    # the cfg snapshot makes config changes visible in telemetry (attribution segmentable by regime)
+    recall_log.log_recall(cfg, "q", _results(), backend="Neo4jMemoryStore",
+                          now="2026-06-30T10:00:00+00:00")
+    ev = recall_log.read_events(cfg)
+    assert ev[0]["cfg"] == {"recency_decay": 0.995, "recall_depth": 2,
+                            "recall_decay": 0.8, "semantic_weights": [0.2, 0.3, 0.5]}
+
+
 def test_log_recall_disabled_writes_nothing(cfg, monkeypatch):
     monkeypatch.setenv("MEMORYSCHEMA_RECALL_LOG", "0")
     recall_log.log_recall(cfg, "q", _results(), backend="Neo4jMemoryStore")

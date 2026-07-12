@@ -41,6 +41,15 @@ def log_recall(config, query, results, backend, degraded=False, now=None):
                 for r in (results or [])][:10]
         rec = {"ts": now, "query": query, "n": len(results or []),
                "backend": backend, "degraded": bool(degraded), "hits": hits}
+        # Snapshot the active retrieval config per event — without it a config change is invisible
+        # in the telemetry and attribution can never be segmented by config regime (gate-tuning eval).
+        try:
+            rec["cfg"] = {"recency_decay": config.recency_decay,
+                          "recall_depth": config.recall_depth,
+                          "recall_decay": config.recall_decay,
+                          "semantic_weights": list(config.semantic_weights)}
+        except Exception:
+            pass                        # telemetry stays best-effort; a partial event beats none
         p = _log_path(config)
         p.parent.mkdir(parents=True, exist_ok=True)
         with open(p, "a", encoding="utf-8") as f:

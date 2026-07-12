@@ -2,6 +2,26 @@
 
 ## [Unreleased]
 
+### Added/Fixed (2026-07-12 — gate-tuning audit: epistemic-policy legibility + measurement seams)
+Follow-ups from the gate-tuning analysis (attribution join = guardrail, not loss function; full evaluation in
+the memory store under `gate-tuning-evaluation`):
+- **Eval now honours the deployment's own config** — every eval store was constructed WITHOUT config and
+  `evaluate_query` used built-in depth/decay, so `memoryschema eval` measured a configuration nobody runs
+  (the placebo class again). All eval paths now thread `config`; `evaluate_query` uses
+  `retrieval.recall_depth/decay`.
+- **Recall log snapshots the active retrieval config per event** (`cfg`: recency_decay, recall_depth,
+  recall_decay, semantic_weights) — without it a config change was invisible in telemetry and attribution
+  could never be segmented by config regime.
+- **New TOML keys for the highest-risk write-suppression levers**: `gate.l0_echo_threshold`,
+  `gate.numeric_probe_mode`, `gate.numeric_probe_enabled`, and `retrieval.mitigation_dampening` (all were
+  config fields with no TOML key — policy-in-code).
+- **`docs/parameter-registry.md`** — the full 53-parameter epistemic-policy surface (class, default, config
+  key, suppression risk), with the two-decays disambiguation (§6.3 note added: lowering `recency_decay`
+  TIGHTENS) and the known systemic couplings.
+- **Dream report `never_surfaced` now names its blind spot** — the recall log records top-10 served hits
+  only, so a consistently-low-ranked entity looks never-surfaced; the note warns the judge before archiving
+  (manual §7.1 documents the cap).
+
 ### Fixed (2026-07-12 — adversarial-review follow-ups on the four fixes above)
 A multi-agent adversarial review (7 dimensions, 2-skeptic verification) of the four fixes surfaced these:
 - **`summary` was also missing from the JSONL merge whitelist** — the same class as `embed_input_hash`, and

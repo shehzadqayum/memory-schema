@@ -72,10 +72,15 @@ def evaluate_query(store, query_spec):
     Returns:
         Dict with metrics: recall@5, recall@10, mrr, ndcg@10, retrieved.
     """
+    # Honour the store's deployment config (retrieval.recall_depth/decay): with the built-in
+    # defaults the eval measured a configuration nobody runs (the placebo class again).
+    cfg = getattr(store, 'config', None)
     results = store.recall(
         query=query_spec['query'],
         project=query_spec.get('project'),
         limit=20,
+        depth=(cfg.recall_depth if cfg else 2),
+        decay=(cfg.recall_decay if cfg else 0.8),
     )
     retrieved = [r['name'] for r in results]
     relevant = query_spec['relevant']

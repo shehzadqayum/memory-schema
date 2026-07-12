@@ -102,6 +102,15 @@ class TestFlattenToml:
         flat = flatten_toml(raw)
         assert flat == {'neo4j_uri': 'bolt://x', 'neo4j_user': 'admin', 'project_name': 'test'}
 
+    def test_gate_and_dampening_keys_map(self):
+        # the write-suppression levers are TOML-tunable, not policy-in-code (gate-tuning audit)
+        raw = {'gate': {'l0_echo_threshold': 0.7, 'numeric_probe_mode': 'quarantine',
+                        'numeric_probe_enabled': False},
+               'retrieval': {'mitigation_dampening': 0.9}}
+        flat = flatten_toml(raw)
+        assert flat == {'l0_echo_threshold': 0.7, 'numeric_probe_mode': 'quarantine',
+                        'numeric_probe_enabled': False, 'mitigation_dampening': 0.9}
+
     def test_empty(self):
         assert flatten_toml({}) == {}
 

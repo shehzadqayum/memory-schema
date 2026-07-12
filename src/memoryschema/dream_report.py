@@ -144,7 +144,11 @@ def build_report(config, active_chain=None, today=None):
                 report["never_surfaced"].append({
                     "name": name,
                     "description": (e.get("description") or "")[:120],
-                    "note": "zero recall appearances in the logged window — "
+                    # The recall log records only the top-10 served hits, so an entity that
+                    # consistently ranks 11+ looks never-surfaced here — a telemetry-window blind
+                    # spot, NOT proof of dead weight. The judge must weigh that before archiving.
+                    "note": "zero recall appearances in the logged window (log records top-10 only — "
+                            "a consistently-low-ranked entity is invisible here, not proven dead) — "
                             "archive if resolved/expired, keep if reference"})
     except Exception:
         pass

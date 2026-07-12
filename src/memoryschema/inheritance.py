@@ -35,6 +35,12 @@ _TOML_FIELD_MAP = {
     'retrieval.max_inherit_depth': 'max_inherit_depth',
     'retrieval.semantic_weights': 'semantic_weights',
     'retrieval.structured_weights': 'structured_weights',
+    'retrieval.mitigation_dampening': 'mitigation_dampening',
+    # [gate] — the write-suppression levers (gate-tuning analysis: the highest-risk epistemic
+    # policy must be as legible/tunable as the retrieval knobs, not policy-in-code).
+    'gate.l0_echo_threshold': 'l0_echo_threshold',
+    'gate.numeric_probe_mode': 'numeric_probe_mode',
+    'gate.numeric_probe_enabled': 'numeric_probe_enabled',
 }
 
 TOML_FILENAME = 'memoryschema.toml'

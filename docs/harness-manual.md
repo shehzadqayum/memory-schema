@@ -371,6 +371,10 @@ as the measured retrieval defect):
 
 ### 6.3 Scoring
 
+> ⚠ Two distinct decays: `retrieval.recency_decay` (0.995/**hour** score decay — LOWER = faster
+> decay = tighter) vs `retrieval.recall_decay` (0.8 per-**hop** BFS decay, §6.4). The full
+> epistemic-parameter surface is catalogued in `docs/parameter-registry.md`.
+
 ```
 score = recency × w_r + importance/10 × w_i + relevance × w_v      (clamped to 1.0, 4 dp)
 ```
@@ -449,10 +453,15 @@ opt-out `MEMORYSCHEMA_RECALL_LOG=0`):
 
 ```json
 {"ts": "...", "query": "...", "n": 7, "backend": "Neo4jMemoryStore",
- "degraded": false, "hits": [{"name": "...", "score": 0.702, "channel": "seed"}, ...]}
+ "degraded": false, "hits": [{"name": "...", "score": 0.702, "channel": "seed"}, ...],
+ "cfg": {"recency_decay": 0.995, "recall_depth": 2, "recall_decay": 0.8,
+         "semantic_weights": [0.2, 0.3, 0.5]}}
 ```
 
-`hits` = top 10. `degraded` = backend was not Neo4j. Deliberately separate from scoring —
+`hits` = top 10 **served** results only (a consistently-lower-ranked memory is invisible to this
+log — and to everything computed from it, e.g. the dream report's `never_surfaced`). `cfg` =
+the active retrieval config, so attribution can be segmented by config regime. `degraded` =
+backend was not Neo4j. Deliberately separate from scoring —
 recall never bumps `access_count`. `memoryschema recall-stats [--strong 0.5]` reports
 events, strong-hit rate (top score ≥ threshold), degraded count, recalls/day, top
 surfaced, and the never-surfaced set (the dream report's dead-weight feed).
