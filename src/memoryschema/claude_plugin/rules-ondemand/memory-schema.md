@@ -93,7 +93,11 @@ frontmatter — lifecycle changes on v4 files revert on reconcile (the CLI warns
 
 `score = recency·w_r + importance/10·w_i + relevance·w_v` (default semantic weights 0.2/0.3/0.5;
 tune per deployment via the `[retrieval]` section of memoryschema.toml — weights, `recency_decay`,
-`mitigation_dampening`, `recall_depth`/`recall_decay`). Relevance is variance-weighted over 7 embedding spaces
+`mitigation_dampening`, `recall_depth`/`recall_decay`, `probe_slot` — and the `[gate]` section for the
+write-suppression levers: `l0_echo_threshold`, `numeric_probe_mode`/`enabled`/`sim_threshold`.
+⚠ These are epistemic policy: tune ONLY via the calibration workflow (harness-manual §7.3 — goldgen →
+`eval --set` grid cells → `eval --mode replay` paired A/B → decayfit). Attribution is a guardrail, never a
+loss function; the operator applies TOML changes one at a time against pre-committed thresholds. Relevance is variance-weighted over 7 embedding spaces
 (name, description+summary, observations, prompt, reasoning, chain, default blend).
 Type modifiers: semantic floors at 0.6; procedural reinforces with access; episodic
 decays. Practical consequences: front-load distinctive wording in the description;

@@ -123,7 +123,10 @@ kernel (`.claude/rules/memory-working.md`) states these five habits for the agen
 - **After bulk `.md` edits:** `memoryschema reconcile` rebuilds JSONL from the `.md` set, pushes Neo4j, prunes,
   and verifies (idempotent; `sync` inspects drift read-only first).
 - **Eval your corpus (optional):** drop a `eval-gold.jsonl` (`{query, relevant, kind}` per line) at the project
-  root and run `memoryschema eval --mode ablation` / `--mode backends`.
+  root and run `memoryschema eval --mode ablation` / `--mode backends`. To TUNE retrieval config safely, use
+  the calibration workflow (harness-manual §7.3): `eval --mode goldgen` mines gold candidates from usage,
+  `eval --set KEY=VALUE` runs grid cells, `eval --mode replay --vs KEY=VALUE` is the paired A/B,
+  `eval --mode decayfit` fits the decay form — then apply ONE TOML change at a time.
 
 | Problem | Fix |
 |---------|-----|

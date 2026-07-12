@@ -16,9 +16,21 @@ name = "{project_name}"
 # [voyage]
 # embed_model = "voyage-4-lite"
 
-# [retrieval]
-# recency_decay = 0.995
-# recall_depth = 2
-# recall_decay = 0.8
+# [retrieval]           — epistemic policy: tune via the calibration workflow (harness-manual §7.3),
+#                         one change at a time; full surface in docs/parameter-registry.md
+# recency_decay = 0.995         # per-HOUR score decay base (lower = FASTER decay = tighter)
+# recall_depth = 2              # BFS hops of spreading activation
+# recall_decay = 0.8            # per-hop score multiplier
+# semantic_weights = [0.2, 0.3, 0.5]    # (recency, importance, relevance) blend
+# structured_weights = [0.3, 0.5, 0.2]
+# mitigation_dampening = 0.95   # score ×= this for entries with inbound MITIGATES
+# association_k = 10            # k-NN neighbour count (the association recall channel)
+# probe_slot = false            # decensoring probe: append one dormant entity per CLI recall
 # l0_token_budget = 2000
 # max_inherit_depth = 3
+
+# [gate]                — write-suppression levers (quarantine thresholds)
+# l0_echo_threshold = 0.6       # Jaccard echo vs the L0 index that QUARANTINEs a write
+# numeric_probe_enabled = true
+# numeric_probe_mode = "log"    # 'log' (warn) or 'quarantine'
+# numeric_probe_sim_threshold = 0.80

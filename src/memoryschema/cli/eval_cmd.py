@@ -1,8 +1,14 @@
-"""CLI command for retrieval and salience evaluation.
+"""CLI command for retrieval evaluation + the calibration workflow (harness-manual §7.3).
 
 Modes:
   retrieval — recall@k, MRR, nDCG@10 against real or fixture store
   salience  — precision/recall of write-decision fixtures + audit log scoring
+  ablation  — single-space vs multi-space, pre-committed keep-threshold
+  backends  — Neo4j vs JSONL quality + latency on the project gold set
+  replay    — paired within-query A/B of config A (--set) vs B (--vs)
+  goldgen   — mine gold-set CANDIDATES from the attribution join (operator reviews)
+  decayfit  — fit the decay form from inter-recall intervals (Anderson & Schooler)
+`--set KEY=VALUE` applies typed config overrides to any mode (the grid-cell mechanism).
 """
 
 import json
@@ -37,6 +43,10 @@ def eval_cmd(config, mode, store_path, set_overrides, vs_overrides, top_k, as_js
         With --store: runs against real data (the single-space baseline)
 
       salience — precision/recall of write-decision fixtures
+      ablation | backends — multi-space / backend benchmarks (project gold set)
+      replay — paired A/B: --set = config A, --vs = config B (§7.3)
+      goldgen — attribution-mined gold candidates for operator review
+      decayfit — environment-derived decay-form fit from the recall log
 
     Example:
         memoryschema eval

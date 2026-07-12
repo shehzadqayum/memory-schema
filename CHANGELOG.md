@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Fixed (2026-07-12 — deployment-surface alignment: the calibration doctrine reaches deployed agents)
+The claude_plugin SSOT, templates, and root docs had missed the calibration work: the deployed scoring note
+(rules-ondemand) now names the `[gate]` levers + `probe_slot` and carries the §7.3 doctrine (attribution =
+guardrail; operator-applied TOML, one change at a time); dream-pass §5 warns about the recall log's top-10
+blind spot (+ probe interaction) before archiving "never-surfaced" entities; `memoryschema.toml.tpl` documents
+the full `[retrieval]` surface + the commented `[gate]` section; BOOTSTRAP.md's eval bullet covers the
+calibration workflow; eval_cmd docstrings list all 7 modes.
+
 ### Added (2026-07-12 — the calibration toolkit: measurement-first tuning, tiers 1/2/4/5)
 `eval/calibrate.py` + CLI modes, per the gate-tuning evaluation (attribution = guardrail, never argmax'd):
 - **`eval --set KEY=VALUE`** — per-run config overrides (typed, loud on unknown keys) = the grid-cell
