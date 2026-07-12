@@ -523,8 +523,10 @@ telemetry→config loop is NEVER closed automatically:
    (Historical-state replay from git commits is out of scope: it needs store+embedding
    rebuild per commit.)
 4. **Decensor**: `retrieval.probe_slot = true` APPENDS one dormant active entity per CLI
-   recall (`channel: "probe"`, score 0.0, never replaces a real result; never-surfaced
-   entities preferred — FSRS-style resurfacing). A cited probe is direct evidence of
+   recall (`channel: "probe"`, score 0.0, never replaces a real result). Dormant = active but
+   never served per the recall log; the probe is chosen uniformly at RANDOM among those
+   (falling back to any unserved active) — random, not ranked, so every dormant entity gets
+   non-zero propensity (FSRS-style resurfacing). A cited probe is direct evidence of
    knowledge suppression; probes are visible in the recall log for segmentation.
 5. **Decay form**: `eval --mode decayfit` fits the inter-recall interval distribution
    (exponential vs power-law CCDF) from the recall log — the environment-derived decay

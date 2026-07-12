@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### Fixed (2026-07-12 — external-review round 2: registry housekeeping)
+Five audited housekeeping catches, each verified against the code: registry header count 53→56 (rows now
+carry their own TOML keys; section counts corrected); `multi_space` risk med→HIGH (flipping it changes every
+recall's relevance — the `semantic_weights` class) + rationale bullets for the post-audit HIGH rows;
+first-column names aligned to the config fields (`seed_count`, `embed_max_chars`); the `semantic_weights`
+rationale no longer hardcodes "the 3 seed slots" (seed count is tunable); §7.3 "dormant" defined precisely —
+uniform RANDOM among never-served actives (the review's proposed "ordered by lowest access count" was
+factually wrong: no such ordering exists; rejected in favour of the accurate wording).
+
 ### Fixed (2026-07-12 — external-review triage: BOM dispatch, log-all-served, registry accuracy)
 Two external docs-only LLM reviews (DeepSeek + Grok), each point checked against the code:
 - **BOM dispatch fix.** `format_v5.is_v5_content` used plain `lstrip()` which does NOT strip a U+FEFF BOM,

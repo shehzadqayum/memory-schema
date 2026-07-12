@@ -2,7 +2,7 @@
 
 > Every tunable epistemic parameter in the package: the thresholds, weights, decays, caps, windows,
 
-**53 parameters** — 23 retrieval-ranking, 9 write-integrity, 8 lifecycle, 8 budget, 5 telemetry-window. (Since this audit, `gate.l0_echo_threshold`, `gate.numeric_probe_mode`, `gate.numeric_probe_enabled`, `gate.numeric_probe_sim_threshold`, and `retrieval.mitigation_dampening` gained TOML keys; `retrieval.probe_slot` (default false) added — the §7.3 decensoring probe; and `gate.strict`, `retrieval.seed_count` (3), `retrieval.embed_max_chars` (8000) promoted to TOML keys; `retrieval.multi_space` (default false — ablation-driven off-switch) added.)
+**56 parameters** — 25 retrieval-ranking, 10 write-integrity, 8 lifecycle, 8 budget, 5 telemetry-window. (TOML-key promotions and additions since the original 53-parameter audit are reflected in the rows themselves; see CHANGELOG for the history.)
 > and budgets that decide what gets WRITTEN (gate), RECALLED (scoring/ranking), or RETIRED
 > (lifecycle/consolidation). These are **policy, not implementation detail** — miscalibration risks
 > knowledge suppression (a memory that never surfaces, is never written, or is wrongly retired).
@@ -20,9 +20,9 @@
 
 | param | where | default | config key | risk | effect |
 |---|---|---|---|---|---|
-| `recall_seed_count` | store.py:980 | 3 (scored[:seed_count]; neo4j top_k) | TOML `retrieval.seed_count` | HIGH | Only the top-3 scored/vector-matched entries seed the activation cascade; everything else must be graph-reachable from them within recall_depth hops. |
+| `seed_count` | store.py:980 | 3 (scored[:seed_count]; neo4j top_k) | TOML `retrieval.seed_count` | HIGH | Only the top-3 scored/vector-matched entries seed the activation cascade; everything else must be graph-reachable from them within recall_depth hops. |
 | `probe_slot` | cli/memory_cmd.py (recall) | false | TOML `retrieval.probe_slot` | HIGH | Appends one dormant active entity per CLI recall (channel=probe, score 0.0) — the §7.3 decensoring probe; changes what is surfaced/logged. |
-| `multi_space` | config.py; store scoring | false | TOML `retrieval.multi_space` | med | Variance-weighted multi-space relevance; OFF by default (2 ablations, no lift). Off = default-space cosine. |
+| `multi_space` | config.py; store scoring | false | TOML `retrieval.multi_space` | HIGH | Variance-weighted multi-space relevance; OFF by default (2 ablations, no lift). Off = default-space cosine. |
 | `semantic_weights` | config.py:106 | (0.2, 0.3, 0.5) | retrieval.semantic_weights | HIGH | (recency, importance, relevance) blend for semantic-mode scoring — the default mode for recall — resolved via store._resolve_weights (store.py:43) for |
 | `as_of_overfetch` | cli/memory_cmd.py:79 | max(limit*4, 20) | HARDCODED | med | Point-in-time (--as-of) recall over-fetches before the temporal validity filter, then truncates back to limit. |
 | `association_k` | config.py:98 | 10 | retrieval.association_k | med | k-NN neighbour count for ASSOCIATED_WITH edges (compute_associations, both stores; also CLI --k default index_cmd.py:138) — the association channel of |
@@ -47,8 +47,10 @@
 | `rerank_limit_default` | embeddings.py:90 | 5 | HARDCODED (function default; recall passes its own limit) | low | Default top_k for the Voyage rerank-2 call when no limit is passed. |
 
 **High-risk rationale:**
-- `recall_seed_count` — The single hardest reachability gate in recall: a relevant but 4th-ranked, graph-isolated memory NEVER surfaces for that query, at any --limit.
-- `semantic_weights` — Miscalibration directly reorders every recall; dropping the relevance weight makes topically-perfect but old/low-importance memories permanently lose the 3 seed slots and never surface.
+- `probe_slot` — Directly changes what is surfaced AND logged (one appended row per recall); its whole point is epistemic (decensoring), so misuse/misreading distorts the telemetry every downstream consumer reads.
+- `multi_space` — Flipping it changes the relevance computation of EVERY recall (7-space variance-weighted blend vs default-space cosine) — the same reorder-everything class as `semantic_weights`; measured flat-to-worse at 47/72 entities, hence default OFF.
+- `seed_count` — The single hardest reachability gate in recall: a relevant but 4th-ranked, graph-isolated memory NEVER surfaces for that query, at any --limit.
+- `semantic_weights` — Miscalibration directly reorders every recall; dropping the relevance weight makes topically-perfect but old/low-importance memories permanently lose the seed slots (default 3, `retrieval.seed_count`) and never surface.
 
 ## write-integrity (9)
 
@@ -90,7 +92,7 @@
 
 | param | where | default | config key | risk | effect |
 |---|---|---|---|---|---|
-| `embedding_input_max_chars` | embedding_input.py:22 | 8000 (DEFAULT_MAX_CHARS) | TOML `retrieval.embed_max_chars` | HIGH | Truncation budget per embedding space; default space = name+description+summary+NEWEST observations (recency-biased tail), reasoning takes its tail. |
+| `embed_max_chars` | embedding_input.py:22 | 8000 (DEFAULT_MAX_CHARS) | TOML `retrieval.embed_max_chars` | HIGH | Truncation budget per embedding space; default space = name+description+summary+NEWEST observations (recency-biased tail), reasoning takes its tail. |
 | `l0_token_budget` | config.py:94 | 2000 (also l0_budget.py:17 DEFAULT_T | retrieval.l0_token_budget | HIGH | Token cap for MEMORY.md (the always-in-context L0 index); rebuild_index drops the lowest-importance ACTIVE entries when over budget (l0_budget.py:268) |
 | `recall_cli_limit` | cli/memory_cmd.py:54 | 10 | HARDCODED (CLI --limit default; kernel habit uses --limit  | med | Default number of recall results returned to the LLM. |
 | `embed_batch_size` | cli/index_cmd.py:58 | 20 | HARDCODED (CLI --batch-size default) | low | Texts per Voyage API call during bulk index --embed. |
@@ -100,7 +102,7 @@
 | `search_cli_limits` | cli/memory_cmd.py:249 | search 20; list/others 10 (memory_cm | HARDCODED (CLI defaults) | low | Default result caps for the substring/fulltext search and list commands. |
 
 **High-risk rationale:**
-- `embedding_input_max_chars` — Content that never fits the composed 8000 chars is semantically invisible forever — the previous 2000-char head-slice value caused the measured 'session recall misses' defect this comment documents.
+- `embed_max_chars` — Content that never fits the composed 8000 chars is semantically invisible forever — the previous 2000-char head-slice value caused the measured 'session recall misses' defect this comment documents.
 - `l0_token_budget` — A dropped entry loses its ambient-context presence entirely — it exists only behind explicit recall, and low-importance entries are exactly the ones nobody thinks to recall.
 
 ## telemetry-window (5)
