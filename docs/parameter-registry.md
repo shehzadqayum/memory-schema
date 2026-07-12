@@ -2,7 +2,7 @@
 
 > Every tunable epistemic parameter in the package: the thresholds, weights, decays, caps, windows,
 
-**53 parameters** — 23 retrieval-ranking, 9 write-integrity, 8 lifecycle, 8 budget, 5 telemetry-window. (Since this audit, `gate.l0_echo_threshold`, `gate.numeric_probe_mode`, `gate.numeric_probe_enabled`, and `retrieval.mitigation_dampening` gained TOML keys.)
+**53 parameters** — 23 retrieval-ranking, 9 write-integrity, 8 lifecycle, 8 budget, 5 telemetry-window. (Since this audit, `gate.l0_echo_threshold`, `gate.numeric_probe_mode`, `gate.numeric_probe_enabled`, and `retrieval.mitigation_dampening` gained TOML keys; `retrieval.probe_slot` (default false) added — the §7.3 decensoring probe.)
 > and budgets that decide what gets WRITTEN (gate), RECALLED (scoring/ranking), or RETIRED
 > (lifecycle/consolidation). These are **policy, not implementation detail** — miscalibration risks
 > knowledge suppression (a memory that never surfaces, is never written, or is wrongly retired).

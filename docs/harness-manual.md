@@ -430,7 +430,9 @@ TOML-tunable via `retrieval.*`):
 
 `search` is the keyword sibling: substring (JSONL) or Lucene fulltext (Neo4j), filters
 only, no scoring/traversal/telemetry. `list` = search with no query, limit 20.
-`eval` measures retrieval quality (recall@k, MRR, nDCG over `recall(limit=20)`).
+`eval` measures retrieval quality (recall@k, MRR, nDCG over `recall(limit=20)`, honouring
+the deployment's `retrieval.*`); `eval --set KEY=VALUE` overrides config per run, and modes
+`replay` / `goldgen` / `decayfit` form the calibration workflow (§7.3).
 
 ### 6.5 Re-embedding
 
@@ -476,6 +478,36 @@ ambient value, reviewed by the dream pass) and `top_attributed` (top 10). The de
 point: retrieval telemetry proves memories are FOUND; a citation at the moment
 `--uses`/`--informs` executes proves one CHANGED the work. Citations are forward-precise
 (logged as they happen); pre-log backlink-era relations are not counted in the rate.
+
+### 7.3 Calibration workflow (tuning epistemic policy safely)
+
+The scoring/gate parameters are epistemic policy (see `docs/parameter-registry.md`); the
+attribution join is a **guardrail, not a loss function** (censored implicit feedback — it
+cannot see what the current policy never serves). Tuning follows this workflow, and the
+telemetry→config loop is NEVER closed automatically:
+
+1. **Grow gold labels**: `eval --mode goldgen` mines candidate `{query → memory}` pairs from
+   the attribution join; the OPERATOR reviews and appends the good ones to `eval-gold.jsonl`
+   (usage labels carry position/selection bias — they are candidates, never auto-labels).
+2. **Grid cells**: `eval --set retrieval.recency_decay=0.99` runs any eval mode under a
+   config override (loud failure on unknown keys); sweep = loop cells in a shell.
+3. **Paired A/B**: `eval --mode replay --vs retrieval.recall_decay=0.7 [--set …A] [--k 5]`
+   re-runs the SAME queries (logged + gold) under A vs B against the current JSONL store:
+   label-free top-k diffs for logged queries; McNemar + rank sign test (exact binomial)
+   where gold exists. Paired within-query comparison is the high-power design at this
+   scale — a between-cell attribution-rate A/B would need ~710 recalls per 10pp effect.
+   (Historical-state replay from git commits is out of scope: it needs store+embedding
+   rebuild per commit.)
+4. **Decensor**: `retrieval.probe_slot = true` APPENDS one dormant active entity per CLI
+   recall (`channel: "probe"`, score 0.0, never replaces a real result; never-surfaced
+   entities preferred — FSRS-style resurfacing). A cited probe is direct evidence of
+   knowledge suppression; probes are visible in the recall log for segmentation.
+5. **Decay form**: `eval --mode decayfit` fits the inter-recall interval distribution
+   (exponential vs power-law CCDF) from the recall log — the environment-derived decay
+   (Anderson & Schooler); honest "insufficient data" below 50 intervals.
+6. **Apply**: config changes are TOML diffs the operator applies ONE at a time, in git,
+   against a pre-committed keep-threshold (the multi-space-ablation protocol: commit the
+   threshold BEFORE seeing results). Record each tuning run as a memory entity.
 
 ---
 

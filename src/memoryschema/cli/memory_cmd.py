@@ -130,6 +130,14 @@ def recall(config, query, limit, project, include_inactive, as_of, as_json):
             except (ValueError, TypeError):
                 pass
 
+    # Decensoring probe (opt-in retrieval.probe_slot): APPEND one dormant entity, marked
+    # channel='probe' — a cited probe is decensored evidence of knowledge suppression.
+    if getattr(config, "probe_slot", False) and not as_of:
+        from memoryschema.recall_log import pick_probe
+        _probe = pick_probe(config, store, {r.get("name") for r in results})
+        if _probe:
+            results = list(results) + [_probe]
+
     # Telemetry: record that this recall happened (Move 1 — measure whether memory is read).
     # Best-effort + separate from scoring; never breaks recall.
     from memoryschema.recall_log import log_recall

@@ -105,6 +105,9 @@ class MemoryConfig:
     # Tune toward relevance for recall-driven workloads (e.g. journaling).
     semantic_weights: tuple = (0.2, 0.3, 0.5)
     structured_weights: tuple = (0.3, 0.5, 0.2)
+    # Decensoring probe (gate-tuning eval Tier 4): append one dormant entity per CLI recall,
+    # channel='probe' — exploration so suppression becomes observable. Opt-in.
+    probe_slot: bool = False
 
     # Gate probes (v4)
     numeric_probe_enabled: bool = True

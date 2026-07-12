@@ -12,14 +12,23 @@ import click
 
 
 @click.command()
-@click.option("--mode", type=click.Choice(["retrieval", "salience", "ablation", "backends"]),
+@click.option("--mode", type=click.Choice(["retrieval", "salience", "ablation", "backends",
+                                           "replay", "goldgen", "decayfit"]),
               default="retrieval",
-              help="retrieval quality | write-decision salience | multi-space ablation | backend benchmark.")
+              help="retrieval quality | write-decision salience | multi-space ablation | backend "
+                   "benchmark | paired A/B config replay | gold-candidate mining | decay-form fit.")
 @click.option("--store", "store_path", default=None, type=click.Path(),
               help="Path to store.jsonl for real-data eval. Default: configured store.")
+@click.option("--set", "set_overrides", multiple=True, metavar="KEY=VALUE",
+              help="Config override (repeatable), e.g. --set retrieval.recency_decay=0.99. "
+                   "For replay this defines config A; for other modes, the run's config.")
+@click.option("--vs", "vs_overrides", multiple=True, metavar="KEY=VALUE",
+              help="replay only: config B overrides (A vs B, paired per query).")
+@click.option("--k", "top_k", default=5, show_default=True,
+              help="replay only: top-k window for the paired comparison.")
 @click.option("--json", "as_json", is_flag=True, help="Output results as JSON.")
 @click.pass_obj
-def eval_cmd(config, mode, store_path, as_json):
+def eval_cmd(config, mode, store_path, set_overrides, vs_overrides, top_k, as_json):
     """Run evaluation against real or fixture store.
 
     Modes:
@@ -35,6 +44,51 @@ def eval_cmd(config, mode, store_path, as_json):
         memoryschema eval --mode salience
         memoryschema eval --json
     """
+    # --set applies config overrides to THIS run (the grid-cell mechanism: sweep by looping
+    # cells in a shell; each run is one cell). Loud failure on a bad key/value.
+    if set_overrides and mode != 'replay':
+        from memoryschema.eval.calibrate import apply_overrides
+        config = apply_overrides(config, set_overrides)
+
+    if mode == 'replay':
+        from memoryschema.eval.calibrate import replay
+        r = replay(config, list(set_overrides), list(vs_overrides), k=top_k)
+        if as_json:
+            click.echo(json.dumps(r, indent=2))
+            return
+        click.echo(f"Paired replay (top-{r['k']}): A={r['a'] or 'deployment'}  B={r['b'] or 'deployment'}")
+        lg = r["logged"]
+        if lg:
+            click.echo(f"  logged queries: {lg['queries']}  changed: {lg['changed']}  "
+                       f"mean jaccard: {lg['mean_jaccard']}")
+            for d in lg["diffs"][:10]:
+                click.echo(f"    {d['query'][:48]:<48} +{','.join(d['entered']) or '-'} "
+                           f"-{','.join(d['left']) or '-'}")
+        g = r["gold"]
+        if g and g.get("queries"):
+            click.echo(f"  gold: hits A={g['hits_a']}/{g['queries']} B={g['hits_b']}/{g['queries']}  "
+                       f"McNemar p={g['mcnemar']['p']}  rank wins B={g['rank']['b_wins']} "
+                       f"A={g['rank']['a_wins']} p={g['rank']['p']}")
+        elif g:
+            click.echo(f"  gold: {g.get('note')}")
+        click.echo("  (verdict is yours: apply a TOML change only on a pre-committed threshold)")
+        return
+    if mode == 'goldgen':
+        from memoryschema.eval.calibrate import gold_candidates
+        rows = gold_candidates(config)
+        if as_json:
+            click.echo(json.dumps(rows, indent=2))
+            return
+        click.echo(f"Gold-set CANDIDATES from the attribution join ({len(rows)}) — REVIEW before "
+                   f"appending to eval-gold.jsonl (usage labels carry position/selection bias):")
+        for r in rows:
+            click.echo("  " + json.dumps(r, ensure_ascii=False))
+        return
+    if mode == 'decayfit':
+        from memoryschema.eval.calibrate import fit_decay
+        r = fit_decay(config)
+        click.echo(json.dumps(r, indent=2))
+        return
     if mode == 'salience':
         _run_salience_eval(as_json)
         return

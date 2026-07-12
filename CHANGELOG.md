@@ -2,6 +2,25 @@
 
 ## [Unreleased]
 
+### Added (2026-07-12 — the calibration toolkit: measurement-first tuning, tiers 1/2/4/5)
+`eval/calibrate.py` + CLI modes, per the gate-tuning evaluation (attribution = guardrail, never argmax'd):
+- **`eval --set KEY=VALUE`** — per-run config overrides (typed, loud on unknown keys) = the grid-cell
+  mechanism for any eval mode.
+- **`eval --mode replay --vs KEY=VALUE [--k N]`** — paired within-query A/B: the same queries (logged +
+  project gold) re-run under config A vs B against the current JSONL store; label-free top-k diffs, McNemar
+  and rank sign tests (exact binomial). The high-power design at low n (~710 recalls/arm would be needed for
+  a between-cell attribution A/B). Uses ONLY the project's own `eval-gold.jsonl` (the packaged fixture
+  fallback names the package's entities, not the deployment's).
+- **`eval --mode goldgen`** — mines candidate `{query → memory}` gold pairs from the attribution join for
+  OPERATOR review into `eval-gold.jsonl` (candidates, never auto-labels — usage labels carry bias).
+- **`eval --mode decayfit`** — fits the inter-recall interval distribution (exponential vs power-law CCDF)
+  from the recall log: the environment-derived decay form (Anderson & Schooler); honest below 50 intervals.
+- **`retrieval.probe_slot`** (default false) — decensoring probe: APPENDS one dormant active entity per CLI
+  recall (`channel: "probe"`, score 0.0; never-surfaced preferred; no real result displaced). A cited probe
+  is direct evidence of knowledge suppression — the zero-propensity region becomes observable.
+- Manual §7.3 "Calibration workflow" (goldgen → grid cells → paired replay → probe → decayfit → operator
+  applies TOML one at a time against pre-committed thresholds); registry note; 11 new tests.
+
 ### Added/Fixed (2026-07-12 — gate-tuning audit: epistemic-policy legibility + measurement seams)
 Follow-ups from the gate-tuning analysis (attribution join = guardrail, not loss function; full evaluation in
 the memory store under `gate-tuning-evaluation`):

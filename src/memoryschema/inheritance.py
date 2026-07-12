@@ -36,6 +36,7 @@ _TOML_FIELD_MAP = {
     'retrieval.semantic_weights': 'semantic_weights',
     'retrieval.structured_weights': 'structured_weights',
     'retrieval.mitigation_dampening': 'mitigation_dampening',
+    'retrieval.probe_slot': 'probe_slot',
     # [gate] — the write-suppression levers (gate-tuning analysis: the highest-risk epistemic
     # policy must be as legible/tunable as the retrieval knobs, not policy-in-code).
     'gate.l0_echo_threshold': 'l0_echo_threshold',

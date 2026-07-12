@@ -58,6 +58,36 @@ def log_recall(config, query, results, backend, degraded=False, now=None):
         pass
 
 
+def pick_probe(config, store, exclude_names, rng=None):
+    """Decensoring probe (gate-tuning eval, Tier 4): pick ONE dormant active entity to APPEND
+    to a recall's results, marked channel='probe'. Citations of probes are direct, decensored
+    evidence of knowledge suppression — without exploration, the attribution telemetry can
+    never see what the current policy never serves (zero-propensity region). Never-surfaced
+    entities are preferred (FSRS-style resurfacing built in). Opt-in via retrieval.probe_slot;
+    best-effort (returns None on any failure); the probe ADDS a row — no real result is lost."""
+    try:
+        if not getattr(config, "probe_slot", False):
+            return None
+        import random
+        rng = rng or random
+        pool = [e for e in store.list_all()
+                if (e.get("status") or "active") == "active"
+                and e.get("name") and e.get("name") not in exclude_names]
+        if not pool:
+            return None
+        surfaced = set()
+        for ev in read_events(config):
+            for h in ev.get("hits") or []:
+                surfaced.add(h.get("name"))
+        dormant = [e for e in pool if e["name"] not in surfaced]
+        e = rng.choice(dormant or pool)
+        return {"name": e["name"], "score": 0.0, "channel": "probe",
+                "type": e.get("type"), "importance": e.get("importance"),
+                "description": e.get("description")}
+    except Exception:
+        return None
+
+
 def read_events(config):
     """All logged recall events (skips malformed lines)."""
     p = _log_path(config)
