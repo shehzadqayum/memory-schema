@@ -1,0 +1,12 @@
+# machine-written by `memoryschema deploy register` — do not hand-edit
+[deployment]
+project = "helios"
+repo_url = "https://github.com/shehzadqayum/helios.git"
+subtree_prefix = "packages/memory-schema"
+scopes = ["working"]
+schema_version = 5
+branch = "deployments/helios"
+module_commit = "617177db9e72c79a0bb4bc7db7405689c9e7a702"
+consumer_commit = "00bba6f8dcecbb1f7077a0cc82e3dc6fecd34732"
+registered_at = "2026-07-13"
+note = "primary consumer; vendored editable into helios/.venv"
