@@ -1,0 +1,40 @@
+# memoryschema.toml — Agent configuration
+# Values here are inherited by child agents. Parent always wins on conflict.
+
+[project]
+name = "memory-schema"
+
+# [store]
+# path = "memory/store.jsonl"
+
+# [neo4j]
+# uri = "bolt://localhost:7687"
+# user = "neo4j"
+# NOTE: password and api_key must come from environment variables:
+#   NEO4J_PASSWORD, VOYAGE_API_KEY — never store secrets in TOML.
+
+# [voyage]
+# embed_model = "voyage-4-lite"
+
+# [retrieval]           — epistemic policy: tune via the calibration workflow (harness-manual §7.3),
+#                         one change at a time; full surface in docs/parameter-registry.md
+# recency_decay = 0.995         # per-HOUR score decay base (lower = FASTER decay = tighter)
+# recall_depth = 2              # BFS hops of spreading activation
+# recall_decay = 0.8            # per-hop score multiplier
+# semantic_weights = [0.2, 0.3, 0.5]    # (recency, importance, relevance) blend
+# structured_weights = [0.3, 0.5, 0.2]
+# mitigation_dampening = 0.95   # score ×= this for entries with inbound MITIGATES
+# association_k = 10            # k-NN neighbour count (the association recall channel)
+# seed_count = 3                # scored seeds the cascade starts from (the hardest reachability gate)
+# embed_max_chars = 8000        # cap on the composed embed input; change → run `embed --all` (not auto)
+# multi_space = false           # variance-weighted multi-space relevance — OFF: ablations measured no lift
+# probe_slot = false            # decensoring probe: append one dormant entity per CLI recall
+# l0_token_budget = 2000
+# max_inherit_depth = 3
+
+# [gate]                — write-suppression levers (quarantine thresholds)
+# l0_echo_threshold = 0.6       # Jaccard echo vs the L0 index that QUARANTINEs a write
+# numeric_probe_enabled = true
+# numeric_probe_mode = "log"    # 'log' (warn) or 'quarantine'
+# numeric_probe_sim_threshold = 0.80
+# strict = false               # gate stage 2 (near-dup probe) — dormant in production; enable after measuring
