@@ -56,14 +56,17 @@ def _deployment_branches(root):
 
 
 def _behind_main(root, sha_or_ref):
-    """How many commits the module's HEAD has that `sha_or_ref` lacks (None if unknowable).
+    """How many commits the latest RELEASE (tag; HEAD when untagged) has that `sha_or_ref` lacks.
 
-    The staleness signal: a ledger stamp or deployments/<project> branch that is N>0 commits
-    behind main means the record predates the module's current state — the ledger is describing
-    an OLD sync, silently (the drift class deploy status exists to make loud)."""
+    The staleness signal: a ledger stamp older than the latest release predates something a
+    consumer could have consumed — the record is describing an OLD sync, silently (the drift
+    class deploy status exists to make loud). Measured against the latest TAG, not HEAD, so
+    module-side chores between releases don't stale every ledger entry (found live: the very
+    commit shipping this detector re-staled a stamp made minutes earlier)."""
     if not sha_or_ref:
         return None
-    out = _git(["rev-list", "--count", f"{sha_or_ref}..HEAD"], cwd=root)
+    base = (_git(["describe", "--tags", "--abbrev=0"], cwd=root) or "").strip() or "HEAD"
+    out = _git(["rev-list", "--count", f"{sha_or_ref}..{base}"], cwd=root)
     try:
         return int((out or "").strip())
     except (ValueError, AttributeError):
@@ -186,12 +189,12 @@ def status(as_json):
         if not r["branch_exists"]:
             flags.append("NOT-PUSHED (no deployments/ branch)")
         if (r.get("module_behind") or 0) > 0:
-            flags.append(f"⚠ STALE ledger ({r['module_behind']} commits behind main — "
+            flags.append(f"⚠ STALE ledger ({r['module_behind']} commits behind the latest release — "
                          f"re-run `deploy register` after the consumer updates)")
         if (r.get("branch_behind") or 0) > 0:
             # informational, not ⚠: consumers legitimately lag main between releases (they pin);
             # the RECORD-keeping failure is the ledger stamp, which re-register tracks for free.
-            flags.append(f"consumer branch {r['branch_behind']} behind main "
+            flags.append(f"consumer branch {r['branch_behind']} behind the latest release "
                          f"(fine if pinned; `git subtree push` after the next update)")
         click.echo(f"  {r['project']:<20} {' '.join(flags) or 'ok'}")
         if r["registered"]:
