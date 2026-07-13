@@ -38,3 +38,9 @@ name = "memory-schema"
 # numeric_probe_mode = "log"    # 'log' (warn) or 'quarantine'
 # numeric_probe_sim_threshold = 0.80
 # strict = false               # gate stage 2 (near-dup probe) — dormant in production; enable after measuring
+
+[neo4j]
+# This repo's OWN container (helios owns 7474/7687, fractal 7475/7688)
+uri = "bolt://localhost:7689"
+bolt_port = 7689
+http_port = 7476

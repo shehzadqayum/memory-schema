@@ -82,6 +82,12 @@ workflow is harness-manual **§7.3**. Non-negotiable principles:
   `schema: <non-5>` (parser last-wins). Detecting intent inside a corrupt file is inherently ambiguous;
   matching the parser exactly beats a heuristic that mis-flags valid notes.
 
+## Memory-store note (dream-pass judges read this)
+
+The five genesis entities `chain-definition`, `chain-entity-design`, `chain-live-accumulation-design`,
+`chain-pattern-formalized`, `chain-pattern-verified` are DESIGN DOCS about the chain pattern (migrated from
+the 2026-06 genesis archive), NOT session chains — never distill/archive them as chains despite the prefix.
+
 ## Status
 
 Schema split complete (authority + harness conformance B1–B4 + security). **Extraction** to a standalone
