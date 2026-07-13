@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Fixed (2026-07-13 — BOOTSTRAP pip path: dependency-confusion hazard)
+Option (a) said bare `pip install memory-schema[all]`, but the package is NOT on PyPI — that command would
+install whatever publicly squats the name. Rewritten to the pinned private-source forms (git+https @ tag /
+local path) with an explicit warning; §8 gains the pip-update procedure. First tag `v0.1.0` cut.
+
 ### Fixed (2026-07-12 — wide package review: vector destruction, quarantine lifecycle, CLI safety)
 An economical whole-package review (4 finders, findings code-verified inline) found 16 real defects:
 - **`embed --all` no longer destroys space vectors.** `reembed()` read store.jsonl RAW (no sidecar

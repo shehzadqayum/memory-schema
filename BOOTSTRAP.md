@@ -27,10 +27,16 @@ CLI creates what it needs and the artefacts ship inside the package, so a plain 
 
 ## 1. Install — two modes
 
-**(a) Standalone consumer** — you just want the memory system:
+**(a) Standalone consumer** — you just want the memory system. ⚠ This package is **not published on
+PyPI** — never run a bare `pip install memory-schema` (it would install whatever squats that public name:
+dependency confusion). Install from the private repo, PINNED to a tag:
 ```bash
-pip install memory-schema[all]      # [all] pulls neo4j + voyageai + numpy; the base install is click-only
+pip install "memory-schema[all] @ git+https://github.com/shehzadqayum/memory-schema.git@v0.1.0"
+# or, from a local checkout of this repo (non-editable):
+pip install "C:\path	o\memory-schema[all]"
 ```
+`[all]` pulls neo4j + voyageai + numpy; the base install is click-only. The `.claude` rules/skills and the
+PostToolUse hook ship INSIDE the package (package-data), so no source tree is needed in your project.
 
 **(b) Co-development vendor** — you want to evolve the module alongside your project (the pattern this repo
 was built with). Vendor it via `git subtree` so your repo stays self-contained:
@@ -118,6 +124,9 @@ kernel (`.claude/rules/memory-working.md`) states these five habits for the agen
 
 ## 8. Upgrades, drift & troubleshooting
 
+- **Update a pip-installed module:** re-run the install with the new tag:
+  `pip install "memory-schema[all] @ git+https://github.com/shehzadqayum/memory-schema.git@<new-tag>"`,
+  then `memoryschema plugin sync` (redeploys the `.claude` artefacts from the new package).
 - **Update a vendored module:** `git subtree pull --prefix packages/memory-schema <url> main --squash`, then
   `pip install -e ".\packages\memory-schema[all]"` and `memoryschema plugin sync` to redeploy the artefacts.
 - **After bulk `.md` edits:** `memoryschema reconcile` rebuilds JSONL from the `.md` set, pushes Neo4j, prunes,
