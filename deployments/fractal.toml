@@ -1,0 +1,12 @@
+# machine-written by `memoryschema deploy register` — do not hand-edit
+[deployment]
+project = "fractal"
+repo_url = "https://github.com/shehzadqayum/fractal.git"
+subtree_prefix = "pip @ v0.1.1"
+scopes = ["working"]
+schema_version = 5
+branch = "deployments/fractal"
+module_commit = "8bd1d3d7a5b2e1643de348471947588f6236588c"
+consumer_commit = "d125bf773c2ca421d926f27cc428d4b0b12b2916"
+registered_at = "2026-07-13"
+note = "first pip-path consumer; acceptance-tested 8/8"
