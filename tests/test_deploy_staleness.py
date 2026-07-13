@@ -49,3 +49,29 @@ def test_deploy_status_flags_stale_ledger(tmp_path, monkeypatch):
     human = CliRunner().invoke(cli, ["deploy", "status"],
                                env={"MEMORYSCHEMA_SKIP_PREFLIGHT": "1"})
     assert "STALE ledger" in human.output
+
+
+def test_pip_consumer_has_no_branch_expectation(tmp_path, monkeypatch):
+    repo = tmp_path / "module"
+    repo.mkdir()
+    _git(["init", "-q", "-b", "main"], repo)
+    _git(["config", "user.email", "t@t"], repo)
+    _git(["config", "user.name", "t"], repo)
+    (repo / "a.txt").write_text("one", encoding="utf-8")
+    _git(["add", "-A"], repo)
+    _git(["commit", "-q", "-m", "one"], repo)
+    sha = subprocess.run(["git", "rev-parse", "HEAD"], cwd=repo, check=True,
+                         capture_output=True, text=True).stdout.strip()
+    ld = repo / "deployments"
+    ld.mkdir()
+    (ld / "pipper.toml").write_text(
+        "[deployment]\n"
+        'project = "pipper"\nrepo_url = "https://example.invalid/p.git"\n'
+        'subtree_prefix = "pip @ v0.1.1"\n'
+        f'module_commit = "{sha}"\nregistered_at = "2026-07-13"\n', encoding="utf-8")
+    monkeypatch.chdir(repo)
+    human = CliRunner().invoke(cli, ["deploy", "status"],
+                               env={"MEMORYSCHEMA_SKIP_PREFLIGHT": "1"})
+    assert human.exit_code == 0, human.output
+    assert "NOT-PUSHED" not in human.output, "pip consumers never subtree-push — branch is N/A"
+    assert "pipper" in human.output

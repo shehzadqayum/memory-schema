@@ -154,6 +154,8 @@ def status(as_json):
     rows = []
     for name in sorted(set(entries) | branches):
         e = entries.get(name, {})
+        # pip consumers never subtree-push — a deployments/ branch is N/A for them, not missing.
+        is_pip = str(e.get("subtree_prefix") or "").lower().startswith("pip")
         branch_ref = None
         if name in branches:
             # prefer the remote-tracking tip when present (the pushed consumer state)
@@ -172,8 +174,9 @@ def status(as_json):
             # Staleness vs the module's CURRENT main: the ledger stamp and the consumer branch
             # go stale TOGETHER after a consumer re-vendors, so comparing them only to each
             # other can never catch it — compare both to HEAD and warn loudly.
+            "install": "pip" if is_pip else "subtree",
             "module_behind": _behind_main(root, e.get("module_commit")),
-            "branch_behind": _behind_main(root, branch_ref),
+            "branch_behind": None if is_pip else _behind_main(root, branch_ref),
         })
     if as_json:
         click.echo(json.dumps(rows, indent=2))
@@ -186,7 +189,7 @@ def status(as_json):
         flags = []
         if not r["registered"]:
             flags.append("UNREGISTERED (branch only)")
-        if not r["branch_exists"]:
+        if not r["branch_exists"] and r.get("install") != "pip":
             flags.append("NOT-PUSHED (no deployments/ branch)")
         if (r.get("module_behind") or 0) > 0:
             flags.append(f"⚠ STALE ledger ({r['module_behind']} commits behind the latest release — "

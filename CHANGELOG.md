@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Fixed (2026-07-13 — pip consumers are not NOT-PUSHED)
+`deploy status` expected a `deployments/` branch from every consumer — permanently wrong for pip consumers,
+who never subtree-push. A ledger entry whose `subtree_prefix` starts with "pip" now reports `install=pip`,
+skips the NOT-PUSHED flag and branch-lag entirely (branch = N/A, not missing).
+
 ### Fixed (2026-07-13 — the ledger could go stale silently)
 `deploy status` compared the ledger only against the `deployments/*` branches — but both go stale TOGETHER
 after a consumer re-vendors, so the most common drift was undetectable and DEPLOYMENT.md's "can never lie"
