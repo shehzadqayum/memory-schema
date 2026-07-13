@@ -2,6 +2,29 @@
 
 ## [Unreleased]
 
+## [0.1.1] — 2026-07-13
+
+### Fixed (fractal acceptance-test feedback — the first pip-path consumer)
+- **Every WRITE path ignored `memoryschema.toml`'s Neo4j settings** (found by fractal's acceptance run):
+  `index_memory`'s dual-write and auth-fallback, and the PostToolUse hook, all constructed
+  `Neo4jMemoryStore()` bare — on any project with a custom `[neo4j]` uri/port the write hit the WRONG bolt
+  endpoint, failed auth, and silently degraded to JSONL-only, while the read/heal paths (preflight, sync,
+  reconcile) loaded the toml correctly and masked it. Never surfaced in helios because helios IS the default
+  config. All three sites now thread the TOML-loaded config (`from_toml`, not the bare constructor — which
+  also skips the toml); config now loads BEFORE the auth block. Regression test pins toml→construction.
+- **Degradation is loud and diagnosable**: the JSONL-only warning now carries the exception message (the
+  type name alone hid the wrong-port detail), and the hook's silent `except: pass` fall-through now prints
+  the reason to stderr.
+- **Hook quarantine parity**: the hook's inline quarantine branch gained the `embed_input_hash` pop and the
+  `set_lifecycle(status='quarantined')` .md persistence (it had drifted behind index_memory's fixes —
+  hook/pipeline unification filed as future work).
+- **CLI no longer crashes on cp1252 consoles**: bare `--help` without `PYTHONUTF8` raised
+  UnicodeEncodeError; stdout/stderr now degrade unencodable characters to '?' instead.
+- **Neo4j driver notification spam suppressed** (`notifications_min_severity="OFF"`, guarded for older
+  drivers).
+- Noted, no change (calibration doctrine): a close paraphrase slipping the 0.6 l0-echo threshold is a
+  tunable-parameter question (`gate.l0_echo_threshold`), not a bug — measure before tightening.
+
 ### Fixed (2026-07-13 — BOOTSTRAP pip path: dependency-confusion hazard)
 Option (a) said bare `pip install memory-schema[all]`, but the package is NOT on PyPI — that command would
 install whatever publicly squats the name. Rewritten to the pinned private-source forms (git+https @ tag /

@@ -89,6 +89,21 @@ def index_memory(filepath, config=None, require_active_chain_auth=True):
         return res
     name = memory.get("name", "")
 
+    # Config FIRST (fractal acceptance-test bug): every store construction below must carry it,
+    # or writes silently ignore memoryschema.toml (wrong bolt port -> auth fail -> JSONL-only).
+    if config is None:
+        try:
+            from memoryschema.config import MemoryConfig
+            from memoryschema.inheritance import find_toml_config
+            # from_toml, not the bare constructor: MemoryConfig(project_root=...) does NOT read
+            # memoryschema.toml, so a custom [neo4j] uri/port would still be ignored here.
+            if find_toml_config(project_root):
+                config = MemoryConfig.from_toml(project_root)
+            else:
+                config = MemoryConfig(project_root=project_root)
+        except Exception:
+            config = None
+
     # Authorization: existing entities are read-only unless they are the active chain.
     if require_active_chain_auth:
         active = get_active_chain(project_root=project_root)
@@ -111,7 +126,7 @@ def index_memory(filepath, config=None, require_active_chain_auth=True):
             # read-only auth. Checked ONLY on a jsonl miss; any failure (Neo4j down) = fast no-op.
             try:
                 from memoryschema.neo4j_store import Neo4jMemoryStore
-                _ns = Neo4jMemoryStore()
+                _ns = Neo4jMemoryStore(config=config)
                 try:
                     exists = _ns.get(name) is not None
                 finally:
@@ -121,13 +136,6 @@ def index_memory(filepath, config=None, require_active_chain_auth=True):
         if exists and name != active:
             res.errors.append("BLOCKED: %s is read-only (not the active chain)" % name)
             return res
-
-    if config is None:
-        try:
-            from memoryschema.config import MemoryConfig
-            config = MemoryConfig(project_root=project_root)
-        except Exception:
-            config = None
 
     jsonl_store = None
     try:
@@ -202,14 +210,15 @@ def index_memory(filepath, config=None, require_active_chain_auth=True):
     l0_source_store = None
     try:
         from memoryschema.neo4j_store import Neo4jMemoryStore
-        ns = Neo4jMemoryStore()
+        ns = Neo4jMemoryStore(config=config)
         ns.upsert(memory)
         if memory.get("embedding"):
             ns.compute_associations_single(name)
         res.indexed_to.append("neo4j")
         l0_source_store = ns
     except Exception as e:
-        res.warnings.append("neo4j unavailable (JSONL only): %s" % type(e).__name__)
+        res.warnings.append("neo4j unavailable (JSONL only): %s: %.140s"
+                            % (type(e).__name__, e))
     if jsonl_store is not None:
         try:
             jsonl_store.upsert(memory)

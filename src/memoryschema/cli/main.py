@@ -51,6 +51,16 @@ Lifecycle:
     export         Portable archive for moving to another project
     import         Import from portable archive
 
+# Windows cp1252 consoles crash on the CLI's Unicode output (even bare --help) unless PYTHONUTF8 is
+# set. Degrade the OUTPUT (unencodable chars -> '?') instead of crashing the command.
+import sys as _sys
+for _stream in (_sys.stdout, _sys.stderr):
+    try:
+        _stream.reconfigure(errors="replace")
+    except Exception:
+        pass
+
+
 Hook Management:
     hook           Manage PostToolUse hook (install, uninstall, status, test)
 

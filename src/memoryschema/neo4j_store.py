@@ -61,7 +61,13 @@ def connect(config=None, uri=None, user=None, password=None):
         uri = uri or config.neo4j_uri
         user = user or config.neo4j_user
         password = password or config.neo4j_password
-    driver = GraphDatabase.driver(uri, auth=(user, password))
+    try:
+        # Suppress driver NOTIFICATION spam (index hints etc. on young stores) — the kwarg
+        # exists from neo4j>=5.7; older drivers get the plain construction.
+        driver = GraphDatabase.driver(uri, auth=(user, password),
+                                      notifications_min_severity="OFF")
+    except TypeError:
+        driver = GraphDatabase.driver(uri, auth=(user, password))
     try:
         with driver.session() as session:
             session.run('RETURN 1')

@@ -250,24 +250,43 @@ try:
     if gate_result.verdict == GateVerdict.QUARANTINE:
         print(f'hook: write gate QUARANTINED {filepath}', file=sys.stderr)
         memory['status'] = 'quarantined'
-        # Fall through to upsert — quarantined entries are saved unembedded
+        # Fall through to upsert — quarantined entries are saved unembedded. The hash pops
+        # WITH the vectors (else old vectors get keyed as current), and the status is persisted
+        # to the .md (else reconcile resurrects) — parity with index_memory's quarantine branch.
         memory.pop('embedding', None)
         memory.pop('embeddings', None)
         memory.pop('divergence_profile', None)
+        memory.pop('embed_input_hash', None)
+        try:
+            from memoryschema.write_index import set_lifecycle
+            set_lifecycle(filepath, status='quarantined')
+        except Exception as e:
+            print(f'hook: could not persist quarantine to the .md ({e})', file=sys.stderr)
 except ImportError:
     pass  # write_gate not available — skip validation
 
-# Try Neo4j first (O(1) upsert, <10ms)
+# Try Neo4j first (O(1) upsert, <10ms) — WITH the project config: a bare construction ignores
+# memoryschema.toml (custom bolt port/uri) and silently degrades every hook write to JSONL-only
+# (found by the fractal acceptance test).
 indexed = False
 try:
     from memoryschema.neo4j_store import Neo4jMemoryStore
-    store = Neo4jMemoryStore()
+    try:
+        from memoryschema.config import MemoryConfig
+        from memoryschema.inheritance import find_toml_config
+        _cfg = (MemoryConfig.from_toml(project_root) if find_toml_config(project_root)
+                else MemoryConfig(project_root=project_root))
+    except Exception:
+        _cfg = None
+    store = Neo4jMemoryStore(config=_cfg) if _cfg else Neo4jMemoryStore()
     store.upsert(memory)
     if memory.get('embedding'):
         store.compute_associations_single(memory['name'])
     indexed = True
-except Exception:
-    pass  # Fall through to JSONL
+except Exception as e:
+    # LOUD fall-through: a silent pass made hook-path degradation invisible (fractal feedback)
+    print(f'hook: neo4j unavailable, JSONL only ({type(e).__name__}: {str(e)[:140]})',
+          file=sys.stderr)
 
 # Fallback: JSONL
 if not indexed:
