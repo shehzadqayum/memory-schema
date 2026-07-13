@@ -127,6 +127,11 @@ kernel (`.claude/rules/memory-working.md`) states these five habits for the agen
 - **Update a pip-installed module:** re-run the install with the new tag:
   `pip install "memory-schema[all] @ git+https://github.com/shehzadqayum/memory-schema.git@<new-tag>"`,
   then `memoryschema plugin sync` (redeploys the `.claude` artefacts from the new package).
+- **After ANY consumer update (pip or vendored), re-stamp the ledger** — from the module checkout:
+  `memoryschema deploy register --project <name> ...` (same args; it upserts), and for subtree consumers
+  `git subtree push --prefix packages/memory-schema <module-url> deployments/<name>` from the consumer.
+  Skipping this leaves the ledger silently describing an old sync; `deploy status` now flags it loudly
+  (STALE ledger / STALE consumer branch, measured against the module's current main).
 - **Update a vendored module:** `git subtree pull --prefix packages/memory-schema <url> main --squash`, then
   `pip install -e ".\packages\memory-schema[all]"` and `memoryschema plugin sync` to redeploy the artefacts.
 - **After bulk `.md` edits:** `memoryschema reconcile` rebuilds JSONL from the `.md` set, pushes Neo4j, prunes,

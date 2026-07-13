@@ -23,7 +23,8 @@ class TestMainGroup:
     def test_version(self, runner):
         result = runner.invoke(cli, ["--version"])
         assert result.exit_code == 0
-        assert "0.1.0" in result.output
+        from memoryschema._version import __version__
+        assert __version__ in result.output   # never hardcode — bumps outrun string literals
 
     def test_global_project_option(self, runner, tmp_path):
         result = runner.invoke(cli, ["--project", "test", "--root", str(tmp_path), "status"])

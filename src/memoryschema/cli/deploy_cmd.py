@@ -55,6 +55,21 @@ def _deployment_branches(root):
     return names
 
 
+def _behind_main(root, sha_or_ref):
+    """How many commits the module's HEAD has that `sha_or_ref` lacks (None if unknowable).
+
+    The staleness signal: a ledger stamp or deployments/<project> branch that is N>0 commits
+    behind main means the record predates the module's current state — the ledger is describing
+    an OLD sync, silently (the drift class deploy status exists to make loud)."""
+    if not sha_or_ref:
+        return None
+    out = _git(["rev-list", "--count", f"{sha_or_ref}..HEAD"], cwd=root)
+    try:
+        return int((out or "").strip())
+    except (ValueError, AttributeError):
+        return None
+
+
 @click.group("deploy")
 def deploy():
     """The deployment ledger — records which projects vendor this module (see DEPLOYMENT.md)."""
@@ -121,6 +136,11 @@ def status(as_json):
     if not root:
         click.echo("Error: not inside a git repo.", err=True)
         raise SystemExit(1)
+    # Best-effort targeted fetch so status reflects the REMOTE deployments/* state — consumer
+    # branches are pushed from consumer repos, so this clone may never have fetched them; without
+    # this, an existing pushed branch reads as NOT-PUSHED. Offline -> degrades to the local view.
+    _git(["fetch", "--quiet", "origin",
+          "+refs/heads/deployments/*:refs/remotes/origin/deployments/*"], cwd=root)
     ld = _ledger_dir(root)
     entries = {}
     if os.path.isdir(ld):
@@ -131,6 +151,13 @@ def status(as_json):
     rows = []
     for name in sorted(set(entries) | branches):
         e = entries.get(name, {})
+        branch_ref = None
+        if name in branches:
+            # prefer the remote-tracking tip when present (the pushed consumer state)
+            for cand in (f"origin/deployments/{name}", f"deployments/{name}"):
+                if _git(["rev-parse", "--verify", "--quiet", cand], cwd=root):
+                    branch_ref = cand
+                    break
         rows.append({
             "project": name,
             "registered": name in entries,
@@ -139,6 +166,11 @@ def status(as_json):
             "subtree_prefix": e.get("subtree_prefix"),
             "module_commit": e.get("module_commit"),
             "registered_at": e.get("registered_at"),
+            # Staleness vs the module's CURRENT main: the ledger stamp and the consumer branch
+            # go stale TOGETHER after a consumer re-vendors, so comparing them only to each
+            # other can never catch it — compare both to HEAD and warn loudly.
+            "module_behind": _behind_main(root, e.get("module_commit")),
+            "branch_behind": _behind_main(root, branch_ref),
         })
     if as_json:
         click.echo(json.dumps(rows, indent=2))
@@ -153,6 +185,14 @@ def status(as_json):
             flags.append("UNREGISTERED (branch only)")
         if not r["branch_exists"]:
             flags.append("NOT-PUSHED (no deployments/ branch)")
+        if (r.get("module_behind") or 0) > 0:
+            flags.append(f"⚠ STALE ledger ({r['module_behind']} commits behind main — "
+                         f"re-run `deploy register` after the consumer updates)")
+        if (r.get("branch_behind") or 0) > 0:
+            # informational, not ⚠: consumers legitimately lag main between releases (they pin);
+            # the RECORD-keeping failure is the ledger stamp, which re-register tracks for free.
+            flags.append(f"consumer branch {r['branch_behind']} behind main "
+                         f"(fine if pinned; `git subtree push` after the next update)")
         click.echo(f"  {r['project']:<20} {' '.join(flags) or 'ok'}")
         if r["registered"]:
             click.echo(f"      prefix={r['subtree_prefix']}  module@{(r['module_commit'] or '')[:9]}"

@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### Fixed (2026-07-13 — the ledger could go stale silently)
+`deploy status` compared the ledger only against the `deployments/*` branches — but both go stale TOGETHER
+after a consumer re-vendors, so the most common drift was undetectable and DEPLOYMENT.md's "can never lie"
+claim was overstated. Status now (a) best-effort fetches the remote `deployments/*` refs (a pushed consumer
+branch no longer reads as NOT-PUSHED from an unfetched clone) and (b) measures the ledger stamp AND the
+consumer branch against the module's current `main`, flagging `STALE ledger` / `STALE consumer branch` with
+commit counts. BOOTSTRAP §8 update procedure now includes the re-register + subtree-push re-stamp steps;
+DEPLOYMENT.md documents the honest limit (currency = last re-stamp; status is the loud detector).
+
 ## [0.1.1] — 2026-07-13
 
 ### Fixed (fractal acceptance-test feedback — the first pip-path consumer)

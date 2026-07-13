@@ -80,5 +80,9 @@ note = ""
 
 `deploy status` reconciles the ledger files against the actual `deployments/*` branches and flags any
 disagreement — a ledger entry with **no branch** = *registered-but-not-pushed*; a branch with **no ledger
-entry** = *unregistered*. Because both the entries and the branches are derived from git, the ledger can never
-silently drift from reality — the whole point of making it machine-stamped rather than a prose list.
+entry** = *unregistered*. It ALSO measures both against the module's **current `main`** and warns loudly
+when they are stale (the ledger stamp and the consumer branch go stale TOGETHER after a consumer updates,
+so comparing them only to each other can never catch the common drift). Honest limit: the ledger is only
+as current as the last re-stamp — the module repo cannot observe a consumer's re-vendor remotely, so the
+update procedure (BOOTSTRAP §8) includes the re-register + re-push steps, and `deploy status` is the
+loud detector when they were skipped.
