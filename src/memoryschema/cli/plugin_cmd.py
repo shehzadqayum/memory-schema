@@ -49,6 +49,15 @@ def artefact_pairs_for_scopes(scopes):
     return pairs
 
 
+def _deployed_scope_pairs(base):
+    """Scope-gated pairs whose artefact already exists under `base` — presence = the project opted in
+    (at `init --scopes` or a prior `sync --scopes`). A scope rule the project never chose is NOT drift:
+    before this inference, `sync --check` compared every fresh working-scope project against the FULL
+    packaged set and reported the corpus rule as phantom-missing (the fractal bootstrap feedback), and a
+    plain `sync` force-deployed rules the project never opted into."""
+    return [p for p in _SCOPE_RULE_PAIRS.values() if (Path(base) / p[1]).exists()]
+
+
 def deploy_artefacts(src_dir, base, pairs):
     """MD5-gated copy of `pairs` from src_dir into `base` (a `.claude/` dir). Writes only missing/changed
     files (so a re-run is a no-op on in-sync files); returns the dst paths actually written. The one
@@ -445,9 +454,11 @@ def compute_artefact_sync(src_dir, base, pairs=None):
               help="Target .claude directory. Default: <project_root>/.claude.")
 @click.option("--global", "use_global", is_flag=True,
               help="Sync to ~/.claude instead of the project.")
+@click.option("--scopes", multiple=True, type=click.Choice(sorted(_SCOPE_RULE_PAIRS)),
+              help="Opt this deployment INTO a scope-gated rule set (deploys it; sticky thereafter).")
 @click.option("--json", "as_json", is_flag=True, help="Machine-readable output.")
 @click.pass_obj
-def sync(config, check, target, use_global, as_json):
+def sync(config, check, target, use_global, scopes, as_json):
     """Sync the deployed memory artefacts FROM the package into a project's .claude/,
     verified by MD5.
 
@@ -457,6 +468,10 @@ def sync(config, check, target, use_global, as_json):
 
       --check   report drift and exit non-zero (a CI / pre-commit gate); writes nothing.
       (default) copy only the files that are missing or differ; leave in-sync files alone.
+
+    SCOPE-AWARE: scope-gated rules (e.g. the corpus rule) participate only if the project opted
+    in — inferred from the artefact already being deployed (init --scopes / a prior --scopes
+    here). A fresh working-scope project is therefore NOT flagged for rules it never chose.
 
     Machine/ops-specific artefacts (the SessionStart hook, ensure-deps.ps1, the tuned
     memoryschema.toml) are deployment-local by design and are NOT touched here.
@@ -473,7 +488,11 @@ def sync(config, check, target, use_global, as_json):
         base = Path(config.project_root) / ".claude"
     base = Path(base).resolve()
 
-    rows = compute_artefact_sync(src_dir, base)
+    pairs = artefact_pairs_for_scopes(scopes)
+    for p in _deployed_scope_pairs(base):
+        if p not in pairs:
+            pairs.append(p)
+    rows = compute_artefact_sync(src_dir, base, pairs=pairs)
     src_missing = [r for r in rows if r["status"] == "src-missing"]
     changed = [r for r in rows if r["status"] in ("missing", "drift")]
 

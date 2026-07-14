@@ -68,10 +68,12 @@ workflow is harness-manual **§7.3**. Non-negotiable principles:
 
 ## Security posture
 
-- The hook `src/memoryschema/hooks/hook-post-write.sh` carries **THREE local patches** (package source — no CLI
-  regenerates it): (1) Windows backslash-path normalization, (2) `.env` autoload, (3) **`.env`-export
-  allowlist** — it exports only `NEO4J_*` / `VOYAGE_*` / `MEMORYSCHEMA_*` / `MEMORY_*`, never the whole `.env`
-  (the HIGH-2 fix).
+- The hook `src/memoryschema/hooks/hook-post-write.sh` is, since v0.2.0, a **thin shim over
+  `write_index.index_memory`** (one pipeline for hook + CLI — the inline duplicate drifted three times).
+  Its shell wrapper carries the deployment hardening (package source — no CLI regenerates it):
+  (1) Windows backslash-path normalization, (2) `.env` autoload with the **export allowlist** — only
+  `NEO4J_*` / `VOYAGE_*` / `MEMORYSCHEMA_*` / `MEMORY_*`, never the whole `.env` (the HIGH-2 fix),
+  (3) forced `PYTHONUTF8`/`PYTHONIOENCODING` (the Windows cp1252 class, v0.1.2).
 - `preflight._start_container` prefers `docker start` (runs no file) and only `compose up`s a file carrying the
   `memoryschema-managed` sentinel — an **anti-footgun, not an adversarial boundary** (the token is copyable).
 - The generated compose references `${NEO4J_PASSWORD}` (secret in the gitignored `.env`, never baked at rest).

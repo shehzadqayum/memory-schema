@@ -370,50 +370,24 @@ def hook_scan(config, as_json, scan_dir):
 @click.argument("file_path", type=click.Path(exists=True))
 @click.pass_obj
 def test(config, file_path):
-    """Simulate hook execution on a memory file.
+    """Run the hook's indexing pipeline on a memory file, manually.
 
-    Parses, validates, optionally embeds, and indexes — same as the
-    PostToolUse hook but invoked manually.
+    Calls the SAME code path as the PostToolUse hook and the CLI writers
+    (write_index.index_memory: parse → auth → embed → gate → dual-write →
+    L0 rebuild), so what this reports is exactly what the hook would do.
+    The previous simulator was a third mini-pipeline that bypassed the
+    write gate entirely (an ungated upsert) — retired by the v0.2.0
+    unification.
 
     Example:
         memoryschema hook test memory/my-memory.md
     """
-    from memoryschema.tags import parse_memory_file
-    from memoryschema.validator import validate
+    from memoryschema.write_index import index_memory
 
-    # Parse
-    memory = parse_memory_file(file_path)
-    if memory is None:
-        click.echo(f"Error: Failed to parse {file_path}.", err=True)
-        sys.exit(1)
-    click.echo(f"Parsed: {memory['name']} — {memory.get('description', '')[:80]}")
-
-    # Validate
-    with open(file_path, encoding="utf-8") as f:
-        content = f.read()
-    errors = validate(content, file_path)
-    if errors:
-        click.echo(f"Validation errors:")
-        for rule, msg in errors:
-            click.echo(f"  [{rule}] {msg}")
-    else:
-        click.echo(f"Validation: passed")
-
-    # Embed
-    if config.voyage_api_key:
-        try:
-            from memoryschema.embeddings import embed_text
-            from memoryschema.embedding_input import compose_embedding_text
-            text = compose_embedding_text(memory)
-            memory['embedding'] = embed_text(text, config=config)
-            click.echo(f"Embedded: {len(memory['embedding'])} dimensions")
-        except Exception as e:
-            click.echo(f"Embedding: skipped ({e})")
-    else:
-        click.echo("Embedding: skipped (VOYAGE_API_KEY not set)")
-
-    # Index
-    from memoryschema.store import get_store
-    store = get_store(config=config)
-    store.upsert(memory)
-    click.echo(f"Indexed: {memory['name']}")
+    res = index_memory(file_path, config=config)
+    for w in res.warnings:
+        click.echo(f"  warn: {w}")
+    click.echo(res.summary())
+    if not res.ok:
+        # the vetoes the hook treats as non-blocking stay exit 0 here too
+        sys.exit(0 if (res.blocked or res.skipped) else 1)

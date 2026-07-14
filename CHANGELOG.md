@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.2.0] — 2026-07-14
+
+### Changed (hook → index_memory unification — one write pipeline)
+`hooks/hook-post-write.sh` is now a **thin exit-code shim over `write_index.index_memory`** — the same
+pipeline the CLI writers (`remember`/`chain step`/`write`) use. The previous ~200-line inline duplicate
+drifted behind `index_memory` three separate times (quarantine parity at 0.1.1, config threading at 0.1.1,
+the cp1252 store scan at 0.1.2); the class is now structurally gone. `hook test` — which had quietly become
+a THIRD mini-pipeline that bypassed the write gate entirely (an ungated upsert) — routes through
+`index_memory` too. `IndexResult` gained `blocked`/`skipped`/`corrupted` outcome flags (the shim's exit-code
+contract), `index_memory` gained the corruption-vs-non-entity triage and the `MEMORY_GENERATOR` stamp the
+hook used to own. Exit contract unchanged: 0 = indexed / non-entity / read-only veto; 2 = corruption, gate
+REJECT, both stores failed.
+
+Two behavior improvements ride along: **hook writes now DUAL-write** (Neo4j AND JSONL — `store.jsonl` no
+longer lags Neo4j between reconciles, retiring the recurring `missing from JSONL (1)` drift), and a
+**DECLARED `schema: 5` file that won't parse is now loud** (exit 2, matching the v4 path and reconcile's
+corruption guard) instead of silently skipped.
+
+### Fixed (plugin sync is scope-aware — fresh-project phantom drift)
+`plugin sync`/`sync --check` compared every deployment against the FULL packaged artefact set, so a fresh
+working-scope project phantom-drifted on the corpus rule forever (fractal bootstrap feedback), and a plain
+`sync` force-deployed rules the project never opted into. Scope-gated rules now participate only when the
+project opted in — inferred statelessly from the artefact being deployed (via `init --scopes` or the new
+`sync --scopes <name>`, which is sticky thereafter).
+
 ## [Unreleased]
 
 ## [0.1.2] — 2026-07-14

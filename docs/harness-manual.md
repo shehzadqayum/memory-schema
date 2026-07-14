@@ -658,23 +658,24 @@ Idempotent: a second run on a clean store is a no-op.
 ### 9.4 The hooks
 
 **PostToolUse** (`hooks/hook-post-write.sh`; fires on Write AND Edit): the safety net for
-hand-edited files. Exit contract: 0 = success or not-a-memory-write; **2 = flag for
-Claude review** (stderr feeds back to the agent in the same turn). Pipeline: python
-resolution (argv[1] from settings.json → `MEMORYSCHEMA_PYTHON` → PATH probe; missing →
-exit 0, never block writes) → path filter (`*/memory/*.md`; MEMORY.md skipped) → sentinel
-touch → parse → corruption triage (v4 V9-class parse errors → loud exit 2 with the
-"unescaped `<`/`&`" hint; a corrupt **v5** file exits 0 silently — v5 safety is the
-writers' round-trip checks) → active-chain authorization (blocked = indexing skipped,
-exit 0; the file write itself is not reverted) → embed (before the gate — stages 5–6
-need the vector) → gate (REJECT → exit 2; QUARANTINE → saved unembedded) → **Neo4j-first
-index with JSONL fallback** (both fail → exit 2) → L0 rebuild from the store just
-written.
-
-Local patches carried in the hook script (package source — `hook upgrade` edits only
-`settings.json`, never the script): (1) Windows backslash normalization
-(`FILE_PATH="${FILE_PATH//\\//}"`) so the `/memory/` match works on Windows paths;
-(2) project `.env` autoload (root = path prefix before `/memory/`; safe line parser,
-values never eval'd) so the hook has DB/API credentials in any shell.
+hand-edited files. Exit contract: 0 = success, not-a-memory-write, or a read-only auth
+veto (indexing skipped, the file write itself is not reverted); **2 = flag for Claude
+review** (stderr feeds back to the agent in the same turn: corruption, gate REJECT, or
+both stores failing). Since v0.2.0 the script is a **thin shim over
+`write_index.index_memory`** — the SAME pipeline the CLI writers use (parse → corruption
+triage → active-chain auth → embed → gate → **dual-write to Neo4j AND JSONL** → L0
+rebuild → sentinel). The previous ~200-line inline duplicate drifted behind
+`index_memory` three separate times (quarantine parity, config threading, the cp1252
+store scan); unification removes the class, and two behavior improvements ride along:
+hook writes no longer leave `store.jsonl` lagging Neo4j between reconciles (dual-write),
+and a DECLARED `schema: 5` file that won't parse is now loud (exit 2) like its v4
+counterpart — matching reconcile's corruption guard — instead of silently skipped.
+The shell wrapper keeps: python resolution (argv[1] from settings.json →
+`MEMORYSCHEMA_PYTHON` → PATH probe; missing → exit 0, never block writes), the
+`*/memory/*.md` path filter (MEMORY.md skipped), the sentinel touch, forced
+`PYTHONUTF8=1`/`PYTHONIOENCODING=utf-8` (self-sufficiency: the harness hook env sets
+neither), Windows backslash normalization, and the allowlisted project `.env` autoload
+(NEO4J_*/VOYAGE_*/MEMORYSCHEMA_*/MEMORY_* only; values never eval'd).
 
 **Stop hook** (`hooks/hook-stop.sh`; always exit 0): if an active chain exists and the
 sentinel was NOT touched this response, emits

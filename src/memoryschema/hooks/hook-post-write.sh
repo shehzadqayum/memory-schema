@@ -115,218 +115,38 @@ if [[ "$(basename "$FILE_PATH")" == "MEMORY.md" ]]; then
     exit 0
 fi
 
-# Run the Python indexing pipeline using memoryschema package.
+# Run the canonical indexing pipeline: write_index.index_memory — the SAME code path the CLI
+# (remember / chain step / write) uses. The hook is a thin exit-code shim over it; the previous
+# ~200-line inline duplicate pipeline drifted behind index_memory three separate times (quarantine
+# parity, config threading, the cp1252 store scan) — v0.2.0 unification removes the class.
+# One behavior improvement rides along: index_memory DUAL-writes (Neo4j AND JSONL), so hook writes
+# no longer leave store.jsonl lagging Neo4j until the next reconcile.
 # Pass the file path via the ENVIRONMENT, never interpolated into the source: a
 # path containing a single quote (e.g. C:/Users/O'Brien/...) would otherwise break
 # the Python literal (every write fails) or inject arbitrary code.
 MEMORYSCHEMA_HOOK_FILE="$FILE_PATH" "$PYTHON" -c "
-import sys, os
+import os, sys
 
-# Derive project root from file path (parent of memory/)
 filepath = os.environ['MEMORYSCHEMA_HOOK_FILE']
-parts = filepath.replace('\\\\', '/').split('/')
-project_root = None
-for i, part in enumerate(parts):
-    if part == 'memory' and i > 0:
-        project_root = '/'.join(parts[:i])
-        break
-if project_root is None:
-    # Hybrid scope fallback: use user-level memory directory
-    project_root = os.path.expanduser('~/.claude')
-
-# Ensure memory directory exists (user-level fallback may not have it yet)
-memory_dir_path = os.path.join(project_root, 'memory')
-os.makedirs(memory_dir_path, exist_ok=True)
-
-# Derive store path
-store_path = os.path.join(project_root, 'memory', 'store.jsonl')
-
-from memoryschema.tags import parse_memory_file
-
-memory = parse_memory_file(filepath)
-if memory is None:
-    # Distinguish CORRUPTION (an entity file that fails to parse — e.g. an unescaped '<' or '&'
-    # in prose, the M14 class that silently truncated the store twice) from a genuine
-    # not-a-memory-entity file. validator.validate already separates the two: V1 = no entity
-    # element (skip quietly), V9 = XML parse error with ElementTree's line/column (fail LOUD:
-    # exit 2 feeds stderr straight back to the agent in the same turn so it can fix the escape).
-    try:
-        from memoryschema.validator import validate as _validate
-        with open(filepath, 'r', encoding='utf-8') as _f:
-            _content = _f.read()
-        _errs = _validate(_content, filepath=filepath)   # returns a list of (rule_id, message) tuples
-        _parse_errs = [e for e in _errs if str(e[0] if isinstance(e, (list, tuple)) else e).startswith('V9')
-                       or 'parse error' in str(e).lower() or 'Unclosed' in str(e)]
-        if _parse_errs:
-            print('memoryschema hook: MEMORY FILE CORRUPTED — XML parse failed and the entity was '
-                  'NOT indexed (store keeps the stale version). Fix the file (likely an unescaped '
-                  '< or & in prose; XML-escape as &lt; &amp;). Details: '
-                  + '; '.join(str(e) for e in _parse_errs[:3]) + ' [file: ' + filepath + ']',
-                  file=sys.stderr)
-            sys.exit(2)
-    except SystemExit:
-        raise
-    except Exception:
-        pass  # never let the corruption-check itself break the hook
-    # Not a memory entity file (e.g., YAML frontmatter, plain markdown) — skip
-    sys.exit(0)
-
-# Authorisation check: only the active chain or new memories can be written
-# Active chain name stored in memory/.active_chain
-name = memory.get('name', '')
-active_chain_path = os.path.join(project_root, 'memory', '.active_chain')
-active_chain = None
-if os.path.exists(active_chain_path):
-    with open(active_chain_path, 'r', encoding='utf-8') as f:
-        active_chain = f.read().strip()
-
-# Check if this name already exists in the store
-existing = None
-if os.path.exists(store_path):
-    import json as _json
-    with open(store_path, 'r', encoding='utf-8') as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                entry = _json.loads(line)
-                if entry.get('name') == name:
-                    existing = entry
-                    break
-            except _json.JSONDecodeError:
-                continue
-
-if existing is not None:
-    # Entity exists — only allow upsert if this is the active chain
-    if name != active_chain:
-        print(f'hook: BLOCKED — {name} is read-only (not the active chain)', file=sys.stderr)
-        sys.exit(0)  # exit 0 = don't block the Write tool, just skip indexing
-
-# Generator stamp (v4): read MEMORY_GENERATOR env var
-generator_id = os.environ.get('MEMORY_GENERATOR')
-if generator_id:
-    memory['generator'] = generator_id
-
-# Construct store + config BEFORE embed (embed needs config for API key)
-hook_store = None
-hook_config = None
 try:
-    from memoryschema.config import MemoryConfig
-    hook_config = MemoryConfig(project_root=project_root)
-except Exception:
-    pass
-try:
-    from memoryschema.store import MemoryStore
-    hook_store = MemoryStore(store_path)
-except Exception:
-    pass
-
-# Embed BEFORE gate (stages 4-6 need the embedding vector)
-# Check both env var and config for API key (subprocess may not inherit env)
-voyage_key = os.environ.get('VOYAGE_API_KEY') or (
-    hook_config.voyage_api_key if hook_config else None)
-if voyage_key:
-    try:
-        # Canonical multi-space embed + divergence (shared with the backfill so the
-        # two cannot drift). Computes the 'default' blend + each non-empty field space
-        # and the divergence profile (1 - cosine to default).
-        from memoryschema.spaces import embed_all_spaces
-        from memoryschema.embedding_input import embed_input_hash
-        embeddings, div_profile = embed_all_spaces(memory, config=hook_config)
-        if embeddings:
-            memory['embedding'] = embeddings.get('default')
-            memory['embeddings'] = embeddings
-            if div_profile:
-                memory['divergence_profile'] = div_profile
-            memory['embed_input_hash'] = embed_input_hash(memory)
-    except Exception:
-        pass  # Embedding failure does not block — stages 4-6 skip gracefully
-
-# Write gate: full pipeline with store + config (stages 1-6)
-try:
-    from memoryschema.write_gate import gate_pipeline, GateVerdict
-    gate_result = gate_pipeline(memory, store=hook_store, config=hook_config)
-    for w in gate_result.warnings:
-        print(f'hook: gate: {w}', file=sys.stderr)
-    for r in gate_result.reasons:
-        print(f'hook: gate: {r}', file=sys.stderr)
-    if gate_result.verdict == GateVerdict.REJECT:
-        print(f'hook: write gate REJECTED {filepath}', file=sys.stderr)
-        sys.exit(2)
-    if gate_result.verdict == GateVerdict.QUARANTINE:
-        print(f'hook: write gate QUARANTINED {filepath}', file=sys.stderr)
-        memory['status'] = 'quarantined'
-        # Fall through to upsert — quarantined entries are saved unembedded. The hash pops
-        # WITH the vectors (else old vectors get keyed as current), and the status is persisted
-        # to the .md (else reconcile resurrects) — parity with index_memory's quarantine branch.
-        memory.pop('embedding', None)
-        memory.pop('embeddings', None)
-        memory.pop('divergence_profile', None)
-        memory.pop('embed_input_hash', None)
-        try:
-            from memoryschema.write_index import set_lifecycle
-            set_lifecycle(filepath, status='quarantined')
-        except Exception as e:
-            print(f'hook: could not persist quarantine to the .md ({e})', file=sys.stderr)
+    from memoryschema.write_index import index_memory
 except ImportError:
-    pass  # write_gate not available — skip validation
+    sys.exit(0)   # package not importable in this interpreter — never block writes
 
-# Try Neo4j first (O(1) upsert, <10ms) — WITH the project config: a bare construction ignores
-# memoryschema.toml (custom bolt port/uri) and silently degrades every hook write to JSONL-only
-# (found by the fractal acceptance test).
-indexed = False
-try:
-    from memoryschema.neo4j_store import Neo4jMemoryStore
-    try:
-        from memoryschema.config import MemoryConfig
-        from memoryschema.inheritance import find_toml_config
-        _cfg = (MemoryConfig.from_toml(project_root) if find_toml_config(project_root)
-                else MemoryConfig(project_root=project_root))
-    except Exception:
-        _cfg = None
-    store = Neo4jMemoryStore(config=_cfg) if _cfg else Neo4jMemoryStore()
-    store.upsert(memory)
-    if memory.get('embedding'):
-        store.compute_associations_single(memory['name'])
-    indexed = True
-except Exception as e:
-    # LOUD fall-through: a silent pass made hook-path degradation invisible (fractal feedback)
-    print(f'hook: neo4j unavailable, JSONL only ({type(e).__name__}: {str(e)[:140]})',
-          file=sys.stderr)
+res = index_memory(filepath)
+for w in res.warnings:
+    print('hook: %s' % w, file=sys.stderr)
 
-# Fallback: JSONL
-if not indexed:
-    try:
-        from memoryschema.store import MemoryStore
-        store = MemoryStore(store_path)
-        store.upsert(memory)
-        store.compute_backlinks()
-        if memory.get('embedding'):
-            store.compute_associations()
-        indexed = True
-    except Exception as e:
-        print(f'hook: both stores failed for {filepath}: {e}', file=sys.stderr)
-
-if not indexed:
-    sys.exit(2)
-
-# Rebuild MEMORY.md (L0) as a faithful, status-filtered index of the store's ACTIVE set.
-# A full REGENERATE — not an append — so superseded/archived entries drop out and any
-# previously-evicted active entries come back (fixes the drift where the append-only index
-# lingered stale entries and lost active ones). Read from the SAME store just written to
-# (Neo4j when up, JSONL otherwise) so the just-written memory is included even though
-# store.jsonl can lag Neo4j between reconciles.
-name = memory.get('name', '')
-if name:
-    try:
-        index_path = os.path.join(os.path.dirname(filepath), 'MEMORY.md')
-        budget = getattr(hook_config, 'l0_token_budget', 2000) if hook_config else 2000
-        active = store.list_all(include_inactive=False)
-        from memoryschema.l0_budget import rebuild_index
-        rebuild_index(index_path, entries=active, token_budget=budget)
-    except Exception:
-        pass  # MEMORY.md update failure does not block indexing
+if res.ok or getattr(res, 'skipped', False):
+    sys.exit(0)                       # indexed, or not a memory entity (notes/README) — quiet
+if getattr(res, 'blocked', False):
+    # read-only auth veto: report it but exit 0 — never block the Write tool itself
+    print('hook: %s' % '; '.join(str(e) for e in res.errors), file=sys.stderr)
+    sys.exit(0)
+# corruption / gate REJECT / both-stores-failed: LOUD — exit 2 feeds stderr straight back to
+# the agent in the same turn so it can fix the file or escalate
+print('hook: %s [file: %s]' % ('; '.join(str(e) for e in res.errors), filepath), file=sys.stderr)
+sys.exit(2)
 "
 
 EXIT_CODE=$?

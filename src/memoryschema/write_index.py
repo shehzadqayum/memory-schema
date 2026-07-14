@@ -51,6 +51,11 @@ class IndexResult:
         self.warnings = []         # gate warnings + advisory notes
         self.errors = []           # fatal reasons when ok is False
         self.verdict = None        # gate verdict string
+        # Outcome flags for exit-code mapping (the hook shim / CLI callers): exactly one of these
+        # is set when ok is False and the failure is an EXPECTED veto rather than a fault.
+        self.blocked = False       # read-only auth veto (existing entity, not the active chain)
+        self.skipped = False       # not a memory entity file (notes/README under memory/)
+        self.corrupted = False     # a DECLARED entity that fails to parse (the M14 class)
 
     def summary(self):
         parts = []
@@ -85,9 +90,41 @@ def index_memory(filepath, config=None, require_active_chain_auth=True):
 
     memory = parse_memory_file(filepath)
     if memory is None:
-        res.errors.append("file failed to parse as a memory entity (corruption?)")
+        # Distinguish CORRUPTION (a DECLARED entity that fails to parse — e.g. an unescaped '<'
+        # or '&' in v4 prose, an unterminated v5 fence: the M14 class that silently truncated the
+        # store twice) from a genuine non-entity .md (notes, README). Corruption is LOUD — the
+        # store keeps the stale version until the file is fixed; a non-entity file is skipped.
+        parse_errs = []
+        try:
+            from memoryschema.validator import validate as _validate
+            with open(filepath, "r", encoding="utf-8") as f:
+                _content = f.read()
+            for e in _validate(_content, filepath=filepath):
+                rule = str(e[0] if isinstance(e, (list, tuple)) else e)
+                # V9 = v4 XML parse errors; 'v5 entity failed to parse' = a DECLARED schema: 5 file
+                # that won't parse (same corruption class reconcile's guard aborts on — loud here
+                # too, an intentional v0.2.0 tightening over the old silently-skipped behavior).
+                if (rule.startswith("V9") or "parse error" in str(e).lower()
+                        or "Unclosed" in str(e) or "v5 entity failed to parse" in str(e)):
+                    parse_errs.append(e)
+        except Exception:
+            pass  # the corruption-check itself must never break indexing
+        if parse_errs:
+            res.corrupted = True
+            res.errors.append(
+                "MEMORY FILE CORRUPTED — parse failed and the entity was NOT indexed (store keeps "
+                "the stale version). Fix the file (likely an unescaped < or & in prose; XML-escape "
+                "as &lt; &amp;). Details: " + "; ".join(str(e) for e in parse_errs[:3]))
+        else:
+            res.skipped = True
+            res.errors.append("not a memory entity file — skipped")
         return res
     name = memory.get("name", "")
+
+    # Generator stamp (provenance): who authored this write, when the caller exports it.
+    _gen = os.environ.get("MEMORY_GENERATOR")
+    if _gen:
+        memory["generator"] = _gen
 
     # Config FIRST (fractal acceptance-test bug): every store construction below must carry it,
     # or writes silently ignore memoryschema.toml (wrong bolt port -> auth fail -> JSONL-only).
@@ -134,6 +171,7 @@ def index_memory(filepath, config=None, require_active_chain_auth=True):
             except Exception:
                 pass
         if exists and name != active:
+            res.blocked = True
             res.errors.append("BLOCKED: %s is read-only (not the active chain)" % name)
             return res
 

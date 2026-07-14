@@ -84,10 +84,13 @@ net for hand-edited files. One hook serves all projects (it derives the project 
 
 `init` already deployed the `.claude/` artefacts. Use `plugin sync` to **re-sync after a package upgrade**, and
 `plugin sync --check` as a **drift gate** (CI / session-start): it MD5s each deployed file against the packaged
-source of truth and exits non-zero on drift, writing nothing.
+source of truth and exits non-zero on drift, writing nothing. Sync is **scope-aware** (v0.2.0): scope-gated
+rules (e.g. the corpus rule) participate only if the project opted in — inferred from the artefact being
+deployed — so a fresh working-scope project is never flagged for rules it didn't choose.
 ```bash
-memoryschema plugin sync --check      # verify; exit 1 on drift
-memoryschema plugin sync              # reconcile (write only what differs)
+memoryschema plugin sync --check           # verify; exit 1 on drift
+memoryschema plugin sync                   # reconcile (write only what differs)
+memoryschema plugin sync --scopes corpus   # opt into a scope-gated rule set (sticky)
 ```
 
 ## 5. Backend up + verify
