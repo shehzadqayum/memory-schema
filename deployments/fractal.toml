@@ -2,11 +2,11 @@
 [deployment]
 project = "fractal"
 repo_url = "https://github.com/shehzadqayum/fractal.git"
-subtree_prefix = "pip @ v0.1.2"
+subtree_prefix = "pip @ v0.2.0"
 scopes = ["working"]
 schema_version = 5
 branch = "deployments/fractal"
-module_commit = "b27a6bc3bc04843b2fc9dbcb399e748dc494078c"
-consumer_commit = "c30df2169ea159e28a529e610271fabd80a87fe0"
+module_commit = "6f72faa9268b02662565de9d3e61e7567ec421ef"
+consumer_commit = "a250067d6d773e7e1485824548d86acdf0723aca"
 registered_at = "2026-07-14"
 note = ""

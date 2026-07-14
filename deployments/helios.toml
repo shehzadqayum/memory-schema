@@ -2,11 +2,11 @@
 [deployment]
 project = "helios"
 repo_url = "https://github.com/shehzadqayum/helios.git"
-subtree_prefix = "pip @ v0.1.2"
+subtree_prefix = "pip @ v0.2.0"
 scopes = ["working"]
 schema_version = 5
 branch = "deployments/helios"
-module_commit = "db6cb39158ef2ec185587e2fe535e5816a0bd820"
-consumer_commit = "4a8854ba1a65eeb18c0d9e689a5fd4ef535b9264"
+module_commit = "6f72faa9268b02662565de9d3e61e7567ec421ef"
+consumer_commit = "a250067d6d773e7e1485824548d86acdf0723aca"
 registered_at = "2026-07-14"
 note = ""
