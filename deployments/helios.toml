@@ -2,11 +2,11 @@
 [deployment]
 project = "helios"
 repo_url = "https://github.com/shehzadqayum/helios.git"
-subtree_prefix = "packages/memory-schema"
+subtree_prefix = "pip @ v0.1.2"
 scopes = ["working"]
 schema_version = 5
 branch = "deployments/helios"
-module_commit = "1923aa1dae33edbfcc56269a0aaa1bc8d0886196"
-consumer_commit = "0337284257c1e1dacfde4499a992a92bc389a1c8"
-registered_at = "2026-07-13"
-note = "primary consumer; subtree; merged to main 2026-07-13"
+module_commit = "db6cb39158ef2ec185587e2fe535e5816a0bd820"
+consumer_commit = "4a8854ba1a65eeb18c0d9e689a5fd4ef535b9264"
+registered_at = "2026-07-14"
+note = ""
