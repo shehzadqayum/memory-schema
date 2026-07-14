@@ -16,7 +16,7 @@ def get_active_chain(project_root=None):
         project_root = str(MemoryConfig().project_root or '.')
     path = os.path.join(project_root, 'memory', '.active_chain')
     if os.path.exists(path):
-        with open(path, 'r') as f:
+        with open(path, 'r', encoding='utf-8') as f:
             name = f.read().strip()
         return name if name else None
     return None
@@ -29,7 +29,7 @@ def set_active_chain(name, project_root=None):
         project_root = str(MemoryConfig().project_root or '.')
     path = os.path.join(project_root, 'memory', '.active_chain')
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, 'w') as f:
+    with open(path, 'w', encoding='utf-8') as f:
         f.write(name + '\n')
     return name
 
@@ -42,7 +42,7 @@ def release_active_chain(project_root=None):
     path = os.path.join(project_root, 'memory', '.active_chain')
     released = None
     if os.path.exists(path):
-        with open(path, 'r') as f:
+        with open(path, 'r', encoding='utf-8') as f:
             released = f.read().strip()
         os.remove(path)
     return released if released else None

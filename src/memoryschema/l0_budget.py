@@ -54,7 +54,7 @@ def enforce_budget(index_path, store_path=None, token_budget=DEFAULT_TOKEN_BUDGE
     if not os.path.exists(index_path):
         return {'evicted': [], 'tokens_before': 0, 'tokens_after': 0}
 
-    with open(index_path, 'r') as f:
+    with open(index_path, 'r', encoding='utf-8') as f:
         content = f.read()
 
     tokens_before = estimate_tokens(content)
@@ -99,7 +99,7 @@ def enforce_budget(index_path, store_path=None, token_budget=DEFAULT_TOKEN_BUDGE
     # Clean up multiple blank lines
     final_content = re.sub(r'\n{3,}', '\n\n', final_content).strip() + '\n'
 
-    with open(index_path, 'w') as f:
+    with open(index_path, 'w', encoding='utf-8') as f:
         f.write(final_content)
 
     tokens_after = estimate_tokens(final_content)
@@ -136,7 +136,7 @@ def categorize_index(index_path, store_path=None):
     if not os.path.exists(index_path):
         return 0
 
-    with open(index_path, 'r') as f:
+    with open(index_path, 'r', encoding='utf-8') as f:
         content = f.read()
 
     entries, other_lines = parse_index_entries(content)
@@ -180,7 +180,7 @@ def categorize_index(index_path, store_path=None):
 
     final = '\n'.join(output).strip() + '\n'
 
-    with open(index_path, 'w') as f:
+    with open(index_path, 'w', encoding='utf-8') as f:
         f.write(final)
 
     return len(entries)

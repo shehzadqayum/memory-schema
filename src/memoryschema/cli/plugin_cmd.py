@@ -79,7 +79,7 @@ def _find_plugin_dir():
 
 def _write_manifest(manifest):
     """Write the deployment manifest."""
-    with open(MANIFEST_PATH, "w") as f:
+    with open(MANIFEST_PATH, "w", encoding="utf-8") as f:
         json.dump(manifest, f, indent=2)
         f.write("\n")
 
@@ -88,7 +88,7 @@ def _read_manifest():
     """Read the deployment manifest."""
     if not MANIFEST_PATH.exists():
         return None
-    with open(MANIFEST_PATH) as f:
+    with open(MANIFEST_PATH, encoding="utf-8") as f:
         return json.load(f)
 
 
@@ -384,7 +384,7 @@ def plugin_status(config):
     if memory_dir.exists():
         store = memory_dir / "store.jsonl"
         if store.exists():
-            lines = sum(1 for _ in open(store) if _.strip())
+            lines = sum(1 for _ in open(store, encoding="utf-8") if _.strip())
             click.echo(f"User store:  {lines} entries")
         else:
             click.echo("User store:  empty (no store.jsonl yet)")

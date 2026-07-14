@@ -178,7 +178,7 @@ def _maybe_preflight(config):
             if not (drift_marker.exists() and (time.time() - drift_marker.stat().st_mtime) < 60):
                 from memoryschema.reconcile import local_drift
                 d = local_drift(config)
-                if d["malformed"] or d["missing_from_jsonl"] or d["jsonl_orphans"]:
+                if d["malformed"] or d["missing_from_jsonl"] or d["jsonl_orphans"] or d.get("status_drift"):
                     click.echo(f"⚠ memory store drift ({d['md_count']} .md vs {d['jsonl_count']} jsonl) — "
                                f"run `memoryschema reconcile`", err=True)
                 try:                                   # throttle the CHECK itself (not just the banner) so the

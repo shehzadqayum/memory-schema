@@ -102,3 +102,25 @@ class TestGateStrictConfig:
         cfg = MemoryConfig(project_root='.', gate_strict=True)
         r = gate_pipeline(self._dup(store), store=store, config=cfg)
         assert r.verdict == GateVerdict.QUARANTINE                 # config flipped stage 2 on
+
+
+class TestForwardReferenceWarning:
+    """v0.1.2 (defect 3): a relation target absent from the store warns — never blocks."""
+
+    def test_missing_target_warns_existing_does_not(self, store):
+        store.upsert({'name': 'known', 'schema': 5, 'description': 'K'})
+        memory = {'name': 'n', 'description': 'd',
+                  'relations': [{'type': 'USES', 'target': 'ghost'},
+                                {'type': 'USES', 'target': 'known'}]}
+        result = gate_pipeline(memory, store=store)
+        assert result.verdict == GateVerdict.ACCEPT                # advisory only
+        joined = ' | '.join(result.warnings)
+        assert "'ghost'" in joined and 'forward reference' in joined
+        assert "'known'" not in joined
+
+    def test_no_store_no_probe(self):
+        memory = {'name': 'n', 'description': 'd',
+                  'relations': [{'type': 'USES', 'target': 'ghost'}]}
+        result = gate_pipeline(memory)                             # store=None -> probe skipped
+        assert result.verdict == GateVerdict.ACCEPT
+        assert not any('forward reference' in w for w in result.warnings)

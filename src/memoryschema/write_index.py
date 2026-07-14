@@ -253,7 +253,7 @@ def index_memory(filepath, config=None, require_active_chain_auth=True):
     try:
         sentinel_dir = os.path.join(project_root, ".memoryschema")
         os.makedirs(sentinel_dir, exist_ok=True)
-        with open(os.path.join(sentinel_dir, "chain-updated"), "w") as f:
+        with open(os.path.join(sentinel_dir, "chain-updated"), "w", encoding="utf-8") as f:
             f.write(name)
     except Exception:
         pass

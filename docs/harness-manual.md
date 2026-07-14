@@ -620,11 +620,13 @@ keyword/BM25) unless `MEMORYSCHEMA_REQUIRE_VOYAGE`.
 
 ### 9.2 sync — read-only drift report
 
-`memoryschema sync` diffs the three layers **by name-set** (counts can match while sets
-differ): `.md` files vs JSONL vs Neo4j (`list_all(include_inactive=True)`). Reports
-malformed files ("reconcile will REFUSE until fixed"), `missing_from_jsonl`,
-`jsonl_orphans`, `neo4j_orphans`; Neo4j unreachable reports as `None` — "down" ≠
-"empty". Always exit 0.
+`memoryschema sync` diffs the three layers **by name-set + lifecycle status** (counts can
+match while sets differ, and names can match while a status drifted): `.md` files vs JSONL
+vs Neo4j (`list_all(include_inactive=True)`). Reports malformed files ("reconcile will
+REFUSE until fixed"), `missing_from_jsonl`, `jsonl_orphans`, `status_drift` (names in both
+.md and JSONL whose status differs — the archive-reached-one-layer class that `dream`
+would otherwise read stale; v0.1.2), `neo4j_orphans`; Neo4j unreachable reports as `None`
+— "down" ≠ "empty". Always exit 0.
 
 ### 9.3 reconcile — heal all layers to the .md set
 
@@ -820,7 +822,7 @@ config resolution → throttled banner-only preflight (§9.1). `--json` on query
 | command | behavior |
 |---------|----------|
 | `preflight [--json] [--no-auto-start] [--require csv]` | §9.1; exit 1 on hard failure |
-| `sync` | §9.2 read-only name-set drift |
+| `sync` | §9.2 read-only name-set + status drift |
 | `reconcile [--dry-run] [--prune/--no-prune] [--no-verify] [--allow-empty]` | §9.3; exit 1 on abort/verify-fail |
 | `doctor [--json] [--fix]` | 22 live checks (python→tests); `--fix` prints fix commands, advisory only; always exit 0 |
 | `validate [PATH] [--strict] [--json]` | rule validator; format-dispatched — v5 via `_validate_v5`, v4 XML via the legacy path (an unparseable `schema: 5` file reports a single V1). schema-specification.md |

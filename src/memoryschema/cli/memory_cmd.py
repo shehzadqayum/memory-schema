@@ -12,6 +12,22 @@ def _get_store(config):
     return get_store(config=config)
 
 
+def _mirror_jsonl_status(config, store, method, name):
+    """Replay a lifecycle flip onto the JSONL mirror when the active backend is Neo4j.
+
+    `_get_store` returns Neo4j when it is up, so a status flip (archive/unarchive/reactivate)
+    otherwise lands in Neo4j + the .md only — the JSONL mirror keeps the OLD status until the
+    next reconcile. sync's name-set diff couldn't see that, and dream reads the JSONL layer
+    (the 2026-07-14 status-drift defect: an archived chain re-offered as a distill candidate)."""
+    try:
+        from memoryschema.neo4j_store import Neo4jMemoryStore
+        if isinstance(store, Neo4jMemoryStore):
+            from memoryschema.store import MemoryStore
+            getattr(MemoryStore(str(config.store_path), config=config), method)(name)
+    except Exception as e:                                    # noqa: BLE001 — mirror is best-effort
+        click.echo(f"  warn: JSONL mirror not updated ({e}) — run reconcile", err=True)
+
+
 def _remove_from_memory_index(config, name):
     """Remove an entry from the MEMORY.md index."""
     index_path = config.memory_index_path
@@ -301,7 +317,7 @@ def write(config, file_path):
         sys.exit(1)
 
     # Validate
-    with open(file_path) as f:
+    with open(file_path, encoding="utf-8") as f:
         content = f.read()
     errors = validate(content, file_path)
     if errors:
@@ -460,6 +476,7 @@ def archive(config, name):
     store = _get_store(config)
     archived = store.archive(name)
     if archived:
+        _mirror_jsonl_status(config, store, "archive", name)
         # File-first: persist status into the .md frontmatter, or the next reconcile
         # (which rebuilds the stores FROM the .md set) silently resurrects the entity
         # — the bug that reverted 7 step-72 archives.
@@ -491,6 +508,7 @@ def unarchive(config, name):
     store = _get_store(config)
     result = store.unarchive(name)
     if result:
+        _mirror_jsonl_status(config, store, "unarchive", name)
         try:
             import os as _os
             from memoryschema.write_index import set_lifecycle
@@ -517,6 +535,15 @@ def reactivate(config, name):
     store = _get_store(config)
     result = store.reactivate(name)
     if result:
+        _mirror_jsonl_status(config, store, "reactivate", name)
+        # File-first parity with archive/unarchive: without this the .md keeps status=superseded
+        # and the next reconcile silently REVERTS the reactivation.
+        try:
+            import os as _os
+            from memoryschema.write_index import set_lifecycle
+            set_lifecycle(_os.path.join(str(config.memory_dir), f"{name}.md"), status="active")
+        except (ValueError, OSError) as e:
+            click.echo(f"  warn: status not persisted to .md ({e}) — will revert on reconcile", err=True)
         click.echo(f"Reactivated: {name}")
     else:
         click.echo(f"Error: Entity '{name}' not found or not superseded.", err=True)

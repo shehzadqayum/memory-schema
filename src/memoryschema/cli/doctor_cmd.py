@@ -162,7 +162,7 @@ def run_checks(config):
         if config.store_path.exists():
             size = config.store_path.stat().st_size
             if size > 0:
-                with open(config.store_path) as f:
+                with open(config.store_path, encoding="utf-8") as f:
                     count = sum(1 for line in f if line.strip())
                 return True, f"store.jsonl ({count:,} entries)", None
             return True, "store.jsonl (empty)", None

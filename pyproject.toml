@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "memory-schema"
-version = "0.1.1"
+version = "0.1.2"
 description = "File-first memory entity system (schema v5: YAML frontmatter + markdown) with JSONL/Neo4j storage, Voyage AI embeddings, and Claude Code integration"
 readme = "README.md"
 license = "MIT"

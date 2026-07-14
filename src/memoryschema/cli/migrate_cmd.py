@@ -116,8 +116,9 @@ def neo4j_to_jsonl(config, output):
 def sync(config):
     """Report drift across the canonical memory/*.md set, the JSONL store, and Neo4j.
 
-    Read-only NAME-SET diff (counts can match while the sets differ, which hides
-    residuals). To FIX drift, run `memoryschema reconcile`.
+    Read-only diff over NAME-SETS + LIFECYCLE STATUSES (.md vs JSONL): counts can match
+    while the sets differ, and names can match while a status drifted (an archive that
+    reached only one layer). To FIX drift, run `memoryschema reconcile`.
 
     Example:
         memoryschema sync
@@ -141,11 +142,12 @@ def sync(config):
             click.echo(f"  {label} ({len(names)}): {', '.join(names[:8])}{more}")
 
     if d['in_sync']:
-        click.echo("Status: in sync (name-sets match)")
+        click.echo("Status: in sync (name-sets + statuses match)")
         return
     click.echo("Status: OUT OF SYNC")
     _line("missing from JSONL", d['missing_from_jsonl'])
     _line("JSONL orphans (no .md)", d['jsonl_orphans'])
+    _line("status drift (.md vs JSONL)", d.get('status_drift'))
     _line("Neo4j orphans (no .md)", d['neo4j_orphans'])
     click.echo("Fix: memoryschema reconcile")
 

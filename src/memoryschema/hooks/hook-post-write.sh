@@ -18,6 +18,13 @@
 
 set -uo pipefail
 
+# Self-sufficiency: force UTF-8 for every python child. Claude Code's hook environment does not
+# set it, and on Windows the default cp1252 codec crashes lazy reads of UTF-8 store/entity files
+# (UnicodeDecodeError on bytes like 0x8f — observed live in a consumer 2026-07-14). Belt for the
+# whole inline pipeline; the individual open() calls below carry encoding='utf-8' as suspenders.
+export PYTHONUTF8=1
+export PYTHONIOENCODING=utf-8
+
 # Resolve Python: argument > env var > auto-detect > bare python3
 if [ -n "${1:-}" ] && [ -x "${1:-}" ]; then
     PYTHON="$1"
@@ -170,14 +177,14 @@ name = memory.get('name', '')
 active_chain_path = os.path.join(project_root, 'memory', '.active_chain')
 active_chain = None
 if os.path.exists(active_chain_path):
-    with open(active_chain_path, 'r') as f:
+    with open(active_chain_path, 'r', encoding='utf-8') as f:
         active_chain = f.read().strip()
 
 # Check if this name already exists in the store
 existing = None
 if os.path.exists(store_path):
     import json as _json
-    with open(store_path, 'r') as f:
+    with open(store_path, 'r', encoding='utf-8') as f:
         for line in f:
             line = line.strip()
             if not line:

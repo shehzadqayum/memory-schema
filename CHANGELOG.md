@@ -2,6 +2,39 @@
 
 ## [Unreleased]
 
+## [0.1.2] — 2026-07-14
+
+### Fixed (2026-07-14 — hook UnicodeDecodeError on Windows: read/write-side cp1252)
+The PostToolUse hook's inline Python scanned `store.jsonl` (and `.active_chain`) with the platform-default
+codec — on Windows (cp1252) any UTF-8 multi-byte content containing bytes like 0x8f crashed EVERY memory-file
+index (loud exit 2; reconcile healed, but no agent-tool edit could index). The 0.1.1 cp1252 guard covered
+stdout/stderr only, not file I/O. Fix is belt + suspenders: the hook script now exports `PYTHONUTF8=1` +
+`PYTHONIOENCODING=utf-8` itself (self-sufficiency — the Claude Code hook env sets neither), and every
+text-mode `open()` across the package gained explicit `encoding="utf-8"` (hook inline reads, doctor/plugin/
+hook-test/write CLI scans, MEMORY.md reads AND writes in l0_budget — cp1252 cannot encode `→`/`✓` so the
+write side was one em-dash away from the same crash — chain_state, hooks settings I/O, the sentinel write).
+Regression: the real hook runs against a 0x8f-seeded store with a UTF-8-stripped env; a static test pins the
+script contract. Strengthens the hook→index_memory unification candidate (the crash lived in the hook's
+hand-rolled duplicate of the store scan).
+
+### Fixed (2026-07-14 — lifecycle-status drift was invisible and dream read the stale layer)
+`archive`/`unarchive` flipped the status on the ACTIVE backend only (Neo4j when up) plus the `.md` — the
+JSONL mirror kept the old status until the next reconcile. `sync`/`diff`/`local_drift` compared NAME-SETS
+only, so they reported "in sync" across the drift, and `dream` (which reads JSONL statuses) offered an
+already-archived chain as a released-chain distill candidate (observed live 2026-07-14). Three-part fix:
+(a) `archive`/`unarchive`/`reactivate` now replay the flip onto the JSONL mirror when Neo4j is the active
+backend; (b) `reactivate` also persists `status` to the `.md` (file-first parity with archive — without it
+the next reconcile silently REVERTED a reactivation); (c) `diff`/`local_drift` gained a `status_drift`
+comparison (.md vs JSONL, names present in both), `in_sync` requires it empty, `sync` prints the drifted
+names, and the throttled preflight drift banner fires on it. `reconcile` already healed this class (status
+flows .md → JSONL); now the drift is loud instead of silent.
+
+### Added (2026-07-14 — forward-reference advisory in the write gate)
+A relation target absent from the store (e.g. a typo'd `--uses`, or a wiki-page name mistaken for a memory)
+silently produced a dangling edge + a Neo4j stub node. The gate now warns — "forward reference (fine if
+intended; `validate` flags it as R6)" — at authoring time, on both the `remember` and hook paths. Warn-only:
+wiki-style forward references remain legal by design.
+
 ### Fixed (2026-07-13 — pip consumers are not NOT-PUSHED)
 `deploy status` expected a `deployments/` branch from every consumer — permanently wrong for pip consumers,
 who never subtree-push. A ledger entry whose `subtree_prefix` starts with "pip" now reports `install=pip`,

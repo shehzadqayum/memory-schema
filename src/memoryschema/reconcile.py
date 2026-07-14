@@ -145,20 +145,36 @@ def local_drift(config):
     (a hook killed mid-index, an interrupted CLI write) into a loud one-line nudge within one CLI call."""
     md_map, malformed = _parse_md(config.memory_dir)
     md = set(md_map)
-    jsonl = {e["name"] for e in MemoryStore(str(config.store_path)).list_all(include_inactive=True)}
+    jsonl_rows = MemoryStore(str(config.store_path)).list_all(include_inactive=True)
+    jsonl = {e["name"] for e in jsonl_rows}
     return {
         "md_count": len(md), "jsonl_count": len(jsonl),
         "missing_from_jsonl": sorted(md - jsonl),
         "jsonl_orphans": sorted(jsonl - md),
+        "status_drift": _status_drift(md_map, jsonl_rows),
         "malformed": [os.path.basename(f) for f in malformed],
     }
 
 
+def _status_drift(md_map, jsonl_rows):
+    """Names present in BOTH layers whose lifecycle status differs (.md is the truth).
+
+    Name-sets alone miss this class entirely: an entity archived in the .md but still active
+    in the JSONL mirror has identical names in both sets, so `sync` said "in sync" while
+    `dream` (which reads JSONL statuses) offered the archived entity as a candidate — the
+    2026-07-14 status-drift defect. Absent status == "active" on both sides."""
+    jstatus = {e["name"]: (e.get("status") or "active") for e in jsonl_rows}
+    return sorted(n for n in (set(md_map) & set(jstatus))
+                  if (md_map[n].get("status") or "active") != jstatus[n])
+
+
 def diff(config):
-    """Read-only drift report across .md / JSONL / Neo4j (the real `sync`)."""
+    """Read-only drift report across .md / JSONL / Neo4j (the real `sync`): name-sets + statuses."""
     md_map, malformed = _parse_md(config.memory_dir)
     md = set(md_map)
-    jsonl = {e["name"] for e in MemoryStore(str(config.store_path)).list_all(include_inactive=True)}
+    jsonl_rows = MemoryStore(str(config.store_path)).list_all(include_inactive=True)
+    jsonl = {e["name"] for e in jsonl_rows}
+    status_drift = _status_drift(md_map, jsonl_rows)
     neo4j_store, neo4j, neo4j_err = _neo4j_names(config)
     reachable = neo4j_store is not None      # explicit flag — never reuse a closed handle for this
     if neo4j_store:
@@ -170,8 +186,10 @@ def diff(config):
         "malformed": [os.path.basename(f) for f in malformed],
         "missing_from_jsonl": sorted(md - jsonl),
         "jsonl_orphans": sorted(jsonl - md),
+        "status_drift": status_drift,
         "neo4j_orphans": (sorted(neo4j - md) if reachable else None),
-        "in_sync": (not malformed) and (md == jsonl) and (not reachable or neo4j == md),
+        "in_sync": (not malformed) and (md == jsonl) and (not status_drift)
+                   and (not reachable or neo4j == md),
     }
 
 

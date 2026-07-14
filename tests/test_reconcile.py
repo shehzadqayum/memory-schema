@@ -206,3 +206,27 @@ def test_reconcile_prunes_neo4j_orphan(tmp_path, monkeypatch):
     assert r["neo4j_pruned"] == 1
     assert "ghost_neo" in fake.deleted
     assert r["neo4j_pushed"] is True
+
+
+def test_status_drift_flagged_and_healed(tmp_path, monkeypatch):
+    """v0.1.2 (defect 2): an archive that reached the .md but not the JSONL mirror must be VISIBLE
+    (status_drift, in_sync False) and reconcile must heal it (status flows .md -> JSONL). Name-set
+    diffs alone called this state 'in sync' while dream read the stale JSONL layer."""
+    mem = tmp_path / "memory"
+    mem.mkdir(parents=True, exist_ok=True)
+    (mem / "s.md").write_text("---\nschema: 5\nstatus: archived\n---\n\nS entity.\n",
+                              encoding="utf-8")
+    (mem / "store.jsonl").write_text(
+        json.dumps({"name": "s", "schema": 5, "description": "S entity."}) + "\n",
+        encoding="utf-8")
+    monkeypatch.setattr(spaces, "embed_all_spaces", lambda entry, **kw: ({"default": [0.3] * 8}, {}))
+    cfg = MemoryConfig(project_root=str(tmp_path),
+                       neo4j_uri="bolt://127.0.0.1:59999", neo4j_password="x")
+    d = local_drift(cfg)
+    assert d["status_drift"] == ["s"]
+    assert d["missing_from_jsonl"] == [] and d["jsonl_orphans"] == []     # names alone can't see it
+    full = diff(cfg)
+    assert full["status_drift"] == ["s"] and full["in_sync"] is False
+    reconcile(cfg)
+    assert local_drift(cfg)["status_drift"] == []
+    assert diff(cfg)["in_sync"] is True                                    # negative control

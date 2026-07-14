@@ -114,6 +114,21 @@ def gate_pipeline(memory, store=None, strict=False, config=None):
         except Exception:
             pass  # nudge failure is never blocking
 
+    # Advisory: a relation target absent from the store is a FORWARD REFERENCE — legal by
+    # design (wiki-style), but it lands as a dangling edge + a Neo4j stub node on push, so a
+    # typo'd target (or a wiki-page name mistaken for a memory) should be caught at authoring
+    # time (2026-07-14 defect 3). Warn-only; never blocks.
+    if store is not None:
+        for _rel in memory.get('relations') or []:
+            _tgt = _rel.get('target') if isinstance(_rel, dict) else None
+            if _tgt and _tgt != name:
+                try:
+                    if store.get(_tgt) is None:
+                        warnings.append("relation target '%s' not in store — forward reference "
+                                        "(fine if intended; `validate` flags it as R6)" % _tgt)
+                except Exception:
+                    pass  # a warning probe must never break the gate
+
     # Stage 2: Consistency probe (strict mode)
     if strict and store is not None and memory.get('embedding'):
         try:

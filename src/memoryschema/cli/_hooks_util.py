@@ -102,7 +102,7 @@ def read_settings(path=None):
     if path is None:
         path = get_settings_path()
     if Path(path).exists():
-        with open(path) as f:
+        with open(path, encoding="utf-8") as f:
             return json.load(f)
     return {}
 
@@ -120,7 +120,7 @@ def write_settings(path, data, backup=True):
         backup_path = path.parent / "settings.json.memory-schema-backup"
         shutil.copy2(path, backup_path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "w") as f:
+    with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2)
         f.write("\n")
 
@@ -483,7 +483,7 @@ def validate_hook_python(hook_script_path, hook_command=None):
     # Extract Python path from script
     python_path = None
     try:
-        with open(hook_script_path) as f:
+        with open(hook_script_path, encoding="utf-8") as f:
             for line in f:
                 match = re.search(r'MEMORYSCHEMA_PYTHON:-([^}]+)', line)
                 if match:

@@ -389,7 +389,7 @@ def test(config, file_path):
     click.echo(f"Parsed: {memory['name']} — {memory.get('description', '')[:80]}")
 
     # Validate
-    with open(file_path) as f:
+    with open(file_path, encoding="utf-8") as f:
         content = f.read()
     errors = validate(content, file_path)
     if errors:
